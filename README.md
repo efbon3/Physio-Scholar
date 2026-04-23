@@ -40,14 +40,18 @@ If it is not explicitly in the V1 Build Specification, it is not in v1.
 | Testing       | Vitest · Playwright · @axe-core/playwright               |
 | Deployment    | Vercel                                                   |
 
-Notes on deviations from `docs/build_spec.md` Appendix A:
+## Implementation notes
 
-- **Next.js 16** (spec says "14+"). Uses Turbopack by default, React 19, new
-  caching semantics. Breaking changes vs Next 14 — check `node_modules/next/dist/docs/`
-  before assuming behavior.
-- **Serwist instead of `next-pwa`**. `next-pwa` is unmaintained and does not
-  support Next 15+; Serwist is the actively maintained successor built on the
-  same Workbox primitives. Same deliverable, supported runtime.
+- **Framework:** Next.js 16+ with React 19. Uses async request APIs —
+  `cookies()`, `headers()`, `params`, and `searchParams` all return Promises
+  and must be awaited. Breaking change from Next 14 — check
+  `node_modules/next/dist/docs/` before assuming older behavior.
+- **Styling:** Tailwind v4 with CSS-first configuration. Tokens and theme
+  live in `src/app/globals.css` via `@theme`; there is no `tailwind.config.ts`.
+- **PWA:** Serwist (not `next-pwa`). `next-pwa` is unmaintained and does not
+  support Next.js 15+. Serwist is the actively-maintained successor built on
+  the same Workbox primitives.
+- **Testing:** Vitest 4.x with native Rollup binaries.
 
 ## Getting started
 
@@ -115,26 +119,27 @@ npx playwright install --with-deps chromium
 └── vitest.setup.ts      @testing-library/jest-dom matchers
 ```
 
-## Environment note: Windows Smart App Control
+## History notes
 
-Native Node modules (`.node` files) for Rollup and Rolldown were blocked by
-Windows Smart App Control during initial setup, which crashed Vitest. The
-first commit applied a `rollup → @rollup/wasm-node` override in
-`package.json` as a workaround. SAC was subsequently disabled on the author's
-machine and the workaround was removed; Vitest now runs on Vitest 4 with the
-native Rollup binary.
+Earlier commits include workarounds for Windows Smart App Control blocking
+native binaries (a `rollup → @rollup/wasm-node` override, Vitest pinned to
+3.x). These were removed after the author disabled SAC on the dev machine.
+See [`c505a63`](https://github.com/efbon3/Physio-Scholar/commit/c505a63) for
+the initial workaround and
+[`ebd61f8`](https://github.com/efbon3/Physio-Scholar/commit/ebd61f8) for the
+removal.
 
-If you are setting this project up on a different Windows machine and see
-`ERR_DLOPEN_FAILED` / "Application Control policy has blocked this file", the
-likely blocker is Smart App Control or Windows Defender. Check state with:
+If you are setting up on a different Windows machine and see
+`ERR_DLOPEN_FAILED` or "Application Control policy has blocked this file",
+check SAC state:
 
 ```powershell
 Get-MpComputerStatus | Select-Object SmartAppControlState
 ```
 
-Disabling SAC is a permanent change (it can only be re-enabled by reinstalling
-Windows). A less invasive fix is a Defender folder exclusion for your projects
-directory, or reinstating the `rollup → @rollup/wasm-node` override.
+Disabling SAC is permanent (it can only be re-enabled by reinstalling
+Windows). A less invasive fix is a Defender folder exclusion, or reinstating
+the `rollup → @rollup/wasm-node` override from commit `c505a63`.
 
 ## Contributing
 

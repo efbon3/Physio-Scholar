@@ -32,16 +32,32 @@ engineering.
 
 ## Stack deviations to remember
 
-- **Next.js 16 + Turbopack**, not 14. React 19. TypeScript strict.
+- **Next.js 16 + Turbopack**, not 14. React 19. TypeScript strict. Request
+  APIs (`cookies()`, `headers()`, `params`, `searchParams`) are async — they
+  return Promises and must be awaited.
 - **Tailwind v4** via `@tailwindcss/postcss` — CSS-first config lives in
   `src/app/globals.css`; there is no `tailwind.config.ts`.
 - **shadcn/ui** with the `base-nova` style on Tailwind v4. Use
   `npx shadcn@latest add <component>` to add primitives.
 - **Serwist** will be used for the service worker (not `next-pwa`) when PWA
   work starts in Phase 2.
-- **Rollup is overridden to `@rollup/wasm-node`** in `package.json` because
-  Windows Smart App Control blocks Rollup's native `.node` binary. Do not
-  remove this override unless you have verified Vitest still runs on Windows.
+
+## Environment
+
+- Development: Windows 11 with Smart App Control disabled.
+- Node: v22 (see `.nvmrc`).
+- Native binaries (Rollup, Rolldown, SWC, lightningcss, etc.) execute without
+  restriction.
+
+## Resolved constraints
+
+- SAC previously blocked native Rollup and Rolldown binaries, forcing a
+  `rollup → @rollup/wasm-node` override and pinning Vitest to 3.x.
+- Resolution: SAC disabled by the author; override removed; Vitest upgraded
+  to 4.x. See commits `c505a63` and `ebd61f8` in git history.
+- No SAC workarounds are currently needed. Do not re-add the Rollup WASM
+  override or pin Vitest back to 3.x unless the environment genuinely
+  changes.
 
 ## Testing conventions
 
