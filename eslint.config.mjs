@@ -15,6 +15,11 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "test-results/**",
     "next-env.d.ts",
+    // Generated service worker bundle produced by @serwist/next at build
+    // time. Lint it at the source (src/app/sw.ts) instead.
+    "public/sw.js",
+    "public/swe-worker-*.js",
+    "public/workbox-*.js",
   ]),
 ]);
 
