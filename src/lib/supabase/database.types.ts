@@ -34,6 +34,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      card_states: {
+        Row: {
+          card_id: string
+          consecutive_again_count: number
+          created_at: string
+          due_at: string
+          ease: number
+          interval_days: number
+          last_reviewed_at: string | null
+          profile_id: string
+          status: Database["public"]["Enums"]["srs_card_status"]
+          updated_at: string
+        }
+        Insert: {
+          card_id: string
+          consecutive_again_count?: number
+          created_at?: string
+          due_at: string
+          ease?: number
+          interval_days?: number
+          last_reviewed_at?: string | null
+          profile_id: string
+          status?: Database["public"]["Enums"]["srs_card_status"]
+          updated_at?: string
+        }
+        Update: {
+          card_id?: string
+          consecutive_again_count?: number
+          created_at?: string
+          due_at?: string
+          ease?: number
+          interval_days?: number
+          last_reviewed_at?: string | null
+          profile_id?: string
+          status?: Database["public"]["Enums"]["srs_card_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_states_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       institutions: {
         Row: {
           country: string
@@ -116,6 +163,54 @@ export type Database = {
             columns: ["institution_id"]
             isOneToOne: false
             referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          card_id: string
+          created_at: string
+          hints_used: number
+          id: string
+          profile_id: string
+          rating: Database["public"]["Enums"]["srs_rating"]
+          session_id: string | null
+          time_spent_seconds: number
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          hints_used?: number
+          id?: string
+          profile_id: string
+          rating: Database["public"]["Enums"]["srs_rating"]
+          session_id?: string | null
+          time_spent_seconds?: number
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          hints_used?: number
+          id?: string
+          profile_id?: string
+          rating?: Database["public"]["Enums"]["srs_rating"]
+          session_id?: string | null
+          time_spent_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "study_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -222,6 +317,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      srs_card_status: "learning" | "review" | "leech" | "suspended"
+      srs_rating: "again" | "hard" | "good" | "easy"
       study_session_status: "active" | "completed" | "abandoned"
       subscription_status: "active" | "past_due" | "cancelled" | "expired"
       subscription_tier: "free" | "pilot" | "student" | "institution"
@@ -355,6 +452,8 @@ export const Constants = {
   },
   public: {
     Enums: {
+      srs_card_status: ["learning", "review", "leech", "suspended"],
+      srs_rating: ["again", "hard", "good", "easy"],
       study_session_status: ["active", "completed", "abandoned"],
       subscription_status: ["active", "past_due", "cancelled", "expired"],
       subscription_tier: ["free", "pilot", "student", "institution"],
