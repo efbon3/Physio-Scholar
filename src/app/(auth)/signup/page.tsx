@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ export default async function SignupPage({ searchParams }: PageProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-2xl">Create your account</CardTitle>
+        <h1 className="font-heading text-2xl font-medium">Create your account</h1>
         <CardDescription>Physio-Scholar v1 pilot · MBBS cardiovascular.</CardDescription>
       </CardHeader>
       <CardContent>

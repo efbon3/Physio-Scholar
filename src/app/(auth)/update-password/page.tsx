@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -27,7 +27,7 @@ export default async function UpdatePasswordPage({ searchParams }: PageProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Password updated</CardTitle>
+          <h1 className="font-heading text-2xl font-medium">Password updated</h1>
           <CardDescription>You can now sign in with your new password.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -42,7 +42,7 @@ export default async function UpdatePasswordPage({ searchParams }: PageProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-2xl">Set a new password</CardTitle>
+        <h1 className="font-heading text-2xl font-medium">Set a new password</h1>
         <CardDescription>Minimum 12 characters.</CardDescription>
       </CardHeader>
       <CardContent>

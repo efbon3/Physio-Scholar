@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -16,7 +16,7 @@ export default async function ResetPasswordPage({ searchParams }: PageProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Check your email</CardTitle>
+          <h1 className="font-heading text-2xl font-medium">Check your email</h1>
           <CardDescription>
             If an account exists for that email, we just sent a reset link. The link is good for 30
             minutes.
@@ -38,7 +38,7 @@ export default async function ResetPasswordPage({ searchParams }: PageProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-2xl">Reset your password</CardTitle>
+        <h1 className="font-heading text-2xl font-medium">Reset your password</h1>
         <CardDescription>We&apos;ll email you a link to set a new one.</CardDescription>
       </CardHeader>
       <CardContent>

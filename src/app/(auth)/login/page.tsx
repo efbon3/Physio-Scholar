@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-2xl">Sign in</CardTitle>
+        <h1 className="font-heading text-2xl font-medium">Sign in</h1>
         <CardDescription>Welcome back to Physio-Scholar.</CardDescription>
       </CardHeader>
       <CardContent>
