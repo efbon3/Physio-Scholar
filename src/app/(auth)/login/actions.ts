@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { isSafeRelativePath } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
 
 type LoginResult = { error: string } | undefined;
@@ -19,7 +20,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "Invalid email or password." };
 
-  redirect(next.startsWith("/") ? next : "/");
+  redirect(isSafeRelativePath(next) ? next : "/");
 }
 
 export async function signOutAction() {

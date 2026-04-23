@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isSafeRelativePath } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -30,7 +31,8 @@ export async function GET(request: Request) {
   }
 
   // Only allow relative redirects so a malicious `next` param can't send
-  // the user to an external site after login.
-  const target = next.startsWith("/") ? next : "/";
+  // the user to an external site after login. See src/lib/auth/redirects.ts
+  // for the guarded criteria and its unit tests.
+  const target = isSafeRelativePath(next) ? next : "/";
   return NextResponse.redirect(new URL(target, url.origin));
 }
