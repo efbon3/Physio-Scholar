@@ -116,6 +116,69 @@ describe("parseMechanism", () => {
     expect(() => parseMechanism(broken)).toThrow(/sum to 100/);
   });
 
+  it("accepts en-dash and hyphen variants in layer headings", () => {
+    // Em-dash (—) is SOP canonical; en-dash (–) appears on iOS/macOS keyboards
+    // via autocorrect; ASCII hyphen (-) is what some authors will literally
+    // type. All three must parse cleanly.
+    const enDash = FIXTURE.replace("Layer 1 —", "Layer 1 –");
+    const { layers } = parseMechanism(enDash);
+    expect(layers.core).toMatch(/stronger contraction/);
+
+    const asciiHyphen = FIXTURE.replace("Layer 2 —", "Layer 2 -");
+    const { layers: l2 } = parseMechanism(asciiHyphen);
+    expect(l2.working).toMatch(/length-tension/);
+  });
+
+  it("tracks fence state across multiple code blocks without losing sections", () => {
+    const body = `---
+id: multi-fence
+title: Multi Fence
+organ_system: cardiovascular
+nmc_competencies: [PY-CV-1.1]
+exam_patterns: [neet-pg]
+prerequisites: []
+related_mechanisms: []
+blooms_distribution: { remember: 25, understand: 25, apply: 25, analyze: 25 }
+author: a
+reviewer: pending
+status: draft
+version: "0.1"
+published_date: 2026-01-01
+last_reviewed: 2026-01-01
+---
+
+# Layer 1 — Core
+
+First code block:
+
+\`\`\`
+# looks like a heading but isn't
+\`\`\`
+
+Regular paragraph.
+
+\`\`\`python
+# also not a heading
+def f(): pass
+\`\`\`
+
+End of Layer 1.
+
+# Layer 2 — Working
+
+Layer 2 body.
+`;
+    const { layers } = parseMechanism(body);
+    expect(layers.core).toMatch(/First code block/);
+    expect(layers.core).toMatch(/Regular paragraph/);
+    expect(layers.core).toMatch(/End of Layer 1/);
+    expect(layers.working).toMatch(/Layer 2 body/);
+    // The Layer 2 body must not accidentally contain Layer 1 content —
+    // that would mean we lost track of the fence and split inside it.
+    expect(layers.working).not.toMatch(/First code block/);
+    expect(layers.working).not.toMatch(/End of Layer 1/);
+  });
+
   it("leaves absent layers undefined instead of throwing", () => {
     const truncated = FIXTURE.split("# Layer 3")[0];
     const withFrontmatter = FIXTURE.slice(0, FIXTURE.indexOf("---\n\n")) + truncated;

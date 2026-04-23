@@ -53,11 +53,21 @@ export function parseMechanism(raw: string): Mechanism {
  * the exact strings SOP Appendix A uses — the SOP is the contract with
  * content authors.
  */
+// Separator between "Layer N" and the section name. SOP Appendix A shows
+// em-dash; author keyboards on macOS / iOS often produce en-dash (–)
+// autocorrect; some authors will type an ASCII hyphen. Accept all three.
+const LAYER_SEPARATOR = "[—–-]";
 const LAYER_HEADINGS = {
-  core: /^#\s+Layer\s+1\s+[—-]\s+Core\s*$/i,
-  working: /^#\s+Layer\s+2\s+[—-]\s+Working(?:\s+Explanation)?\s*$/i,
-  deepDive: /^#\s+Layer\s+3\s+[—-]\s+Deep\s+Dive\s*$/i,
-  clinicalIntegration: /^#\s+Layer\s+4\s+[—-]\s+Clinical\s+Integration\s*$/i,
+  core: new RegExp(`^#\\s+Layer\\s+1\\s+${LAYER_SEPARATOR}\\s+Core\\s*$`, "i"),
+  working: new RegExp(
+    `^#\\s+Layer\\s+2\\s+${LAYER_SEPARATOR}\\s+Working(?:\\s+Explanation)?\\s*$`,
+    "i",
+  ),
+  deepDive: new RegExp(`^#\\s+Layer\\s+3\\s+${LAYER_SEPARATOR}\\s+Deep\\s+Dive\\s*$`, "i"),
+  clinicalIntegration: new RegExp(
+    `^#\\s+Layer\\s+4\\s+${LAYER_SEPARATOR}\\s+Clinical\\s+Integration\\s*$`,
+    "i",
+  ),
   questions: /^#\s+Questions\s*$/i,
   sources: /^#\s+Sources\s*$/i,
 } as const;
