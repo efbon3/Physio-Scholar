@@ -50,9 +50,10 @@ jobs:
       - run: npm ci
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - name: Run Playwright tests
-        run: npx playwright test
+      - name: Run Playwright tests against production build
+        # The CI Playwright config builds the app and starts `next start`
+        # via webServer; Playwright polls the URL until ready.
+        run: npm run test:e2e:ci
         env:
           CI: "true"
       - uses: actions/upload-artifact@v4
