@@ -17,7 +17,7 @@ export default async function SignupPage({ searchParams }: PageProps) {
     <Card>
       <CardHeader>
         <h1 className="font-heading text-2xl font-medium">Create your account</h1>
-        <CardDescription>Physio-Scholar v1 pilot · MBBS cardiovascular.</CardDescription>
+        <CardDescription>Physio-Scholar</CardDescription>
       </CardHeader>
       <CardContent>
         <form
