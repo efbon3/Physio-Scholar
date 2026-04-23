@@ -62,3 +62,26 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  db-test:
+    name: DB migrations + RLS (pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start local Supabase
+        # Pulls ~1 GB of Docker images on first run; ubuntu-latest has Docker
+        # preinstalled. Subsequent runs reuse the image cache for this runner.
+        run: npx supabase start
+      - name: Apply migrations and run pgTAP tests
+        # `supabase test db` resets the DB, replays all migrations, then runs
+        # .sql files in supabase/tests/ via pg_prove.
+        run: npm run db:test
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup
