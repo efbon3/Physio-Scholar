@@ -59,6 +59,21 @@ engineering.
   override or pin Vitest back to 3.x unless the environment genuinely
   changes.
 
+## Deferred constraints
+
+- **Branch protection on `main`**: GitHub Free does not support branch
+  protection or rulesets on private repos (requires Pro or public
+  visibility). Build spec §4.2 lists "main branch protection" as a Phase 1
+  deliverable; we have deferred the server-enforced version. Substitute in
+  place: a pre-push husky hook that runs lint, format:check, type-check,
+  and test:run locally on every push (any branch). CI still runs on every
+  push to `main` and any open PR, giving a second loud signal if something
+  slips past the local gate.
+- Revisit when: (a) a second contributor gets write access, or (b) the repo
+  goes public around launch. At that point, either upgrade to Pro or flip
+  visibility and turn on branch protection with required status checks for
+  the three CI jobs.
+
 ## Testing conventions
 
 - Unit tests live next to source: `src/**/*.test.ts(x)`.

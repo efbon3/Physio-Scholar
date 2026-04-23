@@ -21,7 +21,10 @@ export default defineConfig({
     { name: "mobile-chrome", use: { ...devices["Pixel 5"] } },
   ],
   webServer: {
-    command: "npm run dev",
+    // Dev server locally for fast iteration; production server in CI so
+    // tests see what users see (no HMR websocket, no dev-only warnings).
+    // CI workflow runs `npm run build` before Playwright, so `start` is ready.
+    command: process.env.CI ? "npm run start" : "npm run dev",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
