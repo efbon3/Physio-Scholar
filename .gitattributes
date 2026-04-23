@@ -1,0 +1,23 @@
+# Normalize line endings across platforms — LF in the repo, native in the working tree.
+* text=auto eol=lf
+
+# Keep shell scripts and lockfiles as LF everywhere.
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+package-lock.json text eol=lf
+
+# Binary — never diff, never convert.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.node binary
+
+# SVG is text; diffs should render.
+*.svg text
