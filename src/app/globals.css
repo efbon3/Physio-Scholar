@@ -60,7 +60,10 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* Darkened from shadcn/ui default oklch(0.556 0 0) — that value yields
+     4.34:1 contrast on white and fails WCAG 2.2 AA. 0.48 gives ~6.2:1 on
+     white and still reads as muted next to the 0.205 foreground. */
+  --muted-foreground: oklch(0.48 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
