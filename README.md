@@ -115,16 +115,26 @@ npx playwright install --with-deps chromium
 └── vitest.setup.ts      @testing-library/jest-dom matchers
 ```
 
-## Environment-specific note: Windows Smart App Control
+## Environment note: Windows Smart App Control
 
-On Windows 11 with Smart App Control enabled, unsigned native Node modules
-(`.node` files) are blocked from loading. Rollup's native binary is one such
-casualty, which crashes Vitest and anything that imports Rollup at runtime.
+Native Node modules (`.node` files) for Rollup and Rolldown were blocked by
+Windows Smart App Control during initial setup, which crashed Vitest. The
+first commit applied a `rollup → @rollup/wasm-node` override in
+`package.json` as a workaround. SAC was subsequently disabled on the author's
+machine and the workaround was removed; Vitest now runs on Vitest 4 with the
+native Rollup binary.
 
-The fix in this repo: [`package.json`](package.json) overrides `rollup` with
-`@rollup/wasm-node`, swapping the native bundler for the WASM build. No user
-action is required on other platforms; macOS, Linux, and WSL use the native
-binary transparently. CI uses Ubuntu where this does not apply.
+If you are setting this project up on a different Windows machine and see
+`ERR_DLOPEN_FAILED` / "Application Control policy has blocked this file", the
+likely blocker is Smart App Control or Windows Defender. Check state with:
+
+```powershell
+Get-MpComputerStatus | Select-Object SmartAppControlState
+```
+
+Disabling SAC is a permanent change (it can only be re-enabled by reinstalling
+Windows). A less invasive fix is a Defender folder exclusion for your projects
+directory, or reinstating the `rollup → @rollup/wasm-node` override.
 
 ## Contributing
 
