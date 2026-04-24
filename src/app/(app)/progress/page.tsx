@@ -1,42 +1,49 @@
 import { redirect } from "next/navigation";
 
+import { extractCards, type Card } from "@/lib/content/cards";
+import { readAllMechanisms } from "@/lib/content/fs";
 import { createClient } from "@/lib/supabase/server";
+
+import { ProgressDashboard } from "./progress-dashboard";
 
 export const metadata = {
   title: "Progress",
 };
 
 /**
- * Progress tab — placeholder. The real dashboard (retention curves,
- * mastery %, streak history, weekly metacognitive calibration report,
- * study-time aggregates — build spec §2.3) needs review history and
- * a time-series computation layer that isn't built yet. Shipping
- * the route + nav entry now so the nav shell is complete; the
- * content lands in a later Phase 5 sub-phase.
+ * Progress tab — Phase 5 learner-facing analytics. The route shell +
+ * placeholder copy shipped in D1; D3 wires in the real Dexie-backed
+ * metrics (streak, retention%, per-mechanism mastery, activity
+ * sparkline).
+ *
+ * Per build spec §2.3, the full Progress surface eventually includes
+ * metacognitive calibration too — that depends on the Phase 4 grader
+ * scoring self-explanations, so it lands in a later sub-phase.
  */
 export default async function ProgressPage() {
+  let userId: string | null = null;
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    const supabase = await createClient();
     try {
+      const supabase = await createClient();
       const { data } = await supabase.auth.getUser();
       if (!data.user) redirect("/login?next=/progress");
+      userId = data.user.id;
     } catch {
-      // env present but unreachable — fall through to render placeholder.
+      // env present but unreachable — fall through to render with preview id.
     }
   }
 
+  const mechanisms = await readAllMechanisms();
+  const cards: Card[] = mechanisms.flatMap(extractCards);
+  const mechanismTitles = Object.fromEntries(
+    mechanisms.map((m) => [m.frontmatter.id, m.frontmatter.title]),
+  );
+
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
-      <header className="flex flex-col gap-1">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Progress</p>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">Your progress</h1>
-      </header>
-      <p className="text-sm leading-7">
-        This dashboard will show retention curves, mastery percentages per mechanism, streak
-        history, weekly metacognitive calibration reports, and study-time aggregates. We&apos;re
-        building it in the next sub-phase of Phase 5 — right now review data is collecting locally
-        (Dexie) while we wire the analytics.
-      </p>
-    </main>
+    <ProgressDashboard
+      cards={cards}
+      mechanismTitles={mechanismTitles}
+      profileId={userId ?? "preview"}
+    />
   );
 }

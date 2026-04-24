@@ -29,11 +29,17 @@ test.describe("Today dashboard + app nav", () => {
     expect(errors).toEqual([]);
   });
 
-  test("progress page renders placeholder content and passes axe", async ({ page }) => {
+  test("progress page renders dashboard widgets and passes axe", async ({ page }) => {
     const errors = collectPageErrors(page);
     await page.goto("/progress");
 
     await expect(page.getByRole("heading", { name: /your progress/i })).toBeVisible();
+    // Section landmarks are present — this is the Dexie-backed dashboard,
+    // not the D1 placeholder. Sparkline + headline stats + mechanism list.
+    await expect(page.getByLabel(/headline stats/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByLabel(/retention and card pool/i)).toBeVisible();
+    await expect(page.getByLabel(/daily activity/i)).toBeVisible();
+    await expect(page.getByLabel(/per-mechanism mastery/i)).toBeVisible();
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
