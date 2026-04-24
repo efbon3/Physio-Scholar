@@ -123,6 +123,7 @@ export type Database = {
           guardian_email: string | null
           id: string
           institution_id: string | null
+          is_admin: boolean
           is_minor: boolean | null
           updated_at: string
           year_of_study: number | null
@@ -138,6 +139,7 @@ export type Database = {
           guardian_email?: string | null
           id: string
           institution_id?: string | null
+          is_admin?: boolean
           is_minor?: boolean | null
           updated_at?: string
           year_of_study?: number | null
@@ -153,6 +155,7 @@ export type Database = {
           guardian_email?: string | null
           id?: string
           institution_id?: string | null
+          is_admin?: boolean
           is_minor?: boolean | null
           updated_at?: string
           year_of_study?: number | null
@@ -163,6 +166,57 @@ export type Database = {
             columns: ["institution_id"]
             isOneToOne: false
             referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_flags: {
+        Row: {
+          card_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          profile_id: string
+          reason: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: Database["public"]["Enums"]["content_flag_status"]
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          profile_id: string
+          reason: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["content_flag_status"]
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          profile_id?: string
+          reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["content_flag_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_flags_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_flags_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -320,6 +374,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      content_flag_status: "open" | "resolved" | "rejected"
       srs_card_status: "learning" | "review" | "leech" | "suspended"
       srs_rating: "again" | "hard" | "good" | "easy"
       study_session_status: "active" | "completed" | "abandoned"
@@ -455,6 +510,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      content_flag_status: ["open", "resolved", "rejected"],
       srs_card_status: ["learning", "review", "leech", "suspended"],
       srs_rating: ["again", "hard", "good", "easy"],
       study_session_status: ["active", "completed", "abandoned"],

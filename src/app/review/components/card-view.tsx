@@ -3,6 +3,7 @@
 import type { QueuedCard } from "@/lib/srs/queue";
 import type { Rating } from "@/lib/srs/types";
 
+import { FlagCard } from "./flag-card";
 import { HintLadder } from "./hint-ladder";
 import { RatingRow } from "./rating-row";
 
@@ -173,6 +174,8 @@ export function CardView({
           onRate={onRate}
         />
       ) : null}
+
+      {active.revealed ? <FlagCard cardId={card.id} /> : null}
     </main>
   );
 }
