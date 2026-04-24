@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import { loadAllCardStates, recordReviewLocally } from "@/lib/srs/local";
 import { assembleQueue, type QueuedCard } from "@/lib/srs/queue";
 import type { CardState, Rating } from "@/lib/srs/types";
+import { cn } from "@/lib/utils";
 
 import { CardView } from "./components/card-view";
 
@@ -172,14 +175,35 @@ export function SessionPlayer({ cards, profileId }: Props) {
   );
 }
 
+/**
+ * Navigation options on the end-of-session states. Without these the
+ * learner is marooned on "Session complete" with no way out except the
+ * browser URL bar — which isn't a real product UX. Phase 5's global nav
+ * will replace this; for now the two link buttons cover the obvious
+ * next actions.
+ */
+function SessionExitLinks() {
+  return (
+    <div className="mt-2 flex flex-wrap justify-center gap-2">
+      <Link href="/" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+        Back to home
+      </Link>
+      <Link href="/systems" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+        Browse mechanisms
+      </Link>
+    </div>
+  );
+}
+
 function EmptyState() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="font-heading text-2xl font-medium">Nothing due right now</h1>
       <p className="text-muted-foreground text-sm">
         You&apos;re caught up on reviews, and today&apos;s new-card budget is spent. Come back
-        tomorrow, or browse mechanisms to study from the Systems tab.
+        tomorrow, or browse mechanisms from the Systems tab.
       </p>
+      <SessionExitLinks />
     </main>
   );
 }
@@ -194,6 +218,7 @@ function CompleteState({ ratedCount }: { ratedCount: number }) {
       <p className="text-muted-foreground text-sm">
         See you tomorrow — or sooner, if more cards come due.
       </p>
+      <SessionExitLinks />
     </main>
   );
 }
