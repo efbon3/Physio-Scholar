@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { GoogleSignInButton } from "../google-sign-in-button";
 import { signUpAction } from "./actions";
 
 type PageProps = { searchParams: Promise<{ error?: string }> };
@@ -20,6 +21,18 @@ export default async function SignupPage({ searchParams }: PageProps) {
         <CardDescription>Physio-Scholar</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex flex-col gap-3">
+          <GoogleSignInButton />
+          <p className="text-muted-foreground text-xs">
+            Signing in with Google counts as accepting our Terms of Service and Privacy Policy — the
+            same as ticking both boxes below.
+          </p>
+          <div className="text-muted-foreground flex items-center gap-3 text-xs">
+            <span className="bg-border h-px flex-1" aria-hidden />
+            <span>or sign up with email</span>
+            <span className="bg-border h-px flex-1" aria-hidden />
+          </div>
+        </div>
         <form
           action={async (formData) => {
             "use server";

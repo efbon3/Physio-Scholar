@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { GoogleSignInButton } from "../google-sign-in-button";
 import { loginAction } from "./actions";
 
 type PageProps = { searchParams: Promise<{ error?: string; next?: string }> };
@@ -19,6 +20,14 @@ export default async function LoginPage({ searchParams }: PageProps) {
         <CardDescription>Welcome back to Physio-Scholar.</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex flex-col gap-3">
+          <GoogleSignInButton next={next} />
+          <div className="text-muted-foreground flex items-center gap-3 text-xs">
+            <span className="bg-border h-px flex-1" aria-hidden />
+            <span>or</span>
+            <span className="bg-border h-px flex-1" aria-hidden />
+          </div>
+        </div>
         <form
           action={async (formData) => {
             "use server";
