@@ -38,14 +38,11 @@ export default async function Home() {
       {user ? (
         <>
           <div className="flex flex-wrap gap-3">
-            <Link href="/review" className={cn(buttonVariants({ size: "lg" }))}>
-              Start review
+            <Link href="/today" className={cn(buttonVariants({ size: "lg" }))}>
+              Go to dashboard
             </Link>
-            <Link
-              href="/systems"
-              className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
-            >
-              Browse mechanisms
+            <Link href="/review" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+              Start review
             </Link>
           </div>
           <form action={signOutAction} className="self-start">
