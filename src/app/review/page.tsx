@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 
+import { Watermark } from "@/components/watermark";
 import { extractCards, type Card } from "@/lib/content/cards";
 import { normaliseMechanismId } from "@/lib/content/filters";
 import { readAllMechanisms } from "@/lib/content/fs";
+import { enforceRateLimit } from "@/lib/rate-limit/enforce";
 import { createClient } from "@/lib/supabase/server";
 
 import { SessionPlayer } from "./session-player";
@@ -83,11 +85,37 @@ export default async function ReviewPage({
     }
   }
 
+  // Enforce the 80-questions-per-day ceiling (build spec §2.11) before
+  // we render the player. A blocked learner still sees an informative
+  // screen — not a 429. The limit counts per /review page load, which
+  // over-counts slightly (nav away + back without rating costs one);
+  // that's conservative in the pilot's favour and will be refined when
+  // analytics land.
+  if (userId) {
+    const supabase = await createClient();
+    const rateLimit = await enforceRateLimit(supabase, userId, "reviews");
+    if (!rateLimit.allowed) {
+      return (
+        <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+          <h1 className="font-heading text-2xl font-medium">Daily review limit reached</h1>
+          <p className="text-muted-foreground text-sm">
+            You&apos;ve worked through {rateLimit.totalToday} reviews today — the daily ceiling
+            (build spec §2.11). Come back tomorrow; your streak doesn&apos;t break.
+          </p>
+          <Watermark userId={userId} />
+        </main>
+      );
+    }
+  }
+
   return (
-    <SessionPlayer
-      cards={cards}
-      profileId={userId ?? "preview"}
-      focusMechanism={focusTitle ? { id: mechanismFilter!, title: focusTitle } : null}
-    />
+    <>
+      <SessionPlayer
+        cards={cards}
+        profileId={userId ?? "preview"}
+        focusMechanism={focusTitle ? { id: mechanismFilter!, title: focusTitle } : null}
+      />
+      <Watermark userId={userId} />
+    </>
   );
 }

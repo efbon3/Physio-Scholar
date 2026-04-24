@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AppNav } from "@/components/nav/app-nav";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { Watermark } from "@/components/watermark";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -37,6 +38,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <AppNav profileId={profileId} />
       <div className="flex-1">{children}</div>
       <InstallPrompt />
+      <Watermark userId={profileId === "preview" ? null : profileId} />
     </div>
   );
 }

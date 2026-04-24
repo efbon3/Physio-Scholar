@@ -221,6 +221,38 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          count: number
+          key: string
+          profile_id: string
+          updated_at: string
+          window_date: string
+        }
+        Insert: {
+          count?: number
+          key: string
+          profile_id: string
+          updated_at?: string
+          window_date?: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          profile_id?: string
+          updated_at?: string
+          window_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_limits_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           card_id: string
@@ -371,7 +403,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      enforce_rate_limit: {
+        Args: {
+          p_profile_id: string
+          p_key: string
+          p_max_per_day: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          total_today: number
+        }[]
+      }
     }
     Enums: {
       content_flag_status: "open" | "resolved" | "rejected"

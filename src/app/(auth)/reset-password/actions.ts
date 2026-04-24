@@ -13,6 +13,13 @@ type Result = { error: string } | { ok: true };
  *
  * Always returns `{ ok: true }` for non-errors — we intentionally don't
  * confirm whether an email is registered (account-enumeration defense).
+ *
+ * Rate limit: Supabase Auth's built-in per-email + per-IP limits on
+ * `resetPasswordForEmail` (configurable in the Supabase dashboard)
+ * cover build spec §2.11's "5 password resets per account per day".
+ * We rely on the platform ceiling here because the caller isn't
+ * authenticated yet — our `enforce_rate_limit` RPC needs `auth.uid()`,
+ * so it can't apply to pre-login flows.
  */
 export async function requestResetAction(formData: FormData): Promise<Result> {
   const email = String(formData.get("email") ?? "")
