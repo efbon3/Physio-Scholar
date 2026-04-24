@@ -57,4 +57,27 @@ test.describe("Simulators + exam surfaces", () => {
       .analyze();
     expect(results.violations).toEqual([]);
   });
+
+  test("pre-PG drill produces an MCQ against shipped content (regression for bug G)", async ({
+    page,
+  }) => {
+    // Before the alias fix, the shipped content was tagged `neet-pg`
+    // and the filter accepted only literal `pre-pg`. This page would
+    // render "No questions available" — with the alias map + canonical
+    // tokens in frontmatter, a drill should render.
+    await page.goto("/exam/session?type=pre-pg&count=20");
+    await expect(page.getByRole("heading", { name: /no questions available/i })).toHaveCount(0);
+    // Positive: the drill has a Next/Skip/Submit button.
+    await expect(
+      page.getByRole("button", { name: /submit drill|^next$|^skip$/i }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("MBBS drill also produces an MCQ against shipped content", async ({ page }) => {
+    await page.goto("/exam/session?type=mbbs&count=20");
+    await expect(page.getByRole("heading", { name: /no questions available/i })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /submit drill|^next$|^skip$/i }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+  });
 });
