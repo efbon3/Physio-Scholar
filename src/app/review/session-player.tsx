@@ -8,6 +8,7 @@ import type { Card } from "@/lib/content/cards";
 import { loadAllCardStates, recordReviewLocally } from "@/lib/srs/local";
 import { assembleQueue, type QueuedCard } from "@/lib/srs/queue";
 import type { CardState, Rating } from "@/lib/srs/types";
+import { useAutoSync } from "@/lib/srs/useAutoSync";
 import { cn } from "@/lib/utils";
 
 import { CardView } from "./components/card-view";
@@ -72,6 +73,9 @@ export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props
   const [index, setIndex] = useState(0);
   const [cardState, setCardState] = useState<ActiveCardState>(freshCardState);
   const [ratedCount, setRatedCount] = useState(0);
+  // Post-rating background sync. Cooldown in the hook prevents
+  // hammering the API when the learner blitzes cards.
+  const autoSync = useAutoSync({ profileId });
 
   // Must run unconditionally — hooks rule. Consumed only when reviewing.
   const progress = useMemo(() => ({ index, total: queue.length }), [index, queue.length]);
@@ -137,6 +141,9 @@ export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props
       setIndex(nextIndex);
       setCardState(freshCardState());
     }
+    // Fire-and-forget — the cooldown inside useAutoSync dedupes so a
+    // fast learner doesn't trigger a request per card.
+    void autoSync.runSync();
   }
 
   if (status === "loading") {
