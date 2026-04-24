@@ -57,16 +57,26 @@ function isUuid(value: string): boolean {
 }
 
 const SYNC_CURSOR_PREFIX = "physio-scholar:sync-cursor:";
+/**
+ * Per-table cursor keys. States are keyed on `updated_at`, reviews on
+ * `created_at` — the two advance independently so we don't let a busy
+ * card-state stream hide a slower review stream (or vice versa).
+ */
+type CursorTable = "states" | "reviews";
 
-/** localStorage cursor — per-profile, safe-to-read on the server. */
-function readCursor(profileId: string): string | null {
-  if (typeof localStorage === "undefined") return null;
-  return localStorage.getItem(`${SYNC_CURSOR_PREFIX}${profileId}`);
+function cursorKey(profileId: string, table: CursorTable): string {
+  return `${SYNC_CURSOR_PREFIX}${table}:${profileId}`;
 }
 
-function writeCursor(profileId: string, iso: string): void {
+/** localStorage cursor — per-profile, per-table. */
+function readCursor(profileId: string, table: CursorTable): string | null {
+  if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem(cursorKey(profileId, table));
+}
+
+function writeCursor(profileId: string, table: CursorTable, iso: string): void {
   if (typeof localStorage === "undefined") return;
-  localStorage.setItem(`${SYNC_CURSOR_PREFIX}${profileId}`, iso);
+  localStorage.setItem(cursorKey(profileId, table), iso);
 }
 
 // ---------------- Push ----------------
@@ -86,35 +96,60 @@ export async function pushPendingReviews(
   const mine = pending.filter((r) => r.profile_id === profileId);
   if (mine.length === 0) return 0;
 
+  // Split into UUID-id rows (canonical path) and local-* fallback rows.
+  // They go through different code paths because the id-mapping logic is
+  // different:
+  //   - UUID rows have a stable id already; the server returns whichever
+  //     subset actually inserted, but we know every row's id up-front, so
+  //     we clear pending_sync for the whole batch regardless of what the
+  //     server returns.
+  //   - local-* rows have no id sent; the server assigns a UUID we must
+  //     capture by ordinal. We use INSERT (not UPSERT), so the returned
+  //     rowset order matches the input order — no ordinal-skew risk.
+  //
+  // An earlier version combined both in a single upsert and mapped by
+  // ordinal. A duplicate in the UUID portion shrank the returned array
+  // and silently misaligned every local-* row after it, corrupting the
+  // local store.
+  const uuidRows = mine.filter((r) => isUuid(r.id));
+  const localRows = mine.filter((r) => !isUuid(r.id));
+
   let pushed = 0;
-  for (let i = 0; i < mine.length; i += chunkSize) {
-    const batch = mine.slice(i, i + chunkSize);
+
+  for (let i = 0; i < uuidRows.length; i += chunkSize) {
+    const batch = uuidRows.slice(i, i + chunkSize);
     const payload: ReviewsInsert[] = batch.map((row) => toReviewInsert(row));
-
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("reviews")
-      .upsert(payload, { onConflict: "id", ignoreDuplicates: true })
-      .select("id, created_at");
-    if (error) {
-      throw new Error(`Failed to push reviews: ${error.message}`);
-    }
+      .upsert(payload, { onConflict: "id", ignoreDuplicates: true });
+    if (error) throw new Error(`Failed to push reviews: ${error.message}`);
+    // Every UUID-keyed row either (a) inserted fresh or (b) was already
+    // on the server. Either way, the local copy is now synced — safe to
+    // clear pending_sync for the whole batch.
+    await db.transaction("rw", db.reviews, async () => {
+      for (const local of batch) {
+        await db.reviews.put({ ...local, pending_sync: 0 });
+        pushed += 1;
+      }
+    });
+  }
 
-    // Map local rows (some with UUID ids, some with local-* ids) to server
-    // ids by ordinal position — upsert preserves insertion order in the
-    // returned rowset. Rewrite local ids for the non-UUID subset, clear
-    // pending_sync for everyone that landed.
+  for (let i = 0; i < localRows.length; i += chunkSize) {
+    const batch = localRows.slice(i, i + chunkSize);
+    const payload: ReviewsInsert[] = batch.map((row) => toReviewInsert(row));
+    const { data, error } = await supabase.from("reviews").insert(payload).select("id, created_at");
+    if (error) throw new Error(`Failed to push reviews: ${error.message}`);
     const returned = data ?? [];
+    // INSERT returns rows in input order; map by ordinal and rewrite the
+    // local-* id to the server-assigned UUID so future syncs treat it as
+    // canonical.
     await db.transaction("rw", db.reviews, async () => {
       for (let j = 0; j < batch.length; j += 1) {
         const local = batch[j];
         const server = returned[j];
         if (!server) continue;
-        if (local.id !== server.id) {
-          await db.reviews.delete(local.id);
-          await db.reviews.put({ ...local, id: server.id, pending_sync: 0 });
-        } else {
-          await db.reviews.put({ ...local, pending_sync: 0 });
-        }
+        await db.reviews.delete(local.id);
+        await db.reviews.put({ ...local, id: server.id, pending_sync: 0 });
         pushed += 1;
       }
     });
@@ -124,9 +159,18 @@ export async function pushPendingReviews(
 }
 
 /**
- * Upsert every queued card_state push. Each queue entry snapshots the state
- * at queue time; we use that snapshot (not the latest Dexie read) so a race
- * between "state updated again" and "push" doesn't overwrite a newer push.
+ * Upsert every queued card_state push with a last-write-wins guard.
+ *
+ * Each queue entry snapshots the state at queue time; we compare that
+ * snapshot's `updated_at` against whatever's currently on the server
+ * before overwriting. A device that came online with a stale snapshot
+ * (remote row newer than ours) will not clobber the remote state —
+ * instead we drop the stale queue entry and let the next pull bring
+ * the remote state down to Dexie on last-write-wins at read-time.
+ *
+ * Small race window: another client could write between our SELECT and
+ * UPSERT. That's tolerable for pilot scale; true transactional LWW
+ * requires a dedicated RPC.
  */
 export async function pushPendingStates(
   supabase: SupabaseClient<Database>,
@@ -139,6 +183,22 @@ export async function pushPendingStates(
 
   let pushed = 0;
   for (const entry of mine) {
+    // LWW guard — peek at the server row's updated_at before overwriting.
+    // Absent row → ours is newer by definition; push.
+    const { data: existing, error: readError } = await supabase
+      .from("card_states")
+      .select("updated_at")
+      .eq("profile_id", profileId)
+      .eq("card_id", entry.card_id)
+      .maybeSingle();
+    if (readError) throw new Error(`Failed to read card_state: ${readError.message}`);
+    if (existing && existing.updated_at >= entry.state.updated_at) {
+      // Server has an equal-or-newer row — drop the stale push rather
+      // than overwriting newer data.
+      await db.pending_state_pushes.delete(entry.card_id);
+      continue;
+    }
+
     const payload: CardStatesInsert = toCardStateInsert(entry);
     const { error } = await supabase
       .from("card_states")
@@ -153,27 +213,45 @@ export async function pushPendingStates(
 // ---------------- Pull ----------------
 
 /**
- * Fetch card_states + reviews newer than the stored cursor, merge into
+ * Fetch card_states + reviews newer than the stored cursors, merge into
  * Dexie. Uses `updated_at` on card_states and `created_at` on reviews.
+ *
+ * Each table has its own cursor so a busy card-state stream can't
+ * accidentally hide a slower review stream. The cursors only advance
+ * when the server actually returned at least one row — "no rows seen"
+ * leaves the cursor at its previous value, because advancing to `now`
+ * on the client would skip rows that the server wrote after the select
+ * began but before the request returned (clock-skew plus request
+ * latency would lose them).
  */
 export async function pullRemote(
   supabase: SupabaseClient<Database>,
   profileId: string,
-  now: Date = new Date(),
-): Promise<{ pulledReviews: number; pulledStates: number; cursorUsed: string | null }> {
-  const cursor = readCursor(profileId);
+  _now: Date = new Date(),
+): Promise<{
+  pulledReviews: number;
+  pulledStates: number;
+  cursorUsed: { states: string | null; reviews: string | null };
+}> {
+  void _now; // cursor logic no longer uses client clock (intentional)
+  const stateCursor = readCursor(profileId, "states");
+  const reviewCursor = readCursor(profileId, "reviews");
 
   const [statesResult, reviewsResult] = await Promise.all([
-    (cursor
+    (stateCursor
       ? supabase
           .from("card_states")
           .select("*")
           .eq("profile_id", profileId)
-          .gt("updated_at", cursor)
+          .gt("updated_at", stateCursor)
       : supabase.from("card_states").select("*").eq("profile_id", profileId)
     ).order("updated_at", { ascending: true }),
-    (cursor
-      ? supabase.from("reviews").select("*").eq("profile_id", profileId).gt("created_at", cursor)
+    (reviewCursor
+      ? supabase
+          .from("reviews")
+          .select("*")
+          .eq("profile_id", profileId)
+          .gt("created_at", reviewCursor)
       : supabase.from("reviews").select("*").eq("profile_id", profileId)
     ).order("created_at", { ascending: true }),
   ]);
@@ -191,7 +269,8 @@ export async function pullRemote(
 
   let pulledStates = 0;
   let pulledReviews = 0;
-  let latest = cursor ?? "1970-01-01T00:00:00Z";
+  let latestStateTs: string | null = null;
+  let latestReviewTs: string | null = null;
 
   await db.transaction("rw", db.card_states, db.reviews, async () => {
     for (const row of remoteStates) {
@@ -203,7 +282,9 @@ export async function pullRemote(
         await db.card_states.put(stored);
         pulledStates += 1;
       }
-      if (remoteUpdated > latest) latest = remoteUpdated;
+      if (latestStateTs === null || remoteUpdated > latestStateTs) {
+        latestStateTs = remoteUpdated;
+      }
     }
 
     for (const row of remoteReviews) {
@@ -213,16 +294,24 @@ export async function pullRemote(
         await db.reviews.put(stored);
         pulledReviews += 1;
       }
-      if (row.created_at > latest) latest = row.created_at;
+      if (latestReviewTs === null || row.created_at > latestReviewTs) {
+        latestReviewTs = row.created_at;
+      }
     }
   });
 
-  writeCursor(
-    profileId,
-    latest === (cursor ?? "1970-01-01T00:00:00Z") ? now.toISOString() : latest,
-  );
+  // Only advance a cursor when we saw real server rows for that table.
+  // Leaving it unchanged on an empty pull avoids the clock-skew trap:
+  // writing `now` from the client could overshoot and skip rows the
+  // server wrote during the request window.
+  if (latestStateTs !== null) writeCursor(profileId, "states", latestStateTs);
+  if (latestReviewTs !== null) writeCursor(profileId, "reviews", latestReviewTs);
 
-  return { pulledReviews, pulledStates, cursorUsed: cursor };
+  return {
+    pulledReviews,
+    pulledStates,
+    cursorUsed: { states: stateCursor, reviews: reviewCursor },
+  };
 }
 
 // ---------------- Orchestrator ----------------
