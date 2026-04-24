@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { createMechanismAction, updateMechanismAction } from "./actions";
+import { DiagramInserter } from "./diagram-inserter";
 
 type Mode = "create" | "update";
 
@@ -28,6 +29,10 @@ type Props = {
  * the action. Errors come back in the `result` state and render
  * inline so the admin can correct and re-save without losing the
  * textarea contents.
+ *
+ * A <DiagramInserter> sits above the textarea — admins upload an image
+ * or paste a Drive link, and the resulting `![alt](url)` snippet is
+ * injected at the current caret position.
  */
 export function MechanismEditor({ mode, initialMarkdown, initialStatus, expectedId }: Props) {
   const [markdown, setMarkdown] = useState(initialMarkdown);
@@ -35,8 +40,28 @@ export function MechanismEditor({ mode, initialMarkdown, initialStatus, expected
   const [result, setResult] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const bodyOnly = useMemo(() => stripFrontmatter(markdown), [markdown]);
+  const detectedMechanismId = useMemo(() => extractMechanismId(markdown), [markdown]);
+
+  const insertAtCaret = useCallback((snippet: string) => {
+    setMarkdown((current) => {
+      const ta = textareaRef.current;
+      if (!ta) return `${current}\n\n${snippet}\n`;
+      const start = ta.selectionStart ?? current.length;
+      const end = ta.selectionEnd ?? current.length;
+      const next = `${current.slice(0, start)}${snippet}${current.slice(end)}`;
+      // Restore caret after React applies the new value.
+      queueMicrotask(() => {
+        if (!textareaRef.current) return;
+        const pos = start + snippet.length;
+        textareaRef.current.setSelectionRange(pos, pos);
+        textareaRef.current.focus();
+      });
+      return next;
+    });
+  }, []);
 
   return (
     <form
@@ -78,6 +103,11 @@ export function MechanismEditor({ mode, initialMarkdown, initialStatus, expected
         </p>
       </div>
 
+      <DiagramInserter
+        onInsert={insertAtCaret}
+        mechanismId={detectedMechanismId ?? expectedId ?? "unfiled"}
+      />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium" htmlFor="markdown">
@@ -86,6 +116,7 @@ export function MechanismEditor({ mode, initialMarkdown, initialStatus, expected
           <textarea
             id="markdown"
             name="markdown"
+            ref={textareaRef}
             value={markdown}
             onChange={(e) => setMarkdown(e.target.value)}
             rows={36}
@@ -96,7 +127,7 @@ export function MechanismEditor({ mode, initialMarkdown, initialStatus, expected
 
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium">Preview</p>
-          <div className="border-input bg-muted/20 rounded-md border p-4 text-sm leading-7 [&_h1]:mt-4 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-medium [&_h3]:mt-3 [&_h3]:text-sm [&_h3]:font-medium [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-6">
+          <div className="border-input bg-muted/20 rounded-md border p-4 text-sm leading-7 [&_h1]:mt-4 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-medium [&_h3]:mt-3 [&_h3]:text-sm [&_h3]:font-medium [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-6">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{bodyOnly}</ReactMarkdown>
           </div>
         </div>
@@ -132,4 +163,16 @@ function stripFrontmatter(raw: string): string {
   const match = raw.match(/^---\n[\s\S]*?\n---\n?/);
   if (!match) return raw;
   return raw.slice(match[0].length);
+}
+
+/**
+ * Pull the `id:` value out of the frontmatter so the diagram uploader
+ * can partition files into `<mechanism_id>/…`. Cheap regex; the parser
+ * validates properly server-side.
+ */
+function extractMechanismId(raw: string): string | null {
+  const match = raw.match(/^id:\s*(.+)$/m);
+  if (!match) return null;
+  const id = match[1].trim().replace(/^['"]|['"]$/g, "");
+  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(id) ? id : null;
 }
