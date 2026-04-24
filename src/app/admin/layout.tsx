@@ -14,6 +14,7 @@ import { requireAdmin } from "@/lib/auth/admin";
  */
 const ADMIN_TABS = [
   { label: "Overview", href: "/admin" },
+  { label: "Content", href: "/admin/content" },
   { label: "Users", href: "/admin/users" },
   { label: "Content flags", href: "/admin/flags" },
 ] as const;
