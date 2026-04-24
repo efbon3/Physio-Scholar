@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { UpdateBanner } from "@/components/pwa/update-banner";
 import { PostHogProvider } from "@/lib/analytics/posthog-provider";
 import { createClient } from "@/lib/supabase/server";
 
@@ -72,6 +73,7 @@ export default async function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <PostHogProvider userId={userId} consented={consented}>
+          <UpdateBanner />
           {children}
         </PostHogProvider>
       </body>
