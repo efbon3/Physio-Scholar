@@ -1,3 +1,5 @@
+import Dexie from "dexie";
+
 import { getLearningDB, type StoredCardState, type StoredReview } from "./db";
 import { scheduleNext } from "./scheduler";
 import type { CardState, Rating } from "./types";
@@ -160,6 +162,21 @@ export async function markReviewsSynced(ids: readonly string[]): Promise<void> {
 export async function clearPendingStatePush(cardId: string): Promise<void> {
   const db = getLearningDB();
   await db.pending_state_pushes.delete(cardId);
+}
+
+/**
+ * Load every review row for a profile. Used by the Progress dashboard to
+ * compute streak / retention / study-time aggregates. The returned rows
+ * are sorted descending by created_at so callers can paginate if the
+ * history ever grows unwieldy.
+ */
+export async function loadAllReviews(profileId: string): Promise<StoredReview[]> {
+  const db = getLearningDB();
+  const rows = await db.reviews
+    .where("[profile_id+created_at]")
+    .between([profileId, Dexie.minKey], [profileId, Dexie.maxKey])
+    .toArray();
+  return rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 /** Wipe all SRS local state. Used on logout and in tests. */
