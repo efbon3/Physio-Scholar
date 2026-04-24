@@ -28,6 +28,8 @@ type ActiveCardState = {
   attempt: string;
   hintsShown: number;
   revealed: boolean;
+  /** Post-reveal self-explanation (build spec §2.6). Optional in Review mode. */
+  selfExplanation: string;
   /** ms epoch when the reveal happened — drives the 2s rating delay + timing telemetry. */
   revealedAt: number | null;
   /** ms epoch when the card was first shown — drives time_spent_seconds. */
@@ -39,6 +41,7 @@ function freshCardState(): ActiveCardState {
     attempt: "",
     hintsShown: 0,
     revealed: false,
+    selfExplanation: "",
     revealedAt: null,
     startedAt: Date.now(),
   };
@@ -106,6 +109,7 @@ export function SessionPlayer({ cards, profileId }: Props) {
         rating,
         hintsUsed: cardState.hintsShown,
         timeSpentSeconds,
+        selfExplanation: cardState.selfExplanation,
         now,
       });
     } catch (err) {
@@ -157,6 +161,9 @@ export function SessionPlayer({ cards, profileId }: Props) {
           revealed: true,
           revealedAt: s.revealedAt ?? Date.now(),
         }))
+      }
+      onSelfExplanationChange={(selfExplanation) =>
+        setCardState((s) => ({ ...s, selfExplanation }))
       }
       onRate={handleRating}
       ratingDelayMs={RATING_DELAY_MS}

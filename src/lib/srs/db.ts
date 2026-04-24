@@ -42,6 +42,13 @@ export type StoredReview = {
   hints_used: number;
   time_spent_seconds: number;
   session_id: string | null;
+  /**
+   * Self-explanation the learner typed after reveal (build spec §2.6).
+   * `null` means they skipped it (optional in Review mode). Graded
+   * asynchronously by the grader — C5 uses StubGrader; Phase 4 swaps
+   * in the real Claude-backed implementation.
+   */
+  self_explanation: string | null;
   created_at: string;
   /** 1 = waiting to push to Supabase; 0 = already pushed. */
   pending_sync: 0 | 1;

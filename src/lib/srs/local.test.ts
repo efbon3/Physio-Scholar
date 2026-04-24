@@ -183,6 +183,57 @@ describe("sync-queue helpers", () => {
   });
 });
 
+describe("self_explanation normalisation", () => {
+  it("stores a trimmed non-empty explanation on the review row", async () => {
+    const result = await recordReviewLocally({
+      profileId: ALICE,
+      cardId: "frank-starling:1",
+      rating: "good",
+      hintsUsed: 0,
+      timeSpentSeconds: 5,
+      selfExplanation: "  Frank-Starling matches output to venous return.  ",
+      now: NOW,
+    });
+    expect(result.review.self_explanation).toBe("Frank-Starling matches output to venous return.");
+  });
+
+  it("normalises empty / whitespace-only input to null", async () => {
+    const a = await recordReviewLocally({
+      profileId: ALICE,
+      cardId: "frank-starling:1",
+      rating: "good",
+      hintsUsed: 0,
+      timeSpentSeconds: 5,
+      selfExplanation: "",
+      now: NOW,
+    });
+    expect(a.review.self_explanation).toBeNull();
+
+    const b = await recordReviewLocally({
+      profileId: ALICE,
+      cardId: "frank-starling:2",
+      rating: "hard",
+      hintsUsed: 0,
+      timeSpentSeconds: 5,
+      selfExplanation: "   \n\t  ",
+      now: NOW,
+    });
+    expect(b.review.self_explanation).toBeNull();
+  });
+
+  it("defaults to null when the caller omits the field entirely", async () => {
+    const result = await recordReviewLocally({
+      profileId: ALICE,
+      cardId: "frank-starling:1",
+      rating: "good",
+      hintsUsed: 0,
+      timeSpentSeconds: 5,
+      now: NOW,
+    });
+    expect(result.review.self_explanation).toBeNull();
+  });
+});
+
 describe("clearAllLocalState", () => {
   it("wipes every table in the learning DB", async () => {
     await recordReviewLocally({

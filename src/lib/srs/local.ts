@@ -66,6 +66,12 @@ export type RecordReviewInput = {
   hintsUsed: number;
   timeSpentSeconds: number;
   sessionId?: string | null;
+  /**
+   * Free-text explanation the learner typed after the answer reveal
+   * (build spec §2.6). Null / undefined means they skipped it. Stored
+   * on the review row; the grader consumes it asynchronously.
+   */
+  selfExplanation?: string | null;
   /** Optional clock override for tests. Defaults to `new Date()`. */
   now?: Date;
 };
@@ -99,6 +105,11 @@ export async function recordReviewLocally(input: RecordReviewInput): Promise<Rec
     updated_at: nowIso,
   };
 
+  // Normalise self_explanation: empty strings are "skipped", not empty
+  // strings in the DB. Keeps grader input predictable.
+  const trimmedExplanation = (input.selfExplanation ?? "").trim();
+  const selfExplanation = trimmedExplanation.length > 0 ? trimmedExplanation : null;
+
   const review: StoredReview = {
     id: newReviewId(),
     profile_id: input.profileId,
@@ -107,6 +118,7 @@ export async function recordReviewLocally(input: RecordReviewInput): Promise<Rec
     hints_used: input.hintsUsed,
     time_spent_seconds: input.timeSpentSeconds,
     session_id: input.sessionId ?? null,
+    self_explanation: selfExplanation,
     created_at: nowIso,
     pending_sync: 1,
   };

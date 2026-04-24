@@ -175,6 +175,7 @@ export type Database = {
           id: string
           profile_id: string
           rating: Database["public"]["Enums"]["srs_rating"]
+          self_explanation: string | null
           session_id: string | null
           time_spent_seconds: number
         }
@@ -185,6 +186,7 @@ export type Database = {
           id?: string
           profile_id: string
           rating: Database["public"]["Enums"]["srs_rating"]
+          self_explanation?: string | null
           session_id?: string | null
           time_spent_seconds?: number
         }
@@ -195,6 +197,7 @@ export type Database = {
           id?: string
           profile_id?: string
           rating?: Database["public"]["Enums"]["srs_rating"]
+          self_explanation?: string | null
           session_id?: string | null
           time_spent_seconds?: number
         }
