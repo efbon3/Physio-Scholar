@@ -7,6 +7,23 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   prettier,
+  {
+    // Project-wide convention: parameters prefixed with `_` are
+    // intentionally unused (interface conformance, chainable-API fake
+    // signatures, etc). Matches the TypeScript compiler's own behaviour
+    // with `noUnusedParameters` + underscore prefix.
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
   globalIgnores([
     ".next/**",
     "out/**",

@@ -1,5 +1,6 @@
 "use server";
 
+import { enforceRateLimit } from "@/lib/rate-limit/enforce";
 import { createClient } from "@/lib/supabase/server";
 
 const CARD_ID_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?:\d+$/;
@@ -37,6 +38,17 @@ export async function flagCardAction(formData: FormData): Promise<FlagSubmission
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { status: "error", message: "Please sign in before reporting." };
+
+  // Cap per-account flag submissions per day (build spec §2.11 spirit:
+  // "rate limits across endpoints"). 20/day is generous for the pilot
+  // but closes the spam surface.
+  const limit = await enforceRateLimit(supabase, user.id, "contentFlags");
+  if (!limit.allowed) {
+    return {
+      status: "error",
+      message: "You've hit today's flag submission limit. Try again tomorrow.",
+    };
+  }
 
   const notesString = typeof notes === "string" && notes.trim().length > 0 ? notes.trim() : null;
 
