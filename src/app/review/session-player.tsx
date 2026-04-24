@@ -56,9 +56,17 @@ const DEFAULT_MAX_NEW_CARDS = 10;
 type Props = {
   cards: readonly Card[];
   profileId: string;
+  /**
+   * When the learner entered via `/review?mechanism=<id>` the page passes
+   * in the matched mechanism here. The session renders a header strip
+   * that confirms which topic is being drilled and offers a "Back to
+   * mechanism" escape hatch — without this, a filtered session looks
+   * identical to a general one.
+   */
+  focusMechanism?: { id: string; title: string } | null;
 };
 
-export function SessionPlayer({ cards, profileId }: Props) {
+export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props) {
   const [status, setStatus] = useState<Status>("loading");
   const [queue, setQueue] = useState<QueuedCard[]>([]);
   const [index, setIndex] = useState(0);
@@ -133,45 +141,85 @@ export function SessionPlayer({ cards, profileId }: Props) {
 
   if (status === "loading") {
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-6">
-        <p className="text-muted-foreground text-sm">Loading your session…</p>
-      </main>
+      <>
+        {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+        <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-6">
+          <p className="text-muted-foreground text-sm">Loading your session…</p>
+        </main>
+      </>
     );
   }
 
   if (status === "empty") {
-    return <EmptyState />;
+    return (
+      <>
+        {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+        <EmptyState focusMechanism={focusMechanism} />
+      </>
+    );
   }
 
   if (status === "complete") {
-    return <CompleteState ratedCount={ratedCount} />;
+    return (
+      <>
+        {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+        <CompleteState ratedCount={ratedCount} focusMechanism={focusMechanism} />
+      </>
+    );
   }
 
   // reviewing
   return (
-    <CardView
-      queued={current!}
-      active={cardState}
-      onAttemptChange={(attempt) => setCardState((s) => ({ ...s, attempt }))}
-      onShowHint={() =>
-        setCardState((s) =>
-          s.hintsShown >= current!.card.hints.length ? s : { ...s, hintsShown: s.hintsShown + 1 },
-        )
-      }
-      onReveal={() =>
-        setCardState((s) => ({
-          ...s,
-          revealed: true,
-          revealedAt: s.revealedAt ?? Date.now(),
-        }))
-      }
-      onSelfExplanationChange={(selfExplanation) =>
-        setCardState((s) => ({ ...s, selfExplanation }))
-      }
-      onRate={handleRating}
-      ratingDelayMs={RATING_DELAY_MS}
-      progress={progress}
-    />
+    <>
+      {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+      <CardView
+        queued={current!}
+        active={cardState}
+        onAttemptChange={(attempt) => setCardState((s) => ({ ...s, attempt }))}
+        onShowHint={() =>
+          setCardState((s) =>
+            s.hintsShown >= current!.card.hints.length ? s : { ...s, hintsShown: s.hintsShown + 1 },
+          )
+        }
+        onReveal={() =>
+          setCardState((s) => ({
+            ...s,
+            revealed: true,
+            revealedAt: s.revealedAt ?? Date.now(),
+          }))
+        }
+        onSelfExplanationChange={(selfExplanation) =>
+          setCardState((s) => ({ ...s, selfExplanation }))
+        }
+        onRate={handleRating}
+        ratingDelayMs={RATING_DELAY_MS}
+        progress={progress}
+      />
+    </>
+  );
+}
+
+/**
+ * Confirms which mechanism is being drilled when the learner arrived via
+ * `/review?mechanism=<id>`. Sits at the top of every session state
+ * (loading / empty / reviewing / complete) so the context is always visible.
+ */
+function FocusBanner({ mechanism }: { mechanism: { id: string; title: string } }) {
+  return (
+    <div className="border-border bg-muted/40 sticky top-0 z-10 w-full border-b">
+      <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center justify-between gap-2 px-6 py-2 text-xs">
+        <p>
+          <span className="text-muted-foreground">Studying:</span>{" "}
+          <span className="font-medium">{mechanism.title}</span>
+        </p>
+        <Link
+          href={`/systems`}
+          className="text-muted-foreground underline-offset-2 hover:underline"
+        >
+          Leave
+        </Link>
+      </div>
+    </div>
   );
 }
 
@@ -182,43 +230,61 @@ export function SessionPlayer({ cards, profileId }: Props) {
  * will replace this; for now the two link buttons cover the obvious
  * next actions.
  */
-function SessionExitLinks() {
+function SessionExitLinks({
+  focusMechanism = null,
+}: {
+  focusMechanism?: { id: string; title: string } | null;
+}) {
   return (
     <div className="mt-2 flex flex-wrap justify-center gap-2">
-      <Link href="/" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
-        Back to home
+      <Link href="/today" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+        Back to Today
       </Link>
-      <Link href="/systems" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
-        Browse mechanisms
-      </Link>
+      {focusMechanism ? (
+        <Link href={`/systems`} className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+          Browse mechanisms
+        </Link>
+      ) : (
+        <Link href="/systems" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+          Browse mechanisms
+        </Link>
+      )}
     </div>
   );
 }
 
-function EmptyState() {
+function EmptyState({ focusMechanism }: { focusMechanism: { id: string; title: string } | null }) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="font-heading text-2xl font-medium">Nothing due right now</h1>
       <p className="text-muted-foreground text-sm">
-        You&apos;re caught up on reviews, and today&apos;s new-card budget is spent. Come back
-        tomorrow, or browse mechanisms from the Systems tab.
+        {focusMechanism
+          ? `You're caught up on ${focusMechanism.title}. Come back when the next card is due.`
+          : "You're caught up on reviews, and today's new-card budget is spent. Come back tomorrow, or browse mechanisms from the Systems tab."}
       </p>
-      <SessionExitLinks />
+      <SessionExitLinks focusMechanism={focusMechanism} />
     </main>
   );
 }
 
-function CompleteState({ ratedCount }: { ratedCount: number }) {
+function CompleteState({
+  ratedCount,
+  focusMechanism,
+}: {
+  ratedCount: number;
+  focusMechanism: { id: string; title: string } | null;
+}) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="font-heading text-2xl font-medium">Session complete</h1>
       <p className="text-sm">
-        {ratedCount} card{ratedCount === 1 ? "" : "s"} reviewed.
+        {ratedCount} card{ratedCount === 1 ? "" : "s"} reviewed
+        {focusMechanism ? ` on ${focusMechanism.title}` : ""}.
       </p>
       <p className="text-muted-foreground text-sm">
         See you tomorrow — or sooner, if more cards come due.
       </p>
-      <SessionExitLinks />
+      <SessionExitLinks focusMechanism={focusMechanism} />
     </main>
   );
 }
