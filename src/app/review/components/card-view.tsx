@@ -26,6 +26,7 @@ export function CardView({
   onAttemptChange,
   onShowHint,
   onReveal,
+  onSelfExplanationChange,
   onRate,
   ratingDelayMs,
   progress,
@@ -35,11 +36,13 @@ export function CardView({
     attempt: string;
     hintsShown: number;
     revealed: boolean;
+    selfExplanation: string;
     revealedAt: number | null;
   };
   onAttemptChange: (value: string) => void;
   onShowHint: () => void;
   onReveal: () => void;
+  onSelfExplanationChange: (value: string) => void;
   onRate: (rating: Rating) => void;
   ratingDelayMs: number;
   progress: { index: number; total: number };
@@ -137,6 +140,25 @@ export function CardView({
               </ul>
             </div>
           ) : null}
+        </section>
+      ) : null}
+
+      {active.revealed ? (
+        <section aria-label="Self-explanation" className="flex flex-col gap-2">
+          <label htmlFor="self-explanation" className="text-sm font-medium">
+            In your own words — why?
+          </label>
+          <p className="text-muted-foreground text-xs leading-5">
+            Optional. A sentence or two explaining the mechanism in your own words. We&apos;ll grade
+            it when the grader is live (build spec §2.6).
+          </p>
+          <textarea
+            id="self-explanation"
+            className="border-input bg-background min-h-20 w-full rounded-md border px-3 py-2 text-sm leading-7 outline-none focus:ring-2"
+            placeholder="Skip to rate, or type a short explanation…"
+            value={active.selfExplanation}
+            onChange={(e) => onSelfExplanationChange(e.target.value)}
+          />
         </section>
       ) : null}
 
