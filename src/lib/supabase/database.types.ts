@@ -170,6 +170,41 @@ export type Database = {
           },
         ]
       }
+      content_mechanisms: {
+        Row: {
+          created_at: string
+          id: string
+          markdown: string
+          status: Database["public"]["Enums"]["content_mechanism_status"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          markdown: string
+          status?: Database["public"]["Enums"]["content_mechanism_status"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          markdown?: string
+          status?: Database["public"]["Enums"]["content_mechanism_status"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_mechanisms_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_flags: {
         Row: {
           card_id: string
@@ -418,6 +453,7 @@ export type Database = {
     }
     Enums: {
       content_flag_status: "open" | "resolved" | "rejected"
+      content_mechanism_status: "draft" | "review" | "published" | "retired"
       srs_card_status: "learning" | "review" | "leech" | "suspended"
       srs_rating: "again" | "hard" | "good" | "easy"
       study_session_status: "active" | "completed" | "abandoned"
@@ -554,6 +590,7 @@ export const Constants = {
   public: {
     Enums: {
       content_flag_status: ["open", "resolved", "rejected"],
+      content_mechanism_status: ["draft", "review", "published", "retired"],
       srs_card_status: ["learning", "review", "leech", "suspended"],
       srs_rating: ["again", "hard", "good", "easy"],
       study_session_status: ["active", "completed", "abandoned"],
