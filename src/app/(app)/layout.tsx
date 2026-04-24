@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AppNav } from "@/components/nav/app-nav";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -35,6 +36,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen flex-col">
       <AppNav profileId={profileId} />
       <div className="flex-1">{children}</div>
+      <InstallPrompt />
     </div>
   );
 }
