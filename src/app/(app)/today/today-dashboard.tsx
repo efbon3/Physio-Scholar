@@ -98,14 +98,30 @@ export function TodayDashboard({
               ) : null}
               .
             </p>
-            <div>
+            <div className="flex flex-wrap gap-2">
               <Link href="/review" className={cn(buttonVariants({ size: "lg" }))}>
                 Start review
+              </Link>
+              <Link href="/exam" className={cn(buttonVariants({ size: "lg", variant: "outline" }))}>
+                Exam mode
               </Link>
             </div>
           </>
         )}
       </section>
+
+      {summary && summary.total === 0 ? (
+        <section aria-label="Secondary actions" className="flex flex-col gap-3">
+          <p className="text-sm">
+            Nothing to review? Still worth a drill — try an exam-mode MCQ run.
+          </p>
+          <div>
+            <Link href="/exam" className={cn(buttonVariants({ size: "lg", variant: "outline" }))}>
+              Go to exam mode
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section
         aria-label="Placeholders for Phase 5 widgets"
