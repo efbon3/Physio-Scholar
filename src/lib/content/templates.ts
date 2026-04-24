@@ -56,6 +56,7 @@ Vignettes, pathophysiology, common pitfalls, diagnostic implications.
 
 **Type:** recall
 **Bloom's level:** understand
+**Exam patterns:** mbbs, pre-pg
 **Stem:** The question goes here.
 **Correct answer:** The correct answer.
 **Elaborative explanation:** Why this is correct, with mechanism detail.

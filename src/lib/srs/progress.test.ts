@@ -50,6 +50,7 @@ function card(id: string, mechanismId: string): Card {
     elaborative_explanation: "Why",
     hints: [],
     misconceptions: [],
+    exam_patterns: [],
   };
 }
 

@@ -19,6 +19,7 @@ function card(id: string, index = Number.parseInt(id.split(":")[1] ?? "1", 10)):
     elaborative_explanation: "e",
     hints: [],
     misconceptions: [],
+    exam_patterns: [],
   };
 }
 
