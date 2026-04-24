@@ -6,8 +6,8 @@ nmc_competencies:
   - PY-CV-1.6
   - PY-CV-1.8
 exam_patterns:
-  - neet-pg
-  - ini-cet
+  - mbbs
+  - pre-pg
 prerequisites: []
 related_mechanisms:
   - frank-starling

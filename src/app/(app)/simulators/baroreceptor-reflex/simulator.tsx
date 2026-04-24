@@ -57,7 +57,12 @@ export function BaroreceptorSimulator() {
     cancelAnimation();
     setPlaying(true);
     setPlayhead(0);
+    // Each playback gets its own raf id; if rafRef is nulled (via
+    // cancelAnimation from a mid-play config change) we must bail out
+    // before calling setState or requesting another frame, otherwise
+    // the cancelled animation ghost-scrubs for one more tick.
     const step = (timestamp: number) => {
+      if (rafRef.current === null) return;
       if (playStartRef.current === null) playStartRef.current = timestamp;
       const elapsed = timestamp - playStartRef.current;
       const progress = Math.min(1, elapsed / PLAY_DURATION_MS);
@@ -66,6 +71,7 @@ export function BaroreceptorSimulator() {
         rafRef.current = requestAnimationFrame(step);
       } else {
         setPlaying(false);
+        rafRef.current = null;
       }
     };
     rafRef.current = requestAnimationFrame(step);

@@ -55,18 +55,17 @@ export default async function ExamSessionPage({
   const mechanisms = await readAllMechanisms();
   const allCards: Card[] = mechanisms.flatMap(extractCards);
 
-  // Build a fresh session each page load. Date.now() in the salt means
-  // a refresh re-seeds; a student retaking right away gets a different
-  // set rather than the identical one.
+  // Build a fresh session each page load. Combining Date.now() with a
+  // per-request random uuid means two refreshes in the same millisecond
+  // still get different seeds — Date.now() alone can collide.
   //
-  // React's purity rule flags Date.now() because client components must
-  // be deterministic across renders — but server components legitimately
-  // re-run per request, and a time-based salt is exactly what we want
-  // here (alternative: pass a random id as a query param, strictly worse
-  // UX). Disabling at the call site with a justification rather than
-  // globally.
+  // React's purity rule flags Date.now() / randomUUID() because client
+  // components must be deterministic across renders — but server
+  // components legitimately re-run per request, and a time+random
+  // salt is exactly what we want here. Disabling at the call site
+  // with a justification rather than globally.
   // eslint-disable-next-line react-hooks/purity
-  const sessionSalt = `${Date.now()}`;
+  const sessionSalt = `${Date.now()}-${crypto.randomUUID()}`;
   const questions = assembleExamSession({
     cards: allCards,
     pattern,

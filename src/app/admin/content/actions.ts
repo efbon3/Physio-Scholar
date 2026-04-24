@@ -43,11 +43,22 @@ async function saveMechanism({
     return { status: "error", message };
   }
 
-  if (mode === "update" && expectedId && parsed.frontmatter.id !== expectedId) {
-    return {
-      status: "error",
-      message: `Frontmatter id "${parsed.frontmatter.id}" doesn't match the URL "${expectedId}". Either update the frontmatter or use Save As to create a new row.`,
-    };
+  if (mode === "update") {
+    if (!expectedId) {
+      // Defence against a form submission missing the hidden `expected_id`
+      // input — without it we could UPDATE against a renamed id and
+      // silently hit zero rows (Supabase returns no error on no-match).
+      return {
+        status: "error",
+        message: "Missing expected_id — reopen the editor and try again.",
+      };
+    }
+    if (parsed.frontmatter.id !== expectedId) {
+      return {
+        status: "error",
+        message: `Frontmatter id "${parsed.frontmatter.id}" doesn't match the URL "${expectedId}". Either update the URL, revert the frontmatter id, or use "Save As" to create a new row.`,
+      };
+    }
   }
 
   const supabase = await createClient();
@@ -83,15 +94,25 @@ async function saveMechanism({
       return { status: "error", message: `Failed to save: ${error.message}` };
     }
   } else {
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("content_mechanisms")
       .update({
         markdown,
         status: status as "draft" | "review" | "published" | "retired",
         updated_by: user.id,
       })
-      .eq("id", parsed.frontmatter.id);
+      .eq("id", parsed.frontmatter.id)
+      .select("id");
     if (error) return { status: "error", message: `Failed to save: ${error.message}` };
+    if (!updated || updated.length === 0) {
+      // Zero affected rows — either the id no longer exists, or the
+      // admin's RLS UPDATE policy didn't match. Surface loudly rather
+      // than saying "Saved" when nothing happened.
+      return {
+        status: "error",
+        message: `No row matched id "${parsed.frontmatter.id}". Did the id change? Try creating a new mechanism instead.`,
+      };
+    }
   }
 
   revalidatePath("/admin/content");

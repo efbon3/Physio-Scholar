@@ -53,6 +53,32 @@ describe("filterByExamPattern", () => {
     expect(filterByExamPattern(cards, "mbbs").map((c) => c.id)).toEqual(["m:1", "m:3"]);
     expect(filterByExamPattern(cards, "pre-pg").map((c) => c.id)).toEqual(["m:2", "m:3"]);
   });
+
+  it("accepts pre-pg aliases: neet-pg, ini-cet, fmge, usmle", () => {
+    const cards: Card[] = [
+      card({ id: "m:1", exam_patterns: ["neet-pg"] }),
+      card({ id: "m:2", exam_patterns: ["ini-cet"] }),
+      card({ id: "m:3", exam_patterns: ["fmge"] }),
+      card({ id: "m:4", exam_patterns: ["usmle"] }),
+      card({ id: "m:5", exam_patterns: ["mbbs"] }),
+    ];
+    expect(filterByExamPattern(cards, "pre-pg").map((c) => c.id)).toEqual([
+      "m:1",
+      "m:2",
+      "m:3",
+      "m:4",
+    ]);
+  });
+
+  it("accepts mbbs aliases: university, final-mbbs, ug", () => {
+    const cards: Card[] = [
+      card({ id: "m:1", exam_patterns: ["university"] }),
+      card({ id: "m:2", exam_patterns: ["final-mbbs"] }),
+      card({ id: "m:3", exam_patterns: ["ug"] }),
+      card({ id: "m:4", exam_patterns: ["pre-pg"] }),
+    ];
+    expect(filterByExamPattern(cards, "mbbs").map((c) => c.id)).toEqual(["m:1", "m:2", "m:3"]);
+  });
 });
 
 describe("canRenderAsMcq / buildMcqFromCard", () => {
