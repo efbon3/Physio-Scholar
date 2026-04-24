@@ -23,23 +23,31 @@ type QueueSummary = {
  * and assembles the same queue the review session would use, so the
  * "N due / M new" counter reflects the actual next session.
  *
+ * `profileId` is passed in from the server page so Dexie is scoped to
+ * the real authenticated user id. In envs without Supabase (CI,
+ * unconfigured previews) the server page falls back to the literal
+ * "preview" — the same sentinel the review page uses — so locally
+ * recorded reviews in that mode still round-trip.
+ *
  * Phase 5 will grow this with streak / weak-area / clinical-challenge
  * callouts per build spec §2.3; D1 ships just the essentials.
  */
-export function TodayDashboard({ cards, email }: { cards: readonly Card[]; email: string | null }) {
+export function TodayDashboard({
+  cards,
+  email,
+  profileId,
+}: {
+  cards: readonly Card[];
+  email: string | null;
+  profileId: string;
+}) {
   const [summary, setSummary] = useState<QueueSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        // Profile-scoped load — we don't know the profile id client-side
-        // without another server round-trip, but loadAllCardStates
-        // filters via `where("profile_id").equals(...)`. For the Dexie
-        // guarantee to hold, we use the placeholder / signed-in id the
-        // review page also uses. Phase 6's sync work replaces this
-        // with a proper auth-scoped read.
-        const rows = await loadAllCardStates("preview");
+        const rows = await loadAllCardStates(profileId);
         const stateMap = new Map<string, CardState>();
         for (const row of rows) stateMap.set(row.card_id, row);
         const queue = assembleQueue({
@@ -56,7 +64,7 @@ export function TodayDashboard({ cards, email }: { cards: readonly Card[]; email
     return () => {
       cancelled = true;
     };
-  }, [cards]);
+  }, [cards, profileId]);
 
   const greetingName = email?.split("@")[0] ?? "there";
 

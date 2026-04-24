@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { extractCards, type Card } from "@/lib/content/cards";
+import { normaliseMechanismId } from "@/lib/content/filters";
 import { readAllMechanisms } from "@/lib/content/fs";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,10 +11,18 @@ export const metadata = {
   title: "Review",
 };
 
+type SearchParams = { mechanism?: string | string[] };
+
 /**
  * Review-session entry point. Server-rendered so the card universe is
  * already in the HTML; the client-side session player then reads local
  * card_states from Dexie, assembles the queue, and runs the loop.
+ *
+ * `?mechanism=<id>` narrows the card universe to a single mechanism so
+ * a learner can drill just one topic (wired from the mechanism-detail
+ * "Study this mechanism" CTA per build spec §2.3). An unknown or
+ * malformed id falls back to the full queue — better to study
+ * something than fail closed on a typo.
  *
  * The whole `/review` route is behind middleware-enforced auth
  * (`src/lib/supabase/middleware.ts`), so an anonymous visitor bounces
@@ -22,7 +31,14 @@ export const metadata = {
  * without Supabase env vars (CI, unconfigured previews) — in those cases
  * we show a graceful placeholder instead of crashing.
  */
-export default async function ReviewPage() {
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const resolvedParams = await searchParams;
+  const mechanismFilter = normaliseMechanismId(resolvedParams.mechanism);
+
   // Same graceful posture as the middleware: when Supabase env vars are
   // absent (CI, unconfigured Vercel preview), skip the auth lookup and
   // render the SessionPlayer with a placeholder profile id. The page
@@ -38,14 +54,40 @@ export default async function ReviewPage() {
     } catch {
       // Supabase unreachable — fall through to the preview id.
     }
-    if (!userId) redirect("/login?next=/review");
+    if (!userId) {
+      const next = mechanismFilter
+        ? `/review?mechanism=${encodeURIComponent(mechanismFilter)}`
+        : "/review";
+      redirect(`/login?next=${encodeURIComponent(next)}`);
+    }
   }
 
   // Build the card universe from authored content. Frank-Starling lands
   // here today via the Phase 2 loader + C3a parser. As the cohort grows,
   // every file in content/mechanisms/ automatically contributes cards.
   const mechanisms = await readAllMechanisms();
-  const cards: Card[] = mechanisms.flatMap(extractCards);
+  let cards: Card[] = mechanisms.flatMap(extractCards);
+  let focusTitle: string | null = null;
 
-  return <SessionPlayer cards={cards} profileId={userId ?? "preview"} />;
+  if (mechanismFilter) {
+    const match = mechanisms.find((m) => m.frontmatter.id === mechanismFilter);
+    if (match) {
+      const filtered = extractCards(match);
+      // Only apply the filter when it yields cards — otherwise fall back
+      // to the full queue so the learner isn't bounced straight to the
+      // empty state on a draft mechanism without a Questions section.
+      if (filtered.length > 0) {
+        cards = filtered;
+        focusTitle = match.frontmatter.title;
+      }
+    }
+  }
+
+  return (
+    <SessionPlayer
+      cards={cards}
+      profileId={userId ?? "preview"}
+      focusMechanism={focusTitle ? { id: mechanismFilter!, title: focusTitle } : null}
+    />
+  );
 }

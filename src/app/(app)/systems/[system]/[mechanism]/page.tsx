@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { MechanismRenderer } from "@/components/content/mechanism-renderer";
 import { readAllMechanisms, readMechanismById } from "@/lib/content/fs";
+import { createClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ system: string; mechanism: string }> };
 
@@ -20,6 +21,19 @@ export async function generateMetadata({ params }: Params) {
   return { title: m?.frontmatter.title ?? "Mechanism not found" };
 }
 
+/** Same graceful posture as the middleware: skip Supabase in unconfigured envs. */
+async function getProfileId(nextPath: string): Promise<string> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return "preview";
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    return data.user.id;
+  } catch {
+    return "preview";
+  }
+}
+
 export default async function MechanismPage({ params }: Params) {
   const { system, mechanism: id } = await params;
   const mechanism = await readMechanismById(id);
@@ -30,6 +44,8 @@ export default async function MechanismPage({ params }: Params) {
   if (!mechanism || mechanism.frontmatter.organ_system !== system) {
     notFound();
   }
+
+  const profileId = await getProfileId(`/systems/${system}/${id}`);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-6 py-12">
@@ -42,7 +58,7 @@ export default async function MechanismPage({ params }: Params) {
           {system}
         </Link>
       </nav>
-      <MechanismRenderer mechanism={mechanism} />
+      <MechanismRenderer mechanism={mechanism} profileId={profileId} />
     </main>
   );
 }

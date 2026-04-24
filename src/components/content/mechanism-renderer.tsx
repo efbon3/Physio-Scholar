@@ -1,79 +1,104 @@
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { buttonVariants } from "@/components/ui/button";
+import { extractCards } from "@/lib/content/cards";
 import type { Mechanism } from "@/lib/content/loader";
+import { cn } from "@/lib/utils";
 
-type TabKey = "core" | "working" | "deepDive" | "clinicalIntegration";
+import { MechanismStats } from "./mechanism-stats";
+import { MechanismTabs, type MechanismTabKey } from "./mechanism-tabs";
 
-const TAB_LABEL: Record<TabKey, string> = {
-  core: "Core",
-  working: "Working",
-  deepDive: "Deep Dive",
-  clinicalIntegration: "Clinical",
+type Props = {
+  mechanism: Mechanism;
+  /**
+   * Signed-in learner id. Passed in from the server page (falls back to
+   * "preview" in CI / unconfigured previews, same sentinel the review
+   * page uses) so the Dexie-backed MechanismStats is scoped correctly.
+   */
+  profileId: string;
 };
 
-const TAB_ORDER: readonly TabKey[] = ["core", "working", "deepDive", "clinicalIntegration"];
-
 /**
- * Static mechanism renderer. Shows the four reading layers as tabs.
+ * Mechanism detail page — static reading surfaces (Phase 2) plus the
+ * Phase 5 additions: a proper tablist for the four reading layers,
+ * per-mechanism stats pulled from Dexie, and a "Study this mechanism"
+ * CTA that launches `/review?mechanism=<id>` filtered to just these
+ * cards.
  *
- * Phase 2 stops at "static reading." The interactive learning loop
- * (cards, hints, self-explanation, SRS) is Phase 3. So this component
- * is deliberately presentational — no state machine, no scheduler, no
- * answer capture.
- *
- * Uses the `:target`-driven CSS-only tab pattern — each layer is a
- * section with an id, and the header links are anchors that scroll to
- * them. That keeps the component usable without JS and trivial to cache
- * with Serwist's HTML-first strategy.
+ * Markdown rendering stays on the server so the `react-markdown` +
+ * `remark-gfm` parsers stay out of the client bundle. The `MechanismTabs`
+ * client component receives the already-rendered ReactNodes as panels
+ * and only owns the show/hide state + keyboard interactions.
  */
-export function MechanismRenderer({ mechanism }: { mechanism: Mechanism }) {
-  const availableLayers = TAB_ORDER.filter((key) => mechanism.layers[key]);
+export function MechanismRenderer({ mechanism, profileId }: Props) {
+  const { layers, frontmatter } = mechanism;
+
+  const panels: Partial<Record<MechanismTabKey, React.ReactNode>> = {};
+  if (layers.core) {
+    panels.core = <ReactMarkdown remarkPlugins={[remarkGfm]}>{layers.core}</ReactMarkdown>;
+  }
+  if (layers.working) {
+    panels.working = <ReactMarkdown remarkPlugins={[remarkGfm]}>{layers.working}</ReactMarkdown>;
+  }
+  if (layers.deepDive) {
+    panels.deepDive = <ReactMarkdown remarkPlugins={[remarkGfm]}>{layers.deepDive}</ReactMarkdown>;
+  }
+  if (layers.clinicalIntegration) {
+    panels.clinicalIntegration = (
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{layers.clinicalIntegration}</ReactMarkdown>
+    );
+  }
+
+  const cards = extractCards(mechanism);
+  const cardIds = cards.map((c) => c.id);
+  const hasCards = cardIds.length > 0;
 
   return (
     <article className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
         <p className="text-muted-foreground text-sm tracking-widest uppercase">
-          {mechanism.frontmatter.organ_system}
+          {frontmatter.organ_system}
         </p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          {mechanism.frontmatter.title}
+          {frontmatter.title}
         </h1>
         <p className="text-sm">
           Competencies:{" "}
-          <span className="font-mono">{mechanism.frontmatter.nmc_competencies.join(" · ")}</span>
+          <span className="font-mono">{frontmatter.nmc_competencies.join(" · ")}</span>
         </p>
       </header>
 
-      <nav aria-label="Mechanism layers">
-        <ul className="flex flex-wrap gap-2 text-sm">
-          {availableLayers.map((key) => (
-            <li key={key}>
-              <a
-                href={`#layer-${key}`}
-                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md px-3 py-1 transition-colors"
-              >
-                {TAB_LABEL[key]}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      {availableLayers.map((key) => (
-        <section key={key} id={`layer-${key}`} className="flex scroll-mt-8 flex-col gap-3">
-          <h2 className="font-heading text-xl font-medium">{TAB_LABEL[key]}</h2>
-          <div className="leading-7 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-medium [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-6">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{mechanism.layers[key] ?? ""}</ReactMarkdown>
+      <section
+        aria-label="Your progress on this mechanism"
+        className="border-border bg-muted/40 flex flex-col gap-4 rounded-md border p-4"
+      >
+        <MechanismStats cardIds={cardIds} profileId={profileId} />
+        {hasCards ? (
+          <div>
+            <Link
+              href={`/review?mechanism=${encodeURIComponent(frontmatter.id)}`}
+              className={cn(buttonVariants({ size: "lg" }))}
+            >
+              Study this mechanism
+            </Link>
           </div>
-        </section>
-      ))}
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            No cards have been authored for this mechanism yet — once the `# Questions` section
+            lands in the markdown, a Study CTA will appear here.
+          </p>
+        )}
+      </section>
 
-      {mechanism.layers.sources ? (
+      <MechanismTabs panels={panels} />
+
+      {layers.sources ? (
         <footer className="text-muted-foreground flex flex-col gap-2 border-t pt-4 text-xs">
           <h3 className="text-sm font-medium">Sources</h3>
           <div className="[&_ul]:list-disc [&_ul]:pl-6">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{mechanism.layers.sources}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{layers.sources}</ReactMarkdown>
           </div>
         </footer>
       ) : null}

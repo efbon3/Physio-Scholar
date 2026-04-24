@@ -40,5 +40,7 @@ export default async function TodayPage() {
   const mechanisms = await readAllMechanisms();
   const cards: Card[] = mechanisms.flatMap(extractCards);
 
-  return <TodayDashboard cards={cards} email={user?.email ?? null} />;
+  return (
+    <TodayDashboard cards={cards} email={user?.email ?? null} profileId={user?.id ?? "preview"} />
+  );
 }
