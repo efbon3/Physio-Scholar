@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
+import { incrementSessionCount } from "@/lib/pwa/install-state";
 import { loadAllCardStates, recordReviewLocally } from "@/lib/srs/local";
 import { assembleQueue, type QueuedCard } from "@/lib/srs/queue";
 import type { CardState, Rating } from "@/lib/srs/types";
@@ -281,6 +282,12 @@ function CompleteState({
   ratedCount: number;
   focusMechanism: { id: string; title: string } | null;
 }) {
+  // Bump the PWA install-prompt eligibility counter. Only counts
+  // sessions with at least one rated card so a "launched and bailed"
+  // interaction doesn't accidentally arm the banner.
+  useEffect(() => {
+    if (ratedCount > 0) incrementSessionCount();
+  }, [ratedCount]);
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="font-heading text-2xl font-medium">Session complete</h1>
