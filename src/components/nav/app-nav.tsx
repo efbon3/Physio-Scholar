@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { signOutAction } from "@/app/(auth)/login/actions";
 import { cn } from "@/lib/utils";
 
+import { SyncIndicator } from "./sync-indicator";
+
 /**
  * Global tab nav for the authenticated app — Today / Systems / Progress
  * per build spec §2.3. Shown by `src/app/(app)/layout.tsx` above any
@@ -28,7 +30,7 @@ function matches(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppNav() {
+export function AppNav({ profileId }: { profileId: string }) {
   const pathname = usePathname();
 
   return (
@@ -59,6 +61,7 @@ export function AppNav() {
             );
           })}
         </ul>
+        <SyncIndicator profileId={profileId} />
         <form action={signOutAction}>
           <button
             type="submit"
