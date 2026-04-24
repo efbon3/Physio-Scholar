@@ -30,7 +30,9 @@ export default async function LoginPage({ searchParams }: PageProps) {
           }}
           className="flex flex-col gap-5"
         >
-          <input type="hidden" name="next" value={next ?? "/"} />
+          {/* next-param fallback. Empty string lets the action use its own
+              default (/review) rather than hardcoding the home page here. */}
+          <input type="hidden" name="next" value={next ?? ""} />
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
