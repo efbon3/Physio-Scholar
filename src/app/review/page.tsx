@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Watermark } from "@/components/watermark";
 import { extractCards, type Card } from "@/lib/content/cards";
 import { normaliseMechanismId } from "@/lib/content/filters";
-import { readAllMechanisms } from "@/lib/content/fs";
+import { readAllMechanisms } from "@/lib/content/source";
 import { enforceRateLimit } from "@/lib/rate-limit/enforce";
 import { createClient } from "@/lib/supabase/server";
 

@@ -17,10 +17,11 @@ type CardStateRow = PublicTables["card_states"]["Row"];
 type ReviewRow = PublicTables["reviews"]["Row"];
 
 describe("Database type", () => {
-  it("exposes the eight public tables (Phase 2 + Phase 3 C2 + Phase 5 F1 + F2)", () => {
+  it("exposes the nine public tables (Phase 2 + Phase 3 + Phase 5 + Phase 5+ G1)", () => {
     expectTypeOf<keyof PublicTables>().toEqualTypeOf<
       | "card_states"
       | "content_flags"
+      | "content_mechanisms"
       | "institutions"
       | "profiles"
       | "rate_limits"

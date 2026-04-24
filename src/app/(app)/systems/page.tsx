@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { readAllMechanisms } from "@/lib/content/fs";
+import { readAllMechanisms } from "@/lib/content/source";
 
 export const metadata = {
   title: "Systems",

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { extractCards, type Card } from "@/lib/content/cards";
-import { readAllMechanisms } from "@/lib/content/fs";
+import { readAllMechanisms } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
 import { ProgressDashboard } from "./progress-dashboard";

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { MechanismRenderer } from "@/components/content/mechanism-renderer";
-import { readAllMechanisms, readMechanismById } from "@/lib/content/fs";
+import { readAllMechanisms, readMechanismById } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
 type Params = { params: Promise<{ system: string; mechanism: string }> };
