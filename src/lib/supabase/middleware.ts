@@ -64,4 +64,11 @@ export async function updateSession(request: NextRequest) {
  * Route prefixes that require a signed-in user. Everything else (landing page,
  * auth pages, public assets) is open.
  */
-const PROTECTED_PREFIXES = ["/app", "/today", "/systems", "/progress", "/review"] as const;
+const PROTECTED_PREFIXES = [
+  "/app",
+  "/today",
+  "/systems",
+  "/progress",
+  "/review",
+  "/admin",
+] as const;
