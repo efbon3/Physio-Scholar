@@ -38,6 +38,13 @@ export const cardSchema = z.object({
   /** Three tiers per build spec §2.5, but drafts may have fewer. */
   hints: z.array(z.string().min(1)).max(3),
   misconceptions: z.array(misconceptionSchema),
+  /**
+   * Exam patterns a card is appropriate for — drives the exam-mode
+   * filter (MBBS vs pre-PG per build spec §2.11). Authored either
+   * per-card via `**Exam patterns:** mbbs, pre-pg` or inherited from
+   * the mechanism frontmatter. Stored lowercased + trimmed here.
+   */
+  exam_patterns: z.array(z.string().min(1)),
 });
 export type Card = z.infer<typeof cardSchema>;
 
@@ -47,10 +54,19 @@ export type Card = z.infer<typeof cardSchema>;
  */
 export function extractCards(mechanism: Mechanism): Card[] {
   if (!mechanism.layers.questions) return [];
-  return parseQuestionsSection(mechanism.frontmatter.id, mechanism.layers.questions);
+  const mechanismExamPatterns = mechanism.frontmatter.exam_patterns ?? [];
+  return parseQuestionsSection(
+    mechanism.frontmatter.id,
+    mechanism.layers.questions,
+    mechanismExamPatterns,
+  );
 }
 
-function parseQuestionsSection(mechanismId: string, section: string): Card[] {
+function parseQuestionsSection(
+  mechanismId: string,
+  section: string,
+  mechanismExamPatterns: readonly string[],
+): Card[] {
   // Split the section on `## Question N` headings. The regex keeps the
   // heading with the block so we can recover the index.
   const parts = section.split(/^##\s+Question\s+(\d+)\s*$/im);
@@ -62,13 +78,18 @@ function parseQuestionsSection(mechanismId: string, section: string): Card[] {
     const indexStr = parts[i];
     const body = parts[i + 1] ?? "";
     const index = Number.parseInt(indexStr, 10);
-    const card = parseCardBody(mechanismId, index, body);
+    const card = parseCardBody(mechanismId, index, body, mechanismExamPatterns);
     cards.push(cardSchema.parse(card));
   }
   return cards;
 }
 
-function parseCardBody(mechanismId: string, index: number, body: string) {
+function parseCardBody(
+  mechanismId: string,
+  index: number,
+  body: string,
+  fallbackExamPatterns: readonly string[],
+) {
   return {
     id: `${mechanismId}:${index}`,
     mechanism_id: mechanismId,
@@ -80,7 +101,43 @@ function parseCardBody(mechanismId: string, index: number, body: string) {
     elaborative_explanation: extractLabeledField(body, "Elaborative explanation") ?? "",
     hints: extractHintLadder(body),
     misconceptions: extractMisconceptions(body),
+    exam_patterns: extractCardExamPatterns(body, fallbackExamPatterns),
   };
+}
+
+/**
+ * Parse the optional `**Exam patterns:** mbbs, pre-pg` line from a
+ * question body. If absent, inherit the mechanism-level list (Option
+ * Y per the plan — questions default to the mechanism's tagging,
+ * but can override).
+ *
+ * Values are lower-cased and trimmed so downstream filters don't need
+ * to normalise. Deduplicated to keep the serialised Card compact.
+ */
+function extractCardExamPatterns(body: string, fallback: readonly string[]): string[] {
+  const raw = extractLabeledField(body, "Exam patterns");
+  if (!raw) {
+    return normaliseExamPatterns(fallback);
+  }
+  const tokens = raw
+    .split(/[,\n]/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  return normaliseExamPatterns(tokens);
+}
+
+function normaliseExamPatterns(tokens: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tokens) {
+    const key = raw.toLowerCase().trim();
+    if (!key) continue;
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(key);
+    }
+  }
+  return out;
 }
 
 /**

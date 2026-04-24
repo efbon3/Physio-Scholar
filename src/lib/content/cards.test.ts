@@ -224,3 +224,78 @@ describe("extractCards — parses the shipped placeholder", () => {
     expect(cards[0].stem.length).toBeGreaterThan(20);
   });
 });
+
+describe("extractCards — exam_patterns (Option Y)", () => {
+  it("inherits the mechanism-level list when the card has no line", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0].exam_patterns).toEqual(["neet-pg"]);
+  });
+
+  it("per-card line overrides the mechanism fallback", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Exam patterns:** mbbs, pre-pg
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0].exam_patterns).toEqual(["mbbs", "pre-pg"]);
+  });
+
+  it("normalises case, whitespace, and duplicates", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Exam patterns:**   MBBS ,  pre-pg ,  MBBS
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0].exam_patterns).toEqual(["mbbs", "pre-pg"]);
+  });
+
+  it("different cards in the same mechanism can carry different patterns", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Exam patterns:** mbbs
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 2
+**Type:** recall
+**Bloom's level:** apply
+**Exam patterns:** pre-pg
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const cards = extractCards(mechanism);
+    expect(cards[0].exam_patterns).toEqual(["mbbs"]);
+    expect(cards[1].exam_patterns).toEqual(["pre-pg"]);
+  });
+});
