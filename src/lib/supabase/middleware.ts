@@ -71,5 +71,6 @@ const PROTECTED_PREFIXES = [
   "/progress",
   "/review",
   "/exam",
+  "/simulators",
   "/admin",
 ] as const;
