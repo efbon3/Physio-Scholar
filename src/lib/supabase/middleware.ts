@@ -74,4 +74,5 @@ const PROTECTED_PREFIXES = [
   "/simulators",
   "/admin",
   "/profile",
+  "/calendar",
 ] as const;
