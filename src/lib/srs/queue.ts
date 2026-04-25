@@ -37,10 +37,26 @@ export type AssembleQueueOptions = {
   now: Date;
   maxNewCards: number;
   includeLeeches?: boolean;
+  /**
+   * Optional set of card ids to surface earlier within their bucket
+   * (J7 exam-aware weighting). Cards with id ∈ boostCardIds:
+   *   - among due cards, jump to the front of the due bucket
+   *     (preserving their internal due_at ordering)
+   *   - among new cards, jump to the front of the new bucket
+   *     (preserving their authored order)
+   *
+   * Membership and counts are unchanged — only ordering. When the set
+   * is empty or absent, behaviour is identical to a non-weighted call.
+   *
+   * The page composes this set from the active exam window: the
+   * mechanisms whose organ_system intersects the upcoming exam's
+   * `organ_systems`, then their cards.
+   */
+  boostCardIds?: ReadonlySet<string>;
 };
 
 export function assembleQueue(opts: AssembleQueueOptions): QueuedCard[] {
-  const { cards, cardStates, now, maxNewCards, includeLeeches = true } = opts;
+  const { cards, cardStates, now, maxNewCards, includeLeeches = true, boostCardIds } = opts;
 
   const due: QueuedCard[] = [];
   const newOnes: QueuedCard[] = [];
@@ -62,6 +78,7 @@ export function assembleQueue(opts: AssembleQueueOptions): QueuedCard[] {
     }
   }
 
+  // Stable due-order: by due_at ascending, with id tie-break.
   due.sort((a, b) => {
     const at = new Date(a.state.due_at).getTime();
     const bt = new Date(b.state.due_at).getTime();
@@ -75,7 +92,28 @@ export function assembleQueue(opts: AssembleQueueOptions): QueuedCard[] {
   // appear, which mirrors SOP Appendix A's Question 1, 2, 3 ordering).
   const limitedNew = newOnes.slice(0, Math.max(0, maxNewCards));
 
-  return [...due, ...limitedNew];
+  // Exam-aware re-ordering. Boost set partition is stable: cards in the
+  // set keep their relative order; cards outside the set keep theirs.
+  // Counts are preserved.
+  const dueOrdered =
+    boostCardIds && boostCardIds.size > 0 ? partitionBoosted(due, boostCardIds) : due;
+  const newOrdered =
+    boostCardIds && boostCardIds.size > 0 ? partitionBoosted(limitedNew, boostCardIds) : limitedNew;
+
+  return [...dueOrdered, ...newOrdered];
+}
+
+function partitionBoosted(
+  bucket: readonly QueuedCard[],
+  boostCardIds: ReadonlySet<string>,
+): QueuedCard[] {
+  const boosted: QueuedCard[] = [];
+  const rest: QueuedCard[] = [];
+  for (const q of bucket) {
+    if (boostCardIds.has(q.card.id)) boosted.push(q);
+    else rest.push(q);
+  }
+  return [...boosted, ...rest];
 }
 
 /** Convenience helper: count cards in each bucket (used by Today dashboard). */

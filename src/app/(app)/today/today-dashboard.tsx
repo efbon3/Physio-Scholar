@@ -58,12 +58,22 @@ type DashboardData = {
  *   - No cards in scope → challenge hidden
  * so a brand-new account never sees a broken-looking surface.
  */
+export type ExamWidget = {
+  title: string;
+  startsAt: string;
+  daysAway: number;
+  topics: string[];
+  audience: string;
+};
+
 export function TodayDashboard({
   cards,
   email,
   mechanismTitles,
   profileId,
   studySystems,
+  boostCardIds = [],
+  examWidget = null,
 }: {
   cards: readonly Card[];
   email: string | null;
@@ -71,6 +81,10 @@ export function TodayDashboard({
   profileId: string;
   /** Active organ-systems preference. Null = no preference (CI / preview). */
   studySystems: string[] | null;
+  /** Card ids to boost in queue ordering — derived from the active exam window. */
+  boostCardIds?: readonly string[];
+  /** Active exam window; null when no exam falls in the next 14 days. */
+  examWidget?: ExamWidget | null;
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
   // Local state for the filter chips. Empty Set = no filter on that
@@ -105,6 +119,11 @@ export function TodayDashboard({
     return parts.length === 0 ? "" : `?${parts.join("&")}`;
   }, [priorityFilter, difficultyFilter]);
 
+  // Stable Set across renders so assembleQueue's reference comparison
+  // doesn't rebuild on every keystroke. boostCardIds comes in as an
+  // array prop (server-component-friendly).
+  const boostSet = useMemo(() => new Set(boostCardIds), [boostCardIds]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -122,6 +141,7 @@ export function TodayDashboard({
             cardStates: stateMap,
             now,
             maxNewCards: DEFAULT_MAX_NEW_CARDS,
+            boostCardIds: boostSet,
           }),
         );
         const titlesMap = new Map(Object.entries(mechanismTitles));
@@ -157,7 +177,7 @@ export function TodayDashboard({
     return () => {
       cancelled = true;
     };
-  }, [cards, mechanismTitles, profileId]);
+  }, [cards, mechanismTitles, profileId, boostSet]);
 
   const greetingName = email?.split("@")[0] ?? "there";
   const queue = data?.queue;
@@ -267,6 +287,8 @@ export function TodayDashboard({
         </section>
       ) : null}
 
+      {examWidget ? <ExamCountdown examWidget={examWidget} boosting={boostSet.size > 0} /> : null}
+
       {data ? (
         <section
           aria-label="Today widgets"
@@ -278,6 +300,44 @@ export function TodayDashboard({
         </section>
       ) : null}
     </main>
+  );
+}
+
+function ExamCountdown({ examWidget, boosting }: { examWidget: ExamWidget; boosting: boolean }) {
+  const days = examWidget.daysAway;
+  const dayLabel = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+  return (
+    <section
+      aria-label="Next exam"
+      className="border-destructive/30 bg-destructive/5 flex flex-col gap-2 rounded-md border p-4"
+    >
+      <p className="text-xs tracking-widest uppercase">
+        Next exam · {examWidget.audience === "personal" ? "Personal" : "Institution"}
+      </p>
+      <p className="font-heading text-xl font-semibold">{examWidget.title}</p>
+      <p className="text-sm">
+        <span className="font-medium">{dayLabel}</span>{" "}
+        <span className="text-muted-foreground">({examWidget.startsAt})</span>
+      </p>
+      {examWidget.topics.length > 0 ? (
+        <p className="text-muted-foreground text-xs capitalize">
+          Topics: {examWidget.topics.join(" · ")}
+        </p>
+      ) : null}
+      {boosting ? (
+        <p className="text-muted-foreground text-xs">
+          Cards from these systems are surfacing first in your review queue.
+        </p>
+      ) : null}
+      <div className="mt-1 flex flex-wrap gap-2 text-xs">
+        <Link
+          href="/calendar"
+          className="hover:bg-muted text-foreground rounded-md border px-2 py-1"
+        >
+          See full calendar
+        </Link>
+      </div>
+    </section>
   );
 }
 

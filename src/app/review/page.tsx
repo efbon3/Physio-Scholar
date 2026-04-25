@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { Watermark } from "@/components/watermark";
+import { readVisibleEvents } from "@/lib/calendar/events";
+import { buildBoostCardIds, findActiveExamWindow } from "@/lib/calendar/srs-weighting";
 import {
   applyCardFilters,
   parseDifficultyFilter,
@@ -152,6 +154,16 @@ export default async function ReviewPage({
     };
   }
 
+  // J7 exam-aware boost: same logic as /today. We don't apply weighting
+  // when the learner explicitly drilled into a single mechanism via
+  // `?mechanism=…` — that's a deliberate focus and the boost would
+  // be a no-op anyway (the queue is already a single mechanism).
+  const events = await readVisibleEvents();
+  const activeExam = mechanismFilter ? null : findActiveExamWindow(events, new Date());
+  const boostCardIds = activeExam
+    ? Array.from(buildBoostCardIds(activeExam, filteredMechanisms, cards))
+    : [];
+
   return (
     <>
       <SessionPlayer
@@ -159,6 +171,7 @@ export default async function ReviewPage({
         profileId={userId ?? "preview"}
         focusMechanism={focusTitle ? { id: mechanismFilter!, title: focusTitle } : null}
         mechanismTitles={mechanismTitles}
+        boostCardIds={boostCardIds}
       />
       <Watermark userId={userId} />
     </>

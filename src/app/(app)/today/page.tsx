@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { readVisibleEvents, daysUntil } from "@/lib/calendar/events";
+import { buildBoostCardIds, findActiveExamWindow } from "@/lib/calendar/srs-weighting";
 import { extractCards, type Card } from "@/lib/content/cards";
 import { readAllMechanisms } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
@@ -64,6 +66,25 @@ export default async function TodayPage() {
     mechanismTitles[m.frontmatter.id] = m.frontmatter.title;
   }
 
+  // J7 exam-aware weighting: find the soonest exam in the ±14d window
+  // and compute the boost set of card ids the queue should surface
+  // first. Both audiences (institution + personal) participate.
+  const now = new Date();
+  const events = await readVisibleEvents();
+  const activeExam = findActiveExamWindow(events, now);
+  const boostCardIds = activeExam
+    ? buildBoostCardIds(activeExam, inScope, cards)
+    : new Set<string>();
+  const examWidget = activeExam
+    ? {
+        title: activeExam.title,
+        startsAt: activeExam.starts_at,
+        daysAway: daysUntil(activeExam.starts_at, now),
+        topics: activeExam.organ_systems,
+        audience: activeExam.audience,
+      }
+    : null;
+
   return (
     <TodayDashboard
       cards={cards}
@@ -71,6 +92,8 @@ export default async function TodayPage() {
       email={user?.email ?? null}
       profileId={user?.id ?? "preview"}
       studySystems={studySystems}
+      boostCardIds={Array.from(boostCardIds)}
+      examWidget={examWidget}
     />
   );
 }

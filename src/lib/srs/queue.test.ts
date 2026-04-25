@@ -173,3 +173,92 @@ describe("summariseQueue", () => {
     expect(summariseQueue(q)).toEqual({ due: 1, new: 2, total: 3 });
   });
 });
+
+describe("assembleQueue — boostCardIds (J7 exam-aware weighting)", () => {
+  it("surfaces boosted due cards before non-boosted ones in the same bucket", () => {
+    const cards = [card("a:1"), card("a:2"), card("b:1")];
+    // All three are equally due — natural order would be a:1, a:2, b:1
+    // (id-tiebreak ascending). Boost b:1 and it jumps to the front.
+    const states = new Map<string, CardState>([
+      ["a:1", stateAt(new Date("2026-04-01T10:00:00Z"))],
+      ["a:2", stateAt(new Date("2026-04-01T10:00:00Z"))],
+      ["b:1", stateAt(new Date("2026-04-01T10:00:00Z"))],
+    ]);
+    const q = assembleQueue({
+      cards,
+      cardStates: states,
+      now: NOW,
+      maxNewCards: 0,
+      boostCardIds: new Set(["b:1"]),
+    });
+    expect(q.map((x) => x.card.id)).toEqual(["b:1", "a:1", "a:2"]);
+  });
+
+  it("preserves due_at ordering inside the boosted partition", () => {
+    const cards = [card("a:1"), card("a:2"), card("b:1"), card("b:2")];
+    const states = new Map<string, CardState>([
+      ["a:1", stateAt(new Date("2026-04-01T08:00:00Z"))],
+      ["a:2", stateAt(new Date("2026-04-01T07:00:00Z"))],
+      ["b:1", stateAt(new Date("2026-04-01T10:00:00Z"))],
+      ["b:2", stateAt(new Date("2026-04-01T09:00:00Z"))],
+    ]);
+    const q = assembleQueue({
+      cards,
+      cardStates: states,
+      now: NOW,
+      maxNewCards: 0,
+      boostCardIds: new Set(["a:1", "a:2"]),
+    });
+    // Boosted (a:2 then a:1, more-overdue first), then non-boosted
+    // (b:2 then b:1, more-overdue first).
+    expect(q.map((x) => x.card.id)).toEqual(["a:2", "a:1", "b:2", "b:1"]);
+  });
+
+  it("surfaces boosted new cards before non-boosted within the new bucket", () => {
+    const cards = [card("a:1"), card("a:2"), card("b:1")];
+    const q = assembleQueue({
+      cards,
+      cardStates: new Map(),
+      now: NOW,
+      maxNewCards: 10,
+      boostCardIds: new Set(["b:1"]),
+    });
+    expect(q.map((x) => x.card.id)).toEqual(["b:1", "a:1", "a:2"]);
+  });
+
+  it("does not change membership — counts stay the same", () => {
+    const cards = [card("a:1"), card("a:2"), card("b:1")];
+    const states = new Map<string, CardState>([["a:1", stateAt(new Date("2026-04-01T10:00:00Z"))]]);
+    const q = assembleQueue({
+      cards,
+      cardStates: states,
+      now: NOW,
+      maxNewCards: 5,
+      boostCardIds: new Set(["a:2", "b:1"]),
+    });
+    expect(q).toHaveLength(3);
+    expect(summariseQueue(q)).toEqual({ due: 1, new: 2, total: 3 });
+  });
+
+  it("is a no-op when boost set is empty or absent", () => {
+    const cards = [card("a:1"), card("b:1")];
+    const states = new Map<string, CardState>([
+      ["a:1", stateAt(new Date("2026-04-01T10:00:00Z"))],
+      ["b:1", stateAt(new Date("2026-04-01T10:00:00Z"))],
+    ]);
+    const noBoost = assembleQueue({
+      cards,
+      cardStates: states,
+      now: NOW,
+      maxNewCards: 0,
+    });
+    const emptyBoost = assembleQueue({
+      cards,
+      cardStates: states,
+      now: NOW,
+      maxNewCards: 0,
+      boostCardIds: new Set(),
+    });
+    expect(noBoost.map((x) => x.card.id)).toEqual(emptyBoost.map((x) => x.card.id));
+  });
+});
