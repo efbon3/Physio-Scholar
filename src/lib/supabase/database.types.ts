@@ -532,6 +532,31 @@ export type Database = {
         }[]
       }
       is_current_user_admin: { Args: never; Returns: boolean }
+      is_current_user_faculty: { Args: never; Returns: boolean }
+      current_user_institution_id: { Args: never; Returns: string | null }
+      can_view_cohort: { Args: { p_institution_id: string }; Returns: boolean }
+      cohort_class_roster: {
+        Args: { p_institution_id: string }
+        Returns: {
+          profile_id: string
+          full_name: string | null
+          year_of_study: number | null
+          reviews_total: number
+          reviews_last_7d: number
+          retention_pct_30d: number | null
+          last_review_at: string | null
+        }[]
+      }
+      cohort_card_aggregates: {
+        Args: { p_institution_id: string }
+        Returns: {
+          card_id: string
+          reviews_total: number
+          reviews_last_30d: number
+          retention_pct_30d: number | null
+          unique_learners: number
+        }[]
+      }
     }
     Enums: {
       content_flag_status: "open" | "resolved" | "rejected"
