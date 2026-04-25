@@ -38,4 +38,27 @@ describe("isSafeRelativePath", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(isSafeRelativePath(null as any)).toBe(false);
   });
+
+  it("rejects URL-encoded slash / backslash prefixes that some decoders expand", () => {
+    // After a single decodeURIComponent pass these become `//evil.com`
+    // and `/\evil.com` respectively — both blocked by the literal rule.
+    expect(isSafeRelativePath("/%2Fevil.com")).toBe(false);
+    expect(isSafeRelativePath("/%2fevil.com")).toBe(false);
+    expect(isSafeRelativePath("/%5Cevil.com")).toBe(false);
+    expect(isSafeRelativePath("/%5cevil.com")).toBe(false);
+  });
+
+  it("rejects values with malformed percent escapes", () => {
+    // decodeURIComponent throws on bare `%` — reject rather than let
+    // an odd crafted string through the guard by accident.
+    expect(isSafeRelativePath("/%")).toBe(false);
+    expect(isSafeRelativePath("/%ZZ")).toBe(false);
+  });
+
+  it("leaves normally-encoded legitimate paths alone", () => {
+    // `%20` is the canonical encoding for a space in a URL path; decoding
+    // still leaves a safe prefix.
+    expect(isSafeRelativePath("/reset-password?email=a%40b.com")).toBe(true);
+    expect(isSafeRelativePath("/systems/cardiovascular/frank-starling")).toBe(true);
+  });
 });

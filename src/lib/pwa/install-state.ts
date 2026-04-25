@@ -108,16 +108,28 @@ export function checkEligibility(now: Date = new Date()): InstallEligibility {
 }
 
 /**
- * Best-effort iOS detection. iOS Safari doesn't fire beforeinstallprompt,
- * so on iOS we show an instruction banner instead of a programmatic
- * install button.
+ * Best-effort iOS detection. Every iOS browser is WebKit underneath
+ * and none of them fire `beforeinstallprompt` — Chrome (CriOS),
+ * Firefox (FxiOS), and Edge (EdgiOS) on iOS all need the same
+ * "Tap Share → Add to Home Screen" instructions that Safari does.
+ *
+ * An earlier version of this function only matched Safari, which
+ * silently broke the install path for anyone using iOS Chrome (fairly
+ * common among Indian med students): no beforeinstallprompt, and no
+ * iOS fallback banner either.
  */
+export function isIos(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+/** @deprecated Use `isIos()`. Kept as a narrow Safari-only check for legacy callers. */
 export function isIosSafari(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
-  const isIos = /iPad|iPhone|iPod/.test(ua);
-  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
-  return isIos && isSafari;
+  const ios = /iPad|iPhone|iPod/.test(ua);
+  const safari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  return ios && safari;
 }
 
 /** Detect if the app is already running standalone (installed). */

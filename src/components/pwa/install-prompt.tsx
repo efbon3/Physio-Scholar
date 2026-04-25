@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import {
   checkEligibility,
-  isIosSafari,
+  isIos,
   isRunningStandalone,
   markDismissed,
   markInstalled,
@@ -65,9 +65,12 @@ export function InstallPrompt() {
     window.addEventListener("appinstalled", onInstalled);
 
     // Path 2: iOS fallback — no DOM event, so show instructions directly.
-    // Delay slightly so the banner doesn't flash at page mount.
+    // Delay slightly so the banner doesn't flash at page mount. We use
+    // isIos() (not isIosSafari()) because every iOS browser is WebKit
+    // underneath — Chrome (CriOS) and Firefox (FxiOS) also need the
+    // "Add to Home Screen" hint since none of them fire beforeinstallprompt.
     const iosTimer = setTimeout(() => {
-      if (isIosSafari()) setKind((current) => current ?? "ios");
+      if (isIos()) setKind((current) => current ?? "ios");
     }, 300);
 
     return () => {
@@ -85,7 +88,7 @@ export function InstallPrompt() {
         label="Add Physio-Scholar to your home screen"
         body={
           <>
-            Tap the Share icon in Safari and choose{" "}
+            Tap the <strong>Share</strong> icon in your browser and choose{" "}
             <strong>&ldquo;Add to Home Screen&rdquo;</strong> to launch Physio-Scholar fullscreen.
           </>
         }
