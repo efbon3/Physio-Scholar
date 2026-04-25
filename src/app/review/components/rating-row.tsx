@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Rating } from "@/lib/srs/types";
 
@@ -26,6 +26,15 @@ import type { Rating } from "@/lib/srs/types";
  * `keydown` while the row is active; if focus is in a textarea (the
  * attempt or self-explanation field), we skip — the learner may be
  * mid-sentence and the digits would otherwise hijack their input.
+ *
+ * Forced rating (build spec §2.11 / item 345): "Forced rating allows tab
+ * switches, auto-rates at 24 hours, cannot be bypassed within session."
+ * If the learner has revealed a card and walked away, after 24h of
+ * inactivity we auto-fire `onRate("again")` — same effect as them rating
+ * Again themselves. The card re-enters the queue at a 1-minute interval
+ * so they re-encounter it next session. The timer is wall-clock from
+ * `revealedAt`, not visibility-state-aware, so tab switches don't extend
+ * or shorten the deadline.
  */
 const RATING_KEYS: Record<string, Rating> = {
   "1": "again",
@@ -41,14 +50,22 @@ const RATING_HINTS: Record<Rating, string> = {
   easy: "4",
 };
 
+const DEFAULT_AUTO_RATE_AFTER_MS = 24 * 60 * 60 * 1000;
+
 export function RatingRow({
   revealedAt,
   delayMs,
   onRate,
+  autoRateAfterMs = DEFAULT_AUTO_RATE_AFTER_MS,
+  autoRateValue = "again",
 }: {
   revealedAt: number | null;
   delayMs: number;
   onRate: (rating: Rating) => void;
+  /** Auto-rate threshold from `revealedAt`. Default 24h. Set to 0 to disable. */
+  autoRateAfterMs?: number;
+  /** Rating value to fire when the auto-rate timer expires. Default "again". */
+  autoRateValue?: Rating;
 }) {
   // Parent passes a key tied to `revealedAt`, so this component remounts
   // whenever the student reveals the next card. That means the useState
@@ -66,12 +83,34 @@ export function RatingRow({
     return () => clearTimeout(t);
   }, [revealedAt, delayMs]);
 
+  // Hold onRate in a ref so the auto-rate timer doesn't capture a stale
+  // closure if the parent rebinds the callback on re-render.
+  const onRateRef = useRef(onRate);
+  useEffect(() => {
+    onRateRef.current = onRate;
+  }, [onRate]);
+
+  // Auto-rate watchdog. Wall-clock from revealedAt, fires once.
+  useEffect(() => {
+    if (revealedAt === null) return;
+    if (autoRateAfterMs <= 0) return;
+    const remaining = revealedAt + autoRateAfterMs - Date.now();
+    // If the user lands on the page well past the threshold (e.g. they
+    // reloaded an ancient tab), fire immediately rather than wait the
+    // negative remainder.
+    if (remaining <= 0) {
+      onRateRef.current(autoRateValue);
+      return;
+    }
+    const t = setTimeout(() => onRateRef.current(autoRateValue), remaining);
+    return () => clearTimeout(t);
+  }, [revealedAt, autoRateAfterMs, autoRateValue]);
+
+  // Keyboard shortcuts: only while active and only when no text field
+  // owns focus.
   useEffect(() => {
     if (!active) return;
     const handler = (e: KeyboardEvent) => {
-      // Skip when the learner is typing into a field — they may be
-      // composing the self-explanation. Modifier keys are also skipped
-      // so browser shortcuts (Ctrl+1 etc.) keep working.
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT")) return;
