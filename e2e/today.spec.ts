@@ -59,4 +59,25 @@ test.describe("Today dashboard + app nav", () => {
       "page",
     );
   });
+
+  test("profile page renders with personal-detail fields and passes axe", async ({ page }) => {
+    const errors = collectPageErrors(page);
+    await page.goto("/profile");
+
+    await expect(page.getByRole("heading", { name: /your details/i })).toBeVisible({
+      timeout: 10_000,
+    });
+    // The four editable text inputs are exposed.
+    await expect(page.getByLabel(/^full name$/i)).toBeVisible();
+    await expect(page.getByLabel(/^date of birth$/i)).toBeVisible();
+    await expect(page.getByLabel(/^roll number$/i)).toBeVisible();
+    await expect(page.getByLabel(/^phone number$/i)).toBeVisible();
+    await expect(page.getByLabel(/^address$/i)).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(results.violations).toEqual([]);
+    expect(errors).toEqual([]);
+  });
 });

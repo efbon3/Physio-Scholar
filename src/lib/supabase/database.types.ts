@@ -113,11 +113,14 @@ export type Database = {
       }
       profiles: {
         Row: {
+          address: string | null
+          avatar_url: string | null
           consent_analytics: boolean
           consent_analytics_updated_at: string | null
           consent_privacy_accepted_at: string | null
           consent_terms_accepted_at: string | null
           created_at: string
+          date_of_birth: string | null
           deletion_requested_at: string | null
           full_name: string | null
           guardian_email: string | null
@@ -125,15 +128,20 @@ export type Database = {
           institution_id: string | null
           is_admin: boolean
           is_minor: boolean | null
+          phone: string | null
+          roll_number: string | null
           updated_at: string
           year_of_study: number | null
         }
         Insert: {
+          address?: string | null
+          avatar_url?: string | null
           consent_analytics?: boolean
           consent_analytics_updated_at?: string | null
           consent_privacy_accepted_at?: string | null
           consent_terms_accepted_at?: string | null
           created_at?: string
+          date_of_birth?: string | null
           deletion_requested_at?: string | null
           full_name?: string | null
           guardian_email?: string | null
@@ -141,15 +149,20 @@ export type Database = {
           institution_id?: string | null
           is_admin?: boolean
           is_minor?: boolean | null
+          phone?: string | null
+          roll_number?: string | null
           updated_at?: string
           year_of_study?: number | null
         }
         Update: {
+          address?: string | null
+          avatar_url?: string | null
           consent_analytics?: boolean
           consent_analytics_updated_at?: string | null
           consent_privacy_accepted_at?: string | null
           consent_terms_accepted_at?: string | null
           created_at?: string
+          date_of_birth?: string | null
           deletion_requested_at?: string | null
           full_name?: string | null
           guardian_email?: string | null
@@ -157,6 +170,8 @@ export type Database = {
           institution_id?: string | null
           is_admin?: boolean
           is_minor?: boolean | null
+          phone?: string | null
+          roll_number?: string | null
           updated_at?: string
           year_of_study?: number | null
         }
