@@ -14,6 +14,8 @@ function card(id: string, index = Number.parseInt(id.split(":")[1] ?? "1", 10)):
     index,
     type: "prediction",
     blooms_level: "apply",
+    priority: "should",
+    difficulty: "standard",
     stem: `stem-${id}`,
     correct_answer: "a",
     elaborative_explanation: "e",

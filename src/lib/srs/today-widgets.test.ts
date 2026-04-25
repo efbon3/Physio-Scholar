@@ -96,6 +96,8 @@ describe("uniqueMechanisms", () => {
       index,
       type: "free-recall",
       blooms_level: "understand",
+      priority: "should",
+      difficulty: "standard",
       stem: "stem",
       correct_answer: "ans",
       elaborative_explanation: "why",

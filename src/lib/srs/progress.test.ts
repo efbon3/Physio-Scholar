@@ -45,6 +45,8 @@ function card(id: string, mechanismId: string): Card {
     index: Number.parseInt(id.split(":")[1] ?? "1", 10),
     type: "recall",
     blooms_level: "understand",
+    priority: "should",
+    difficulty: "standard",
     stem: "Stem",
     correct_answer: "Answer",
     elaborative_explanation: "Why",

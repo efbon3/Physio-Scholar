@@ -17,6 +17,8 @@ function card(overrides: Partial<Card> & { id: string }): Card {
     index: Number.parseInt(overrides.id.split(":")[1] ?? "1", 10),
     type: "mcq",
     blooms_level: "understand",
+    priority: "should",
+    difficulty: "standard",
     stem: "Stem",
     correct_answer: "Correct answer",
     elaborative_explanation: "Why.",

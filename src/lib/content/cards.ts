@@ -18,6 +18,38 @@ import type { Mechanism } from "./loader";
 export const bloomsLevelSchema = z.enum(["remember", "understand", "apply", "analyze"]);
 export type BloomsLevel = z.infer<typeof bloomsLevelSchema>;
 
+/**
+ * Pedagogic priority — how essential the question is to mastery of the
+ * mechanism. Drives adaptive ordering (must-know surfaces first, then
+ * should-know, then good-to-know) and curriculum-coverage analytics.
+ *
+ *   - must:   foundational facts the learner cannot omit
+ *   - should: standard expectations of a competent learner
+ *   - good:   bonus depth — interesting, not required
+ *
+ * Default when omitted: "should". Authored per question via
+ * `**Priority:** must` (or `should` / `good`).
+ */
+export const priorityLevelSchema = z.enum(["must", "should", "good"]);
+export type PriorityLevel = z.infer<typeof priorityLevelSchema>;
+
+/**
+ * Difficulty band — how hard the question is to answer correctly,
+ * independent of pedagogic priority. A "must / advanced" question is
+ * legitimate and useful (a foundational concept tested at high
+ * cognitive depth). Used for adaptive pacing — the queue can
+ * front-load foundational items before advancing.
+ *
+ *   - foundational: a learner first encountering the topic should manage
+ *   - standard:     average difficulty for this level of training
+ *   - advanced:     challenging even for a well-prepared learner
+ *
+ * Default when omitted: "standard". Authored per question via
+ * `**Difficulty:** foundational` (or `standard` / `advanced`).
+ */
+export const difficultyLevelSchema = z.enum(["foundational", "standard", "advanced"]);
+export type DifficultyLevel = z.infer<typeof difficultyLevelSchema>;
+
 export const misconceptionSchema = z.object({
   /** The incorrect answer string, as written. */
   wrong_answer: z.string().min(1),
@@ -32,6 +64,10 @@ export const cardSchema = z.object({
   index: z.number().int().min(1),
   type: z.string().min(1),
   blooms_level: bloomsLevelSchema,
+  /** Pedagogic priority — see `priorityLevelSchema`. Defaults to "should". */
+  priority: priorityLevelSchema,
+  /** Difficulty band — see `difficultyLevelSchema`. Defaults to "standard". */
+  difficulty: difficultyLevelSchema,
   stem: z.string().min(1),
   correct_answer: z.string().min(1),
   elaborative_explanation: z.string().min(1),
@@ -96,6 +132,8 @@ function parseCardBody(
     index,
     type: extractLabeledField(body, "Type") ?? "unspecified",
     blooms_level: normaliseBloomsLevel(extractLabeledField(body, "Bloom's level") ?? ""),
+    priority: normalisePriorityLevel(extractLabeledField(body, "Priority")),
+    difficulty: normaliseDifficultyLevel(extractLabeledField(body, "Difficulty")),
     stem: extractLabeledField(body, "Stem") ?? "",
     correct_answer: extractLabeledField(body, "Correct answer") ?? "",
     elaborative_explanation: extractLabeledField(body, "Elaborative explanation") ?? "",
@@ -171,6 +209,50 @@ function normaliseBloomsLevel(raw: string): BloomsLevel {
   // to the closest supported bucket rather than fail the whole parse.
   if (lower.startsWith("evaluate") || lower.startsWith("create")) return "analyze";
   return "apply";
+}
+
+/**
+ * Coerce a `**Priority:**` value to one of the canonical tokens.
+ * Accepts a few near-synonyms authors are likely to type
+ * ("essential" / "core" → must; "optional" / "bonus" → good) so the
+ * parser tolerates light drift. Falls back to "should" when omitted
+ * or unrecognised — that's the centre of the distribution and the
+ * least surprising default.
+ */
+function normalisePriorityLevel(raw: string | null): PriorityLevel {
+  if (!raw) return "should";
+  const lower = raw.trim().toLowerCase();
+  if (lower === "must" || lower === "must-know" || lower === "essential" || lower === "core") {
+    return "must";
+  }
+  if (lower === "should" || lower === "should-know" || lower === "expected") {
+    return "should";
+  }
+  if (lower === "good" || lower === "good-to-know" || lower === "optional" || lower === "bonus") {
+    return "good";
+  }
+  return "should";
+}
+
+/**
+ * Coerce a `**Difficulty:**` value to one of the canonical tokens.
+ * Accepts the few synonym variants authors are likely to type
+ * ("intermediate" / "moderate" → standard) so a paste from a draft
+ * doesn't break the parse. Falls back to "standard" when omitted.
+ */
+function normaliseDifficultyLevel(raw: string | null): DifficultyLevel {
+  if (!raw) return "standard";
+  const lower = raw.trim().toLowerCase();
+  if (lower === "foundational" || lower === "basic" || lower === "easy") {
+    return "foundational";
+  }
+  if (lower === "standard" || lower === "intermediate" || lower === "moderate") {
+    return "standard";
+  }
+  if (lower === "advanced" || lower === "hard" || lower === "challenging") {
+    return "advanced";
+  }
+  return "standard";
 }
 
 function extractHintLadder(body: string): string[] {

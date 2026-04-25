@@ -10,6 +10,20 @@ so the names below are conventions, not enforced enums. Pick the label
 that best describes what the learner is being asked to do; reuse a
 label if a more specific one would be misleading.
 
+Each template ships with default **Priority** and **Difficulty** values
+that match the typical centre of gravity for that question type
+(e.g., `recall` → `must / foundational`, `analysis` → `should / advanced`).
+Override per-question whenever the topic warrants it. Both fields
+parse to enums:
+
+- **Priority**: `must` · `should` · `good`
+- **Difficulty**: `foundational` · `standard` · `advanced`
+
+The two axes are independent. A `recall` question can be `good /
+advanced` (an obscure trivia recall), and an `analysis` question can
+be `must / standard` (a high-yield breakdown that's not particularly
+hard).
+
 Each template uses the strict misconception line shape the parser
 requires (`- Wrong answer: "..." -> Misconception: ...`). Either ASCII
 `->` or Unicode `→` is accepted as the separator.
@@ -25,6 +39,8 @@ Bloom's level: **remember**. Keep stems short and unambiguous.
 ## Question N
 **Type:** recall
 **Bloom's level:** remember
+**Priority:** must
+**Difficulty:** foundational
 **Stem:** What is the normal resting cardiac output of a healthy 70 kg adult?
 **Correct answer:** Approximately 5 L/min (range 4.5–6 L/min at rest).
 **Elaborative explanation:** Cardiac output = stroke volume × heart rate. At rest, a typical 70 kg adult has SV ≈ 70 mL and HR ≈ 70 bpm, giving CO ≈ 4.9 L/min. This baseline anchors every comparison you'll see — a fall to 3 L/min is shock; a rise to 25 L/min is heavy exercise.
@@ -51,6 +67,8 @@ clinical decision rides on the distinction).
 ## Question N
 **Type:** comparison
 **Bloom's level:** understand
+**Priority:** must
+**Difficulty:** standard
 **Stem:** A patient lying flat has a JVP of 4 cm above the sternal angle. After standing, it falls to below the clavicle. A second patient lying flat has a JVP of 4 cm; after standing, it remains visibly elevated. Which finding is normal and which suggests right-sided heart failure, and why does posture distinguish them?
 **Correct answer:** The first patient is normal. JVP is a hydrostatic column reflecting right atrial pressure; standing drops the column relative to the sternal angle and the visible level falls. The second patient has a persistently elevated JVP regardless of posture — a hallmark of raised right atrial pressure (right-sided heart failure, fluid overload, tamponade, constrictive pericarditis).
 **Elaborative explanation:** The bedside utility of JVP is exactly this: posture-sensitivity reveals whether elevated pressure is positional or pathological. A column that responds to gravity is venous return doing its job; a column that doesn't is the right atrium failing to drain.
@@ -77,6 +95,8 @@ trivial, more becomes a puzzle.
 ## Question N
 **Type:** mechanism chain ordering
 **Bloom's level:** understand
+**Priority:** must
+**Difficulty:** foundational
 **Stem:** Place the following events of the baroreceptor reflex in causal order, beginning with the disturbance: (i) sympathetic outflow falls and parasympathetic outflow rises, (ii) MAP rises acutely, (iii) afferent signals via CN IX and CN X reach the NTS, (iv) carotid sinus and aortic arch baroreceptors increase firing, (v) heart rate slows, contractility decreases, vasodilatation occurs, (vi) MAP returns toward set-point.
 **Correct answer:** ii → iv → iii → i → v → vi (disturbance → sensor → afferent → integrator → efferent + effector → response).
 **Elaborative explanation:** The reflex maps onto the canonical homeostatic loop. Knowing where each lesion lives clinically — afferent baroreceptor failure, NTS damage, autonomic neuropathy — is the payoff for memorising this sequence rather than the bare reflex name.
@@ -102,6 +122,8 @@ consequence using the mechanism. Bloom's level: **apply**.
 ## Question N
 **Type:** prediction
 **Bloom's level:** apply
+**Priority:** should
+**Difficulty:** standard
 **Stem:** A patient with normal cardiac function receives a sudden 1 L crystalloid bolus. Predict the directional changes in (a) right atrial pressure, (b) end-diastolic volume, (c) stroke volume, and (d) cardiac output, holding heart rate constant.
 **Correct answer:** All four rise. The bolus increases venous return, raising right atrial pressure. Greater venous return increases end-diastolic volume (preload). By the Frank-Starling relationship, increased preload increases stroke volume. With heart rate held constant, the rise in stroke volume produces a rise in cardiac output.
 **Elaborative explanation:** This is the Frank-Starling chain in its simplest form. Each step depends on the previous one — a failure anywhere breaks the prediction. In a patient with diastolic dysfunction, step (b) is impaired; in systolic failure, step (c) is impaired. Practising the prediction on a healthy heart first makes the failure modes legible.
@@ -127,6 +149,8 @@ Always state the formula, the values, the arithmetic, and the units.
 ## Question N
 **Type:** calculation
 **Bloom's level:** apply
+**Priority:** should
+**Difficulty:** standard
 **Stem:** A patient has a heart rate of 80 bpm, end-diastolic volume of 120 mL, and end-systolic volume of 50 mL. Calculate (a) stroke volume, (b) ejection fraction, and (c) cardiac output in L/min.
 **Correct answer:**
 (a) SV = EDV − ESV = 120 − 50 = **70 mL**.
@@ -155,6 +179,8 @@ Maps the mechanism onto a real clinical situation. Bloom's level:
 ## Question N
 **Type:** clinical application
 **Bloom's level:** apply
+**Priority:** should
+**Difficulty:** advanced
 **Stem:** A 65-year-old with severe aortic stenosis presents with exertional syncope. Using cardiovascular mechanics, explain why exertion specifically — rather than rest — precipitates loss of consciousness in this patient.
 **Correct answer:** Aortic stenosis fixes the maximum stroke volume by limiting outflow. At rest, baseline cardiac output is preserved by elevated heart rate and contractility. During exertion, peripheral vasodilatation drops total peripheral resistance, but the stenosed valve prevents the compensatory rise in cardiac output (CO cannot rise enough to maintain MAP = CO × TPR). MAP falls, cerebral perfusion falls, syncope follows.
 **Elaborative explanation:** The clinical pearl: any condition that fixes one term in MAP = CO × TPR makes the patient fragile to exercise, where the other term must adjust. Aortic stenosis is the textbook example; severe pulmonary hypertension and constrictive pericarditis behave similarly. Recognising the haemodynamic family is more useful than memorising the symptom list of each condition individually.
@@ -182,6 +208,8 @@ so the question is doing pedagogical work even before the reveal.
 ## Question N
 **Type:** misconception-targeted
 **Bloom's level:** analyze
+**Priority:** must
+**Difficulty:** advanced
 **Stem:** Many textbooks state that the parasympathetic nervous system "decreases heart rate." A student infers from this that vagal stimulation alone could stop a healthy heart by driving rate to zero. Why is this inference wrong, and what actually limits the maximum slowing produced by vagal tone?
 **Correct answer:** Vagal stimulation slows the SA node by hyperpolarising the pacemaker cells (M2 → Gi → IK,ACh activation), but it cannot drive heart rate below the intrinsic rate of subordinate pacemakers. If the SA node is silenced entirely, the AV node (~40–60 bpm) or ventricular pacemakers (~20–40 bpm) take over. Maximum vagal slowing in a healthy human is roughly 30–40 bpm — not zero. Asystole from vagal activation alone is not a normal physiological outcome; it requires either sustained extreme stimulation or pre-existing conduction disease.
 **Elaborative explanation:** This is the conceptual difference between *suppressing the dominant pacemaker* and *abolishing all cardiac automaticity*. The hierarchy of pacemakers is a safety system — vagal tone modulates the dominant one without eliminating the backup.
@@ -208,6 +236,8 @@ contributing mechanisms, and explain how they interact. Bloom's level:
 ## Question N
 **Type:** analysis
 **Bloom's level:** analyze
+**Priority:** should
+**Difficulty:** advanced
 **Stem:** A patient on long-term ACE inhibitor therapy for hypertension develops acute renal failure within hours of starting an NSAID. Decompose this into the contributing mechanisms: (i) what the ACE inhibitor does to the renal afferent and efferent arterioles, (ii) what NSAIDs do to the same vessels, and (iii) why combining the two — but neither alone — typically produces the failure.
 **Correct answer:**
 (i) ACE inhibitors reduce angiotensin II, which preferentially constricts the *efferent* arteriole. Removing ATII lowers efferent tone, dropping intra-glomerular pressure and GFR.
