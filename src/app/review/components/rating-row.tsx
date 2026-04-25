@@ -14,8 +14,33 @@ import type { Rating } from "@/lib/srs/types";
  *
  * Flat emotional tone (build spec §2.4) — no colors correlated with
  * "right / wrong." Buttons are visually identical; the only per-button
- * adornment is the label.
+ * adornment is the label and a small keyboard-shortcut hint.
+ *
+ * Layout: 2×2 grid on phone (so each tap target is ~half-width and
+ * full-height enough to avoid mis-taps), 1×4 row from sm: up. Buttons
+ * are at least 48px tall (min-h-12) — that's the Material touch-target
+ * floor and beats Apple's 44pt minimum.
+ *
+ * Keyboard: 1 = Again, 2 = Hard, 3 = Good, 4 = Easy. Hints are shown
+ * as small subscript characters under the label. Bound globally to
+ * `keydown` while the row is active; if focus is in a textarea (the
+ * attempt or self-explanation field), we skip — the learner may be
+ * mid-sentence and the digits would otherwise hijack their input.
  */
+const RATING_KEYS: Record<string, Rating> = {
+  "1": "again",
+  "2": "hard",
+  "3": "good",
+  "4": "easy",
+};
+
+const RATING_HINTS: Record<Rating, string> = {
+  again: "1",
+  hard: "2",
+  good: "3",
+  easy: "4",
+};
+
 export function RatingRow({
   revealedAt,
   delayMs,
@@ -41,6 +66,24 @@ export function RatingRow({
     return () => clearTimeout(t);
   }, [revealedAt, delayMs]);
 
+  useEffect(() => {
+    if (!active) return;
+    const handler = (e: KeyboardEvent) => {
+      // Skip when the learner is typing into a field — they may be
+      // composing the self-explanation. Modifier keys are also skipped
+      // so browser shortcuts (Ctrl+1 etc.) keep working.
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT")) return;
+      const rating = RATING_KEYS[e.key];
+      if (!rating) return;
+      e.preventDefault();
+      onRate(rating);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [active, onRate]);
+
   const buttons: { rating: Rating; label: string }[] = [
     { rating: "again", label: "Again" },
     { rating: "hard", label: "Hard" },
@@ -54,7 +97,7 @@ export function RatingRow({
       aria-label="Rate this card"
       aria-hidden={!active}
       className={
-        "sticky bottom-4 mt-auto flex flex-wrap gap-2 transition-opacity duration-200 " +
+        "sticky bottom-4 mt-auto grid grid-cols-2 gap-2 transition-opacity duration-200 sm:grid-cols-4 " +
         (active ? "opacity-100" : "pointer-events-none opacity-0")
       }
     >
@@ -65,9 +108,13 @@ export function RatingRow({
           onClick={() => onRate(b.rating)}
           disabled={!active}
           data-testid={`rate-${b.rating}`}
-          className="border-input bg-background hover:bg-muted flex-1 rounded-md border px-4 py-3 text-sm font-medium disabled:opacity-50"
+          aria-keyshortcuts={RATING_HINTS[b.rating]}
+          className="border-input bg-background hover:bg-muted flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-md border px-4 py-2.5 text-sm font-medium disabled:opacity-50"
         >
-          {b.label}
+          <span>{b.label}</span>
+          <span aria-hidden className="text-muted-foreground text-[10px] font-normal">
+            {RATING_HINTS[b.rating]}
+          </span>
         </button>
       ))}
     </div>
