@@ -57,6 +57,28 @@ export function DiagramInserter({ onInsert, mechanismId }: Props) {
     setError(null);
     setOk(null);
     formData.set("mechanism_id", mechanismId);
+    // Client-side pre-flight so a 10 MB file doesn't round-trip only
+    // to fail the server's 2 MB guard. Server re-checks anyway — this
+    // just shortens the feedback loop for the admin.
+    const file = formData.get("file");
+    if (file instanceof File) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError("File too large. Max 2 MB — compress or crop before uploading.");
+        return;
+      }
+      const allowed = new Set([
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/svg+xml",
+        "image/webp",
+        "image/gif",
+      ]);
+      if (file.type && !allowed.has(file.type)) {
+        setError(`Unsupported file type (${file.type}). Use PNG, JPEG, SVG, WEBP, or GIF.`);
+        return;
+      }
+    }
     startTransition(async () => {
       const result = await uploadDiagramAction(formData);
       if (result.status === "error") {

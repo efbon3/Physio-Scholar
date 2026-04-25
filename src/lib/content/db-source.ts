@@ -47,10 +47,15 @@ export async function readPublishedMechanismsFromDb(): Promise<Mechanism[]> {
     try {
       const mechanism = parseMechanism(row.markdown);
       // Defence: frontmatter's id field must match the DB key. If they
-      // disagree, trust the DB row (it's what the admin saved) but
-      // don't silently ingest — skip so the mismatch gets caught in
-      // the admin UI instead of rendering a ghost mechanism.
-      if (mechanism.frontmatter.id !== row.id) continue;
+      // disagree, skip the row — but log loudly so the mismatch gets
+      // noticed in Vercel logs instead of the row just vanishing from
+      // /systems with no diagnostic.
+      if (mechanism.frontmatter.id !== row.id) {
+        console.warn(
+          `[content/db-source] Skipping mechanism: DB id "${row.id}" does not match frontmatter id "${mechanism.frontmatter.id}". Edit the row in /admin/content and align them.`,
+        );
+        continue;
+      }
       parsed.push(mechanism);
     } catch (err) {
       // Malformed DB row — log, don't crash.
@@ -81,7 +86,12 @@ export async function readPublishedMechanismByIdFromDb(id: string): Promise<Mech
 
   try {
     const mechanism = parseMechanism(data.markdown);
-    if (mechanism.frontmatter.id !== data.id) return null;
+    if (mechanism.frontmatter.id !== data.id) {
+      console.warn(
+        `[content/db-source] Mechanism "${data.id}" requested, but frontmatter id is "${mechanism.frontmatter.id}". Falling back to filesystem.`,
+      );
+      return null;
+    }
     return mechanism;
   } catch (err) {
     console.error(`Failed to parse DB mechanism ${id}`, err);

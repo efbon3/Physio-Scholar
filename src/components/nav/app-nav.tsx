@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { signOutAction } from "@/app/(auth)/login/actions";
 import { cn } from "@/lib/utils";
 
+import { SignOutButton } from "./sign-out-button";
 import { SyncIndicator } from "./sync-indicator";
 
 /**
@@ -62,14 +62,7 @@ export function AppNav({ profileId }: { profileId: string }) {
           })}
         </ul>
         <SyncIndicator profileId={profileId} />
-        <form action={signOutAction}>
-          <button
-            type="submit"
-            className="text-muted-foreground hover:bg-muted rounded-md px-2 py-1 text-xs"
-          >
-            Sign out
-          </button>
-        </form>
+        <SignOutButton />
       </div>
     </nav>
   );

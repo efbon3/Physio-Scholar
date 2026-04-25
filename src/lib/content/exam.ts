@@ -41,9 +41,29 @@ export const EXAM_PATTERNS: ReadonlyArray<{ key: ExamPattern; label: string }> =
   { key: "pre-pg", label: "Pre-PG (NEET-PG / INI-CET)" },
 ];
 
+/**
+ * Synonyms accepted for each canonical bucket. Older / historically-
+ * authored content used `neet-pg`, `ini-cet`, `fmge`, `usmle` for
+ * pre-PG and `university` / `mbbs-exam` for undergraduate; keeping
+ * those as aliases means existing files continue to flow through the
+ * filter without a content migration.
+ *
+ * Canonical values for new content are the keys of EXAM_PATTERNS
+ * above (`mbbs` / `pre-pg`); aliases are only a backwards-compat
+ * layer. The CMS starter template should use the canonical values.
+ */
+const PATTERN_ALIASES: Record<ExamPattern, ReadonlyArray<string>> = {
+  mbbs: ["mbbs", "university", "mbbs-exam", "final-mbbs", "ug"],
+  "pre-pg": ["pre-pg", "prepg", "neet-pg", "ini-cet", "fmge", "usmle"],
+};
+
+function tokenMatchesPattern(token: string, pattern: ExamPattern): boolean {
+  return PATTERN_ALIASES[pattern].includes(token);
+}
+
 /** Filter a deck to cards tagged for the requested exam pattern. */
 export function filterByExamPattern(cards: readonly Card[], pattern: ExamPattern): Card[] {
-  return cards.filter((c) => c.exam_patterns.includes(pattern));
+  return cards.filter((c) => c.exam_patterns.some((token) => tokenMatchesPattern(token, pattern)));
 }
 
 /**

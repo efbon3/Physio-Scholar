@@ -31,33 +31,49 @@ function makeFakeClient(server: FakeServer): {
 } {
   const calls = { reviewsUpsert: [] as unknown[][], stateUpserts: [] as unknown[] };
 
+  function hydrateReviewInsert(
+    r: Database["public"]["Tables"]["reviews"]["Insert"],
+    autoId: string,
+  ): Database["public"]["Tables"]["reviews"]["Row"] {
+    return {
+      card_id: r.card_id,
+      created_at: r.created_at ?? new Date().toISOString(),
+      hints_used: r.hints_used ?? 0,
+      id: (r as { id?: string }).id ?? autoId,
+      profile_id: r.profile_id,
+      rating: r.rating,
+      self_explanation: r.self_explanation ?? null,
+      session_id: r.session_id ?? null,
+      time_spent_seconds: r.time_spent_seconds ?? 0,
+    };
+  }
+
   const reviewsTable = {
     upsert(rows: unknown[]) {
       calls.reviewsUpsert.push(rows);
-      // Assign server uuids if missing (simulate gen_random_uuid()).
       const typed = rows as Database["public"]["Tables"]["reviews"]["Insert"][];
-      const assigned = typed.map((r, i) => {
-        const id =
-          (r as { id?: string }).id ??
-          `server-${server.reviews.length + i}-${Math.random().toString(36).slice(2, 8)}`;
-        const row: Database["public"]["Tables"]["reviews"]["Row"] = {
-          card_id: r.card_id,
-          created_at: r.created_at ?? new Date().toISOString(),
-          hints_used: r.hints_used ?? 0,
-          id,
-          profile_id: r.profile_id,
-          rating: r.rating,
-          self_explanation: r.self_explanation ?? null,
-          session_id: r.session_id ?? null,
-          time_spent_seconds: r.time_spent_seconds ?? 0,
-        };
-        return row;
-      });
-      // De-dupe by id.
+      const assigned = typed.map((r, i) =>
+        hydrateReviewInsert(r, `server-u-${server.reviews.length + i}`),
+      );
       for (const row of assigned) {
         const existing = server.reviews.findIndex((x) => x.id === row.id);
         if (existing === -1) server.reviews.push(row);
       }
+      // Real Supabase with ignoreDuplicates returns ONLY the rows that
+      // actually inserted (the duplicates are omitted). Upsert path in
+      // the new sync.ts doesn't rely on the returned rowset — it clears
+      // pending_sync for the whole batch regardless — so we can return
+      // the full batch safely. A dedicated test simulates the "dup
+      // returns fewer rows" case.
+      return Promise.resolve({ data: assigned, error: null });
+    },
+    insert(rows: unknown[]) {
+      calls.reviewsUpsert.push(rows);
+      const typed = rows as Database["public"]["Tables"]["reviews"]["Insert"][];
+      const assigned = typed.map((r, i) =>
+        hydrateReviewInsert(r, `server-i-${server.reviews.length + i}`),
+      );
+      for (const row of assigned) server.reviews.push(row);
       return {
         select: (_: string) => Promise.resolve({ data: assigned, error: null }),
       };
@@ -132,6 +148,10 @@ function makeFakeClient(server: FakeServer): {
         order(_col: string, _opts: { ascending: boolean }) {
           return Promise.resolve({ data: rows, error: null });
         },
+        maybeSingle() {
+          const first = rows.length > 0 ? rows[0] : null;
+          return Promise.resolve({ data: first, error: null });
+        },
       };
       return chain;
     },
@@ -200,7 +220,10 @@ describe("pushPendingReviews", () => {
 
     const pushed = await pushPendingReviews(supabase, ALICE);
     expect(pushed).toBe(2);
-    expect(calls.reviewsUpsert).toHaveLength(1);
+    // Two server calls now: one upsert for UUID rows, one insert for
+    // local-* rows. Split in sync.ts to avoid ordinal-skew corruption
+    // when a duplicate row shrinks the upsert's returned rowset.
+    expect(calls.reviewsUpsert).toHaveLength(2);
     expect(server.reviews).toHaveLength(2);
 
     // Non-UUID row should be rewritten to the server-assigned id.
@@ -210,6 +233,77 @@ describe("pushPendingReviews", () => {
     // pending_sync should be cleared on every row.
     const all = await db.reviews.toArray();
     expect(all.every((r) => r.pending_sync === 0)).toBe(true);
+  });
+
+  it("duplicate UUID-keyed reviews still clear pending_sync (regression for ordinal-skew bug)", async () => {
+    // Seed a UUID-keyed review already on the server, then try to push
+    // two more UUID-keyed reviews plus a local-* row. Before the fix,
+    // the server's ignoreDuplicates shrank the upsert rowset, and the
+    // ordinal-based id mapping misaligned the local-* row onto a
+    // wrong server id.
+    const existingId = "aaaaaaaa-1111-4111-8111-111111111111";
+    const server: FakeServer = {
+      reviews: [
+        {
+          card_id: "frank-starling:1",
+          created_at: NOW.toISOString(),
+          hints_used: 0,
+          id: existingId,
+          profile_id: ALICE,
+          rating: "good",
+          self_explanation: null,
+          session_id: null,
+          time_spent_seconds: 5,
+        },
+      ],
+      card_states: [],
+    };
+    const { supabase } = makeFakeClient(server);
+    const db = getLearningDB();
+    // Local row with the same UUID id as the existing server row.
+    await db.reviews.put({
+      id: existingId,
+      profile_id: ALICE,
+      card_id: "frank-starling:1",
+      rating: "good",
+      hints_used: 0,
+      time_spent_seconds: 5,
+      session_id: null,
+      self_explanation: null,
+      created_at: NOW.toISOString(),
+      pending_sync: 1,
+    });
+    // Another local-* row that should get a server-assigned id.
+    await db.reviews.put({
+      id: "local-xyz-789",
+      profile_id: ALICE,
+      card_id: "frank-starling:2",
+      rating: "hard",
+      hints_used: 0,
+      time_spent_seconds: 8,
+      session_id: null,
+      self_explanation: null,
+      created_at: NOW.toISOString(),
+      pending_sync: 1,
+    });
+
+    const pushed = await pushPendingReviews(supabase, ALICE);
+    expect(pushed).toBe(2);
+
+    // Dupe UUID row: still present with its UUID id, pending_sync cleared.
+    const dupe = await db.reviews.get(existingId);
+    expect(dupe).toBeDefined();
+    expect(dupe?.pending_sync).toBe(0);
+
+    // Local-* row: rewritten to the server-assigned UUID.
+    const localStillThere = await db.reviews.get("local-xyz-789");
+    expect(localStillThere).toBeUndefined();
+
+    // Sanity: no corrupt rows where a local-* row was rewritten to the
+    // existingId (the old ordinal-skew bug would produce this).
+    const allByCard = await db.reviews.where("card_id").equals("frank-starling:2").toArray();
+    expect(allByCard).toHaveLength(1);
+    expect(allByCard[0].id).not.toBe(existingId);
   });
 
   it("is a no-op when there are no pending reviews", async () => {
@@ -240,6 +334,55 @@ describe("pushPendingStates", () => {
     const pushed = await pushPendingStates(supabase, ALICE);
     expect(pushed).toBe(1);
     expect(server.card_states).toHaveLength(1);
+    expect((await db.pending_state_pushes.toArray()).length).toBe(0);
+  });
+
+  it("LWW: does not overwrite a newer server row with an older local one", async () => {
+    // Server already has a newer card_state; local pending push is
+    // stale. The push should drop the stale entry without clobbering.
+    const server: FakeServer = {
+      reviews: [],
+      card_states: [
+        {
+          card_id: "frank-starling:1",
+          consecutive_again_count: 0,
+          created_at: "2026-05-01T10:00:00Z",
+          due_at: "2026-05-10T10:00:00Z",
+          ease: 3.0,
+          interval_days: 5,
+          last_reviewed_at: "2026-05-03T10:00:00Z",
+          profile_id: ALICE,
+          status: "review",
+          updated_at: "2026-05-03T10:00:00Z", // NEWER than local push
+        },
+      ],
+    };
+    const { supabase } = makeFakeClient(server);
+    const db = getLearningDB();
+    // Seed a stale pending push (updated_at older than server).
+    await db.pending_state_pushes.put({
+      card_id: "frank-starling:1",
+      profile_id: ALICE,
+      state: {
+        card_id: "frank-starling:1",
+        profile_id: ALICE,
+        ease: 2.5,
+        interval_days: 1,
+        status: "learning",
+        consecutive_again_count: 0,
+        last_reviewed_at: "2026-04-30T10:00:00Z",
+        due_at: "2026-05-01T10:00:00Z",
+        updated_at: "2026-04-30T10:00:00Z", // older
+      },
+      requested_at: "2026-04-30T10:00:00Z",
+    });
+
+    const pushed = await pushPendingStates(supabase, ALICE);
+    expect(pushed).toBe(0); // LWW rejected the stale push
+    // Server row is untouched.
+    expect(server.card_states[0].ease).toBe(3.0);
+    expect(server.card_states[0].updated_at).toBe("2026-05-03T10:00:00Z");
+    // Stale queue entry cleared to prevent re-try.
     expect((await db.pending_state_pushes.toArray()).length).toBe(0);
   });
 });

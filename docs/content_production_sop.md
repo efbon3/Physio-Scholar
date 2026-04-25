@@ -686,7 +686,7 @@ id: frank-starling
 title: Frank-Starling Mechanism
 organ_system: cardiovascular
 nmc_competencies: [PY-CV-1.5, PY-CV-1.6]
-exam_patterns: [neet-pg, ini-cet, usmle]
+exam_patterns: [mbbs, pre-pg]
 prerequisites: [cardiac-cycle, ventricular-pressure-volume]
 related_mechanisms: [cardiac-output-regulation, contractility-regulation]
 blooms_distribution:

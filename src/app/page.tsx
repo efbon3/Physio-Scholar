@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { signOutAction } from "@/app/(auth)/login/actions";
 import { buttonVariants } from "@/components/ui/button";
+import { SignOutButton } from "@/components/nav/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
@@ -45,14 +45,10 @@ export default async function Home() {
               Start review
             </Link>
           </div>
-          <form action={signOutAction} className="self-start">
-            <button
-              type="submit"
-              className="text-muted-foreground text-sm underline-offset-2 hover:underline"
-            >
-              Sign out
-            </button>
-          </form>
+          <SignOutButton
+            className="text-muted-foreground text-sm underline-offset-2 hover:underline disabled:opacity-50"
+            formClassName="self-start"
+          />
         </>
       ) : (
         <div className="flex flex-wrap gap-3">

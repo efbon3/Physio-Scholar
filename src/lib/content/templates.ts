@@ -13,7 +13,8 @@ organ_system: cardiovascular
 nmc_competencies:
   - PY-CV-1.1
 exam_patterns:
-  - neet-pg
+  - mbbs
+  - pre-pg
 prerequisites: []
 related_mechanisms: []
 blooms_distribution:
