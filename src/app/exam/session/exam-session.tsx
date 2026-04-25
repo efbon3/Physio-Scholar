@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { estimateExamMinutes, PreflightModal } from "@/components/preflight-modal";
 import type { ExamPattern, McqQuestion } from "@/lib/content/exam";
 import { cn } from "@/lib/utils";
 
-type Status = "drilling" | "complete";
+type Status = "preflight" | "drilling" | "complete";
 
 type Answer = {
   cardId: string;
@@ -36,7 +37,11 @@ export function ExamSession({
   pattern: ExamPattern;
   questions: McqQuestion[];
 }) {
-  const [status, setStatus] = useState<Status>("drilling");
+  // Pre-flight gate (J1/J2): start on the disclaimer modal, transition
+  // to "drilling" only after the learner accepts. The 60s/question
+  // timer is bound to the "drilling" state, so the clock doesn't run
+  // while the disclaimer is visible.
+  const [status, setStatus] = useState<Status>("preflight");
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>(() =>
     questions.map((q) => ({
@@ -66,8 +71,24 @@ export function ExamSession({
     return () => clearInterval(id);
   }, [status]);
 
+  // Hooks must run unconditionally — keep all useMemo/useState/useEffect
+  // calls above the conditional render branches below.
   const current = questions[index];
   const progress = useMemo(() => ({ index, total: questions.length }), [index, questions.length]);
+
+  if (status === "preflight") {
+    return (
+      <PreflightModal
+        open
+        kind={`Exam drill · ${pattern === "mbbs" ? "MBBS" : "Pre-PG"}`}
+        questionCount={questions.length}
+        estimatedMinutes={estimateExamMinutes(questions.length)}
+        context="One minute per question. Skipped questions do not count against you."
+        cancelHref="/exam"
+        onAccept={() => setStatus("drilling")}
+      />
+    );
+  }
 
   function selectOption(optionIndex: number) {
     if (status !== "drilling") return;

@@ -27,6 +27,12 @@ test.describe("Review session — end-to-end loop", () => {
     const errors = collectPageErrors(page);
     await page.goto("/review");
 
+    // Pre-flight modal: dismiss it before the card UI appears.
+    // The dialog opens once the Dexie queue has been assembled.
+    const beginButton = page.getByTestId("preflight-accept");
+    await expect(beginButton).toBeVisible({ timeout: 10_000 });
+    await beginButton.click();
+
     // Wait for the queue to assemble on the client.
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
@@ -77,6 +83,10 @@ test.describe("Review session — end-to-end loop", () => {
 
   test("axe WCAG 2.2 AA clean on the reveal state", async ({ page }) => {
     await page.goto("/review");
+    // Dismiss the preflight modal before the card UI loads.
+    const beginButton = page.getByTestId("preflight-accept");
+    await expect(beginButton).toBeVisible({ timeout: 10_000 });
+    await beginButton.click();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
 
     // Drive the UI to the "revealed" state so axe audits it too.

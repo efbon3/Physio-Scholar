@@ -8,12 +8,14 @@ import { createClient } from "@/lib/supabase/server";
 type LoginResult = { error: string } | undefined;
 
 /**
- * Default post-login destination. Review-first instead of the marketing
- * home page — once a learner is signed in, the daily review loop is the
- * intended landing. Phase 5 replaces this with "/today" when that tab
- * is built.
+ * Default post-login destination. /today is the dashboard surface
+ * (greeting, queue summary, active-systems chip, primary CTA). Landing
+ * directly on /review used to drop the learner straight into card 1/N
+ * with no orientation — confusing on a fresh sign-in. /today gives them
+ * the lay of the land first, and a single click takes them into the
+ * focused-study modal.
  */
-const DEFAULT_POST_LOGIN = "/review";
+const DEFAULT_POST_LOGIN = "/today";
 
 export async function loginAction(formData: FormData): Promise<LoginResult> {
   const email = String(formData.get("email") ?? "")
