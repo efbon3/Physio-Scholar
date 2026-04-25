@@ -60,6 +60,24 @@ test.describe("Today dashboard + app nav", () => {
     );
   });
 
+  test("calendar page renders with empty state and passes axe", async ({ page }) => {
+    const errors = collectPageErrors(page);
+    await page.goto("/calendar");
+
+    await expect(page.getByRole("heading", { name: /upcoming/i })).toBeVisible({
+      timeout: 10_000,
+    });
+    // Empty state copy — CI has no Supabase env vars, so the read returns []
+    // and we show the "Nothing scheduled" line.
+    await expect(page.getByText(/Nothing scheduled/i)).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(results.violations).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
   test("profile page renders with personal-detail fields and passes axe", async ({ page }) => {
     const errors = collectPageErrors(page);
     await page.goto("/profile");
