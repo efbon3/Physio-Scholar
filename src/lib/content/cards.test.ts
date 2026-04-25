@@ -299,3 +299,160 @@ describe("extractCards — exam_patterns (Option Y)", () => {
     expect(cards[1].exam_patterns).toEqual(["pre-pg"]);
   });
 });
+
+describe("extractCards — priority + difficulty classification", () => {
+  it("defaults to should/standard when both labels are omitted", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const card = extractCards(mechanism)[0]!;
+    expect(card.priority).toBe("should");
+    expect(card.difficulty).toBe("standard");
+  });
+
+  it("reads explicit priority and difficulty labels", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Priority:** must
+**Difficulty:** foundational
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 2
+**Type:** analysis
+**Bloom's level:** analyze
+**Priority:** good
+**Difficulty:** advanced
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const cards = extractCards(mechanism);
+    expect(cards[0]!.priority).toBe("must");
+    expect(cards[0]!.difficulty).toBe("foundational");
+    expect(cards[1]!.priority).toBe("good");
+    expect(cards[1]!.difficulty).toBe("advanced");
+  });
+
+  it("accepts known priority synonyms (essential/core/optional/bonus/expected)", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Priority:** essential
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 2
+**Type:** recall
+**Bloom's level:** remember
+**Priority:** bonus
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 3
+**Type:** recall
+**Bloom's level:** remember
+**Priority:** expected
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const cards = extractCards(mechanism);
+    expect(cards[0]!.priority).toBe("must");
+    expect(cards[1]!.priority).toBe("good");
+    expect(cards[2]!.priority).toBe("should");
+  });
+
+  it("accepts known difficulty synonyms (intermediate/easy/hard)", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Difficulty:** easy
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 2
+**Type:** recall
+**Bloom's level:** remember
+**Difficulty:** intermediate
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 3
+**Type:** recall
+**Bloom's level:** remember
+**Difficulty:** hard
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const cards = extractCards(mechanism);
+    expect(cards[0]!.difficulty).toBe("foundational");
+    expect(cards[1]!.difficulty).toBe("standard");
+    expect(cards[2]!.difficulty).toBe("advanced");
+  });
+
+  it("falls back to should/standard for unrecognised values rather than failing", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Priority:** crucial
+**Difficulty:** brutal
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const card = extractCards(mechanism)[0]!;
+    expect(card.priority).toBe("should");
+    expect(card.difficulty).toBe("standard");
+  });
+
+  it("priority and difficulty are independent — must/advanced is legitimate", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** analysis
+**Bloom's level:** analyze
+**Priority:** must
+**Difficulty:** advanced
+**Stem:** A foundational concept tested at high cognitive depth
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const card = extractCards(mechanism)[0]!;
+    expect(card.priority).toBe("must");
+    expect(card.difficulty).toBe("advanced");
+  });
+});

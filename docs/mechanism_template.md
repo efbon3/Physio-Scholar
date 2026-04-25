@@ -87,12 +87,25 @@ needs them; the parser doesn't require them. Layers above 2 are extra.
 Each question must use the exact heading shape `## Question N` with N
 starting at 1 and incrementing by 1. The four bold labels (Type,
 Bloom's level, Stem, Correct answer) and the **Elaborative
-explanation:** label are required. The two `###` subheadings (Hint
+explanation:** label are required. **Priority** and **Difficulty** are
+optional (defaults: `should` / `standard`) but should be set
+explicitly on every question — they drive adaptive ordering and
+curriculum-coverage analytics. The two `###` subheadings (Hint
 Ladder, Misconception Mappings) are optional but recommended.
+
+Priority and difficulty are independent axes:
+
+- **Priority** = how essential to mastery (`must` / `should` / `good`).
+- **Difficulty** = how hard to answer correctly (`foundational` / `standard` / `advanced`).
+
+A "must / advanced" question is rare but legitimate — a foundational
+concept tested at high cognitive depth.
 
 ## Question 1
 **Type:** comparison
 **Bloom's level:** understand
+**Priority:** must
+**Difficulty:** standard
 **Stem:** Write the question stem as one paragraph. It can include
 numbers, units, and even Markdown like **bold** or `code` — the parser
 captures everything up to the next `**Label:**` line or `###` heading.
@@ -125,6 +138,8 @@ on the post-drill review screen during exam mode.
 ## Question 2
 **Type:** prediction
 **Bloom's level:** apply
+**Priority:** should
+**Difficulty:** standard
 **Stem:** ...
 **Correct answer:** ...
 **Elaborative explanation:** ...
