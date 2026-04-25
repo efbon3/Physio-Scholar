@@ -56,10 +56,18 @@ export default async function TodayPage() {
     ? mechanisms.filter((m) => studySystems.includes(m.frontmatter.organ_system))
     : mechanisms;
   const cards: Card[] = inScope.flatMap(extractCards);
+  // Mechanism title lookup powers the weak-area + daily-challenge widgets.
+  // Built from `inScope` so the daily challenge only rotates through
+  // mechanisms the learner has actively opted into studying.
+  const mechanismTitles: Record<string, string> = {};
+  for (const m of inScope) {
+    mechanismTitles[m.frontmatter.id] = m.frontmatter.title;
+  }
 
   return (
     <TodayDashboard
       cards={cards}
+      mechanismTitles={mechanismTitles}
       email={user?.email ?? null}
       profileId={user?.id ?? "preview"}
       studySystems={studySystems}

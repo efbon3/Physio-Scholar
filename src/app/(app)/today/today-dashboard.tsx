@@ -5,8 +5,20 @@ import { useEffect, useState } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
-import { loadAllCardStates } from "@/lib/srs/local";
+import { loadAllCardStates, loadAllReviews } from "@/lib/srs/local";
+import {
+  computeProgressSnapshot,
+  type MechanismProgress,
+  type ProgressSnapshot,
+} from "@/lib/srs/progress";
 import { assembleQueue, summariseQueue } from "@/lib/srs/queue";
+import {
+  pickDailyChallenge,
+  pickWeakestMechanism,
+  uniqueMechanisms,
+  type DailyChallenge,
+  type WeakArea,
+} from "@/lib/srs/today-widgets";
 import type { CardState } from "@/lib/srs/types";
 import { cn } from "@/lib/utils";
 
@@ -18,58 +30,100 @@ type QueueSummary = {
   total: number;
 };
 
+type DashboardData = {
+  queue: QueueSummary;
+  streakDays: number;
+  longestStreakDays: number;
+  weakArea: WeakArea | null;
+  challenge: DailyChallenge | null;
+};
+
 /**
- * Client-side half of the Today tab. Reads card_states out of Dexie
- * and assembles the same queue the review session would use, so the
- * "N due / M new" counter reflects the actual next session.
+ * Today tab — the post-login landing dashboard. Reads card_states and
+ * the review history out of Dexie, computes a single
+ * `ProgressSnapshot`, and renders three follow-on widgets atop the
+ * queue summary:
+ *   - Streak (current day count + longest as a subtitle)
+ *   - Weak-area callout (lowest mastery mechanism, with a Drill CTA)
+ *   - Daily clinical challenge (deterministic per-day pick)
  *
- * `profileId` is passed in from the server page so Dexie is scoped to
- * the real authenticated user id. In envs without Supabase (CI,
- * unconfigured previews) the server page falls back to the literal
- * "preview" — the same sentinel the review page uses — so locally
- * recorded reviews in that mode still round-trip.
- *
- * Phase 5 will grow this with streak / weak-area / clinical-challenge
- * callouts per build spec §2.3; D1 ships just the essentials.
+ * The widgets degrade gracefully:
+ *   - No reviews yet → streak 0, weak-area "review some cards first"
+ *   - No cards in scope → challenge hidden
+ * so a brand-new account never sees a broken-looking surface.
  */
 export function TodayDashboard({
   cards,
   email,
+  mechanismTitles,
   profileId,
   studySystems,
 }: {
   cards: readonly Card[];
   email: string | null;
+  mechanismTitles: Record<string, string>;
   profileId: string;
   /** Active organ-systems preference. Null = no preference (CI / preview). */
   studySystems: string[] | null;
 }) {
-  const [summary, setSummary] = useState<QueueSummary | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const rows = await loadAllCardStates(profileId);
+        const [stateRows, reviewRows] = await Promise.all([
+          loadAllCardStates(profileId),
+          loadAllReviews(profileId),
+        ]);
         const stateMap = new Map<string, CardState>();
-        for (const row of rows) stateMap.set(row.card_id, row);
-        const queue = assembleQueue({
-          cards,
-          cardStates: stateMap,
-          now: new Date(),
-          maxNewCards: DEFAULT_MAX_NEW_CARDS,
+        for (const row of stateRows) stateMap.set(row.card_id, row);
+        const now = new Date();
+        const queue = summariseQueue(
+          assembleQueue({
+            cards,
+            cardStates: stateMap,
+            now,
+            maxNewCards: DEFAULT_MAX_NEW_CARDS,
+          }),
+        );
+        const titlesMap = new Map(Object.entries(mechanismTitles));
+        const snapshot: ProgressSnapshot = computeProgressSnapshot({
+          reviews: reviewRows,
+          cardStates: stateRows,
+          allCards: cards,
+          mechanismTitles: titlesMap,
+          now,
         });
-        if (!cancelled) setSummary(summariseQueue(queue));
+        const weakArea = pickWeakestMechanism(snapshot.byMechanism as MechanismProgress[]);
+        const challenge = pickDailyChallenge(now, uniqueMechanisms(cards, titlesMap));
+        if (cancelled) return;
+        setData({
+          queue,
+          streakDays: snapshot.currentStreakDays,
+          longestStreakDays: snapshot.longestStreakDays,
+          weakArea,
+          challenge,
+        });
       } catch {
-        if (!cancelled) setSummary({ due: 0, new: 0, total: 0 });
+        if (!cancelled) {
+          setData({
+            queue: { due: 0, new: 0, total: 0 },
+            streakDays: 0,
+            longestStreakDays: 0,
+            weakArea: null,
+            challenge: null,
+          });
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [cards, profileId]);
+  }, [cards, mechanismTitles, profileId]);
 
   const greetingName = email?.split("@")[0] ?? "there";
+  const queue = data?.queue;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
@@ -91,25 +145,25 @@ export function TodayDashboard({
       </header>
 
       <section aria-label="Review queue" className="flex flex-col gap-4">
-        {summary === null ? (
+        {data === null ? (
           <p className="text-muted-foreground text-sm">Loading queue…</p>
-        ) : summary.total === 0 ? (
+        ) : queue!.total === 0 ? (
           <p className="text-sm">
             Nothing due right now. You&apos;re all caught up — come back tomorrow.
           </p>
         ) : (
           <>
             <p className="text-base leading-7">
-              <strong className="font-medium">{summary.total}</strong> card
-              {summary.total === 1 ? "" : "s"} waiting
-              {summary.due > 0 ? (
+              <strong className="font-medium">{queue!.total}</strong> card
+              {queue!.total === 1 ? "" : "s"} waiting
+              {queue!.due > 0 ? (
                 <>
                   {" "}
-                  ({summary.due} due
-                  {summary.new > 0 ? `, ${summary.new} new` : ""})
+                  ({queue!.due} due
+                  {queue!.new > 0 ? `, ${queue!.new} new` : ""})
                 </>
-              ) : summary.new > 0 ? (
-                <> ({summary.new} new)</>
+              ) : queue!.new > 0 ? (
+                <> ({queue!.new} new)</>
               ) : null}
               .
             </p>
@@ -125,7 +179,7 @@ export function TodayDashboard({
         )}
       </section>
 
-      {summary && summary.total === 0 ? (
+      {data && queue!.total === 0 ? (
         <section aria-label="Secondary actions" className="flex flex-col gap-3">
           <p className="text-sm">
             Nothing to review? Still worth a drill — try an exam-mode MCQ run.
@@ -138,15 +192,120 @@ export function TodayDashboard({
         </section>
       ) : null}
 
-      <section
-        aria-label="Placeholders for Phase 5 widgets"
-        className="text-muted-foreground flex flex-col gap-2 border-t pt-4 text-xs"
-      >
-        <p>
-          Coming soon on this dashboard: streak indicator, weak-area callout, and a clinical
-          challenge link (build spec §2.3).
-        </p>
-      </section>
+      {data ? (
+        <section
+          aria-label="Today widgets"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          <StreakCard streakDays={data.streakDays} longestStreakDays={data.longestStreakDays} />
+          <WeakAreaCard weakArea={data.weakArea} />
+          <ChallengeCard challenge={data.challenge} />
+        </section>
+      ) : null}
     </main>
+  );
+}
+
+function StreakCard({
+  streakDays,
+  longestStreakDays,
+}: {
+  streakDays: number;
+  longestStreakDays: number;
+}) {
+  return (
+    <article
+      aria-label="Study streak"
+      className="border-input flex flex-col gap-2 rounded-md border p-4"
+    >
+      <p className="text-muted-foreground text-xs tracking-widest uppercase">Streak</p>
+      {streakDays === 0 ? (
+        <p className="font-heading text-2xl font-semibold tracking-tight">Start a streak today</p>
+      ) : (
+        <p className="font-heading text-2xl font-semibold tracking-tight">
+          {streakDays} day{streakDays === 1 ? "" : "s"}
+        </p>
+      )}
+      <p className="text-muted-foreground text-xs">
+        {longestStreakDays > 0
+          ? `Best: ${longestStreakDays} day${longestStreakDays === 1 ? "" : "s"}.`
+          : "Rate at least one card to begin."}
+      </p>
+    </article>
+  );
+}
+
+function WeakAreaCard({ weakArea }: { weakArea: WeakArea | null }) {
+  if (weakArea === null) {
+    return (
+      <article
+        aria-label="Weak area"
+        className="border-input flex flex-col gap-2 rounded-md border p-4"
+      >
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">Weak area</p>
+        <p className="font-heading text-base font-medium">Review some cards first.</p>
+        <p className="text-muted-foreground text-xs">
+          Once you&apos;ve rated a few cards, we&apos;ll surface where you&apos;re slipping.
+        </p>
+      </article>
+    );
+  }
+  return (
+    <article
+      aria-label="Weak area"
+      className="border-input flex flex-col gap-2 rounded-md border p-4"
+    >
+      <p className="text-muted-foreground text-xs tracking-widest uppercase">Weak area</p>
+      <p className="font-heading text-base font-medium">{weakArea.title}</p>
+      <p className="text-muted-foreground text-xs">
+        {weakArea.masteryPct}% mastery across {weakArea.seen} reviewed card
+        {weakArea.seen === 1 ? "" : "s"}.
+      </p>
+      <Link
+        href={`/review?mechanism=${encodeURIComponent(weakArea.mechanismId)}`}
+        className={cn(buttonVariants({ size: "sm", variant: "outline" }), "mt-1 self-start")}
+      >
+        Drill this mechanism
+      </Link>
+    </article>
+  );
+}
+
+function ChallengeCard({ challenge }: { challenge: DailyChallenge | null }) {
+  if (challenge === null) {
+    return (
+      <article
+        aria-label="Daily challenge"
+        className="border-input flex flex-col gap-2 rounded-md border p-4"
+      >
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">
+          Today&apos;s challenge
+        </p>
+        <p className="font-heading text-base font-medium">No mechanisms in scope.</p>
+        <p className="text-muted-foreground text-xs">
+          Add a study system in Settings to unlock the daily challenge.
+        </p>
+      </article>
+    );
+  }
+  return (
+    <article
+      aria-label="Daily challenge"
+      className="border-input flex flex-col gap-2 rounded-md border p-4"
+    >
+      <p className="text-muted-foreground text-xs tracking-widest uppercase">
+        Today&apos;s challenge
+      </p>
+      <p className="font-heading text-base font-medium">{challenge.title}</p>
+      <p className="text-muted-foreground text-xs">
+        Stretch goal — drop in for one focused pass through this mechanism.
+      </p>
+      <Link
+        href={`/review?mechanism=${encodeURIComponent(challenge.mechanismId)}`}
+        className={cn(buttonVariants({ size: "sm", variant: "outline" }), "mt-1 self-start")}
+      >
+        Try it
+      </Link>
+    </article>
   );
 }
