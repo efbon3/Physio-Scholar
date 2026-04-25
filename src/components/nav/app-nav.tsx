@@ -62,6 +62,18 @@ export function AppNav({ profileId }: { profileId: string }) {
           })}
         </ul>
         <SyncIndicator profileId={profileId} />
+        <Link
+          href="/profile"
+          aria-current={matches(pathname, "/profile") ? "page" : undefined}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-sm transition-colors",
+            matches(pathname, "/profile")
+              ? "bg-secondary text-secondary-foreground"
+              : "hover:bg-muted",
+          )}
+        >
+          Profile
+        </Link>
         <SignOutButton />
       </div>
     </nav>

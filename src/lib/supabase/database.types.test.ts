@@ -62,6 +62,14 @@ describe("Database type", () => {
     expectTypeOf<ProfileRow>().toHaveProperty("guardian_email");
   });
 
+  it("profiles carry the J4 personal-details columns", () => {
+    expectTypeOf<ProfileRow>().toHaveProperty("date_of_birth");
+    expectTypeOf<ProfileRow>().toHaveProperty("address");
+    expectTypeOf<ProfileRow>().toHaveProperty("phone");
+    expectTypeOf<ProfileRow>().toHaveProperty("roll_number");
+    expectTypeOf<ProfileRow>().toHaveProperty("avatar_url");
+  });
+
   it("subscriptions.tier is the enum type", () => {
     expectTypeOf<SubscriptionRow["tier"]>().toEqualTypeOf<PublicEnums["subscription_tier"]>();
   });
