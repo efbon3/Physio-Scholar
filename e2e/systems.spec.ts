@@ -73,6 +73,12 @@ test.describe("Systems tab + mechanism renderer", () => {
   test("review page shows a focus banner when launched via ?mechanism=", async ({ page }) => {
     await page.goto("/review?mechanism=frank-starling");
 
+    // Pre-flight modal renders before the reviewing state. Both it and
+    // the ReviewHeader behind it surface the mechanism context, so
+    // dismiss the modal first to leave a single source of "Studying:"
+    // / mechanism title in the DOM for strict-mode selectors.
+    await page.getByTestId("preflight-accept").click();
+
     // Banner surfaces which mechanism the session is drilling.
     await expect(page.getByText(/^studying:/i)).toBeVisible();
     await expect(page.getByText(/Frank-Starling Mechanism/i)).toBeVisible();
@@ -81,7 +87,10 @@ test.describe("Systems tab + mechanism renderer", () => {
   test("review page ignores a malformed ?mechanism= and falls back", async ({ page }) => {
     // The input is non-kebab — `normaliseMechanismId` should reject it,
     // so no focus banner appears even though the query is present.
+    // The preflight modal still renders for the unfiltered queue, so
+    // dismiss it before asserting the FocusBanner's absence.
     await page.goto("/review?mechanism=../../etc/passwd");
+    await page.getByTestId("preflight-accept").click();
     await expect(page.getByText(/^studying:/i)).toHaveCount(0);
   });
 });
