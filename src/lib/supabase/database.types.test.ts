@@ -15,13 +15,15 @@ type SubscriptionRow = PublicTables["subscriptions"]["Row"];
 type StudySessionRow = PublicTables["study_sessions"]["Row"];
 type CardStateRow = PublicTables["card_states"]["Row"];
 type ReviewRow = PublicTables["reviews"]["Row"];
+type ExamEventRow = PublicTables["exam_events"]["Row"];
 
 describe("Database type", () => {
-  it("exposes the nine public tables (Phase 2 + Phase 3 + Phase 5 + Phase 5+ G1)", () => {
+  it("exposes the ten public tables (+ J7 exam_events)", () => {
     expectTypeOf<keyof PublicTables>().toEqualTypeOf<
       | "card_states"
       | "content_flags"
       | "content_mechanisms"
+      | "exam_events"
       | "institutions"
       | "profiles"
       | "rate_limits"
@@ -113,5 +115,30 @@ describe("Database type", () => {
     expectTypeOf<ReviewRow>().toHaveProperty("time_spent_seconds");
     expectTypeOf<ReviewRow>().toHaveProperty("session_id");
     expectTypeOf<ReviewRow>().toHaveProperty("created_at");
+  });
+
+  it("profiles carry is_faculty (J7 institutional faculty role)", () => {
+    expectTypeOf<ProfileRow>().toHaveProperty("is_faculty");
+    expectTypeOf<ProfileRow["is_faculty"]>().toEqualTypeOf<boolean>();
+  });
+
+  it("exam_events row carries the J7 calendar columns", () => {
+    expectTypeOf<ExamEventRow>().toHaveProperty("audience");
+    expectTypeOf<ExamEventRow>().toHaveProperty("institution_id");
+    expectTypeOf<ExamEventRow>().toHaveProperty("owner_id");
+    expectTypeOf<ExamEventRow>().toHaveProperty("title");
+    expectTypeOf<ExamEventRow>().toHaveProperty("kind");
+    expectTypeOf<ExamEventRow>().toHaveProperty("organ_systems");
+    expectTypeOf<ExamEventRow>().toHaveProperty("starts_at");
+    expectTypeOf<ExamEventRow>().toHaveProperty("ends_at");
+    expectTypeOf<ExamEventRow>().toHaveProperty("notes");
+  });
+
+  it("exam_events.organ_systems is a string array", () => {
+    expectTypeOf<ExamEventRow["organ_systems"]>().toEqualTypeOf<string[]>();
+  });
+
+  it("exam_events.ends_at is nullable (single-day events have null)", () => {
+    expectTypeOf<ExamEventRow["ends_at"]>().toEqualTypeOf<string | null>();
   });
 });

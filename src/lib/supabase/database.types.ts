@@ -81,6 +81,66 @@ export type Database = {
           },
         ]
       }
+      exam_events: {
+        Row: {
+          audience: string
+          created_at: string
+          ends_at: string | null
+          id: string
+          institution_id: string | null
+          kind: string
+          notes: string | null
+          organ_systems: string[]
+          owner_id: string | null
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audience: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          institution_id?: string | null
+          kind: string
+          notes?: string | null
+          organ_systems?: string[]
+          owner_id?: string | null
+          starts_at: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          institution_id?: string | null
+          kind?: string
+          notes?: string | null
+          organ_systems?: string[]
+          owner_id?: string | null
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_events_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_events_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       institutions: {
         Row: {
           country: string
@@ -127,6 +187,7 @@ export type Database = {
           id: string
           institution_id: string | null
           is_admin: boolean
+          is_faculty: boolean
           is_minor: boolean | null
           phone: string | null
           roll_number: string | null
@@ -149,6 +210,7 @@ export type Database = {
           id: string
           institution_id?: string | null
           is_admin?: boolean
+          is_faculty?: boolean
           is_minor?: boolean | null
           phone?: string | null
           roll_number?: string | null
@@ -171,6 +233,7 @@ export type Database = {
           id?: string
           institution_id?: string | null
           is_admin?: boolean
+          is_faculty?: boolean
           is_minor?: boolean | null
           phone?: string | null
           roll_number?: string | null
@@ -468,6 +531,7 @@ export type Database = {
           total_today: number
         }[]
       }
+      is_current_user_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       content_flag_status: "open" | "resolved" | "rejected"
