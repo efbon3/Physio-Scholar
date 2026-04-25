@@ -17,6 +17,8 @@ const ADMIN_TABS = [
   { label: "Content", href: "/admin/content" },
   { label: "Users", href: "/admin/users" },
   { label: "Content flags", href: "/admin/flags" },
+  { label: "Calendar", href: "/admin/calendar" },
+  { label: "Audit log", href: "/admin/audit" },
 ] as const;
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

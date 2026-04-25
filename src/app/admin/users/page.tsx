@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -9,18 +11,23 @@ export const metadata = {
  * activity. The guard runs in src/app/admin/layout.tsx so by the time
  * this renders we know the caller is an admin.
  *
+ * J6 search: `?q=<text>` filters by full_name or roll_number
+ * (case-insensitive substring). Empty query returns everyone, sorted
+ * by most-recently-joined.
+ *
  * We stick to RLS-visible columns — no auth.users lookup — because
- * Supabase profiles carry the fields the pilot actually needs
- * (created_at, institution, year_of_study) and email lives in
- * auth.users which requires service_role. If email becomes essential
- * later, add a materialised view + RLS that admins can select.
+ * profiles carries the fields the pilot actually needs. If email
+ * becomes essential later, add a materialised view + RLS that admins
+ * can select.
  */
 type ProfileRow = {
   id: string;
   full_name: string | null;
+  roll_number: string | null;
   institution_id: string | null;
   year_of_study: number | null;
   is_admin: boolean;
+  is_faculty: boolean;
   created_at: string;
 };
 
@@ -30,17 +37,37 @@ type ReviewAgg = {
   latest: string | null;
 };
 
-export default async function AdminUsersPage() {
+type SearchParams = { q?: string };
+
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
+  const rawQuery = (params.q ?? "").trim();
   const supabase = await createClient();
 
-  const { data: profiles, error: profilesError } = await supabase
+  let profilesQuery = supabase
     .from("profiles")
-    .select("id, full_name, institution_id, year_of_study, is_admin, created_at")
+    .select(
+      "id, full_name, roll_number, institution_id, year_of_study, is_admin, is_faculty, created_at",
+    )
     .order("created_at", { ascending: false });
+
+  if (rawQuery.length > 0) {
+    // Postgres `or` filter supports comma-separated `column.op.value`
+    // clauses; ilike is case-insensitive substring match. We escape
+    // wildcards to avoid `%` injecting outside our intent.
+    const safe = rawQuery.replace(/[%_]/g, (m) => `\\${m}`);
+    profilesQuery = profilesQuery.or(`full_name.ilike.%${safe}%,roll_number.ilike.%${safe}%`);
+  }
+
+  const { data: profiles, error: profilesError } = await profilesQuery;
 
   if (profilesError) {
     return (
-      <Shell>
+      <Shell query={rawQuery}>
         <p className="text-destructive text-sm">Failed to load profiles: {profilesError.message}</p>
       </Shell>
     );
@@ -53,7 +80,7 @@ export default async function AdminUsersPage() {
 
   if (reviewsError) {
     return (
-      <Shell>
+      <Shell query={rawQuery}>
         <p className="text-destructive text-sm">
           Failed to load review aggregates: {reviewsError.message}
         </p>
@@ -77,17 +104,19 @@ export default async function AdminUsersPage() {
   }
 
   return (
-    <Shell>
+    <Shell query={rawQuery}>
       {profiles && profiles.length > 0 ? (
         <table className="w-full text-sm">
           <thead>
             <tr className="text-muted-foreground border-b text-left text-xs tracking-widest uppercase">
               <th className="py-2 pr-4">Profile</th>
+              <th className="py-2 pr-4">Roll</th>
               <th className="py-2 pr-4">Year</th>
               <th className="py-2 pr-4">Reviews</th>
               <th className="py-2 pr-4">Last review</th>
               <th className="py-2 pr-4">Joined</th>
               <th className="py-2 pr-4">Role</th>
+              <th className="py-2 pr-4" />
             </tr>
           </thead>
           <tbody>
@@ -99,16 +128,27 @@ export default async function AdminUsersPage() {
                     <span className="font-medium">{p.full_name ?? "(no name)"}</span>
                     <div className="text-muted-foreground font-mono text-xs">{p.id}</div>
                   </td>
+                  <td className="py-2 pr-4">{p.roll_number ?? "—"}</td>
                   <td className="py-2 pr-4">{p.year_of_study ?? "—"}</td>
                   <td className="py-2 pr-4 font-medium">{agg?.count ?? 0}</td>
                   <td className="py-2 pr-4">{agg?.latest ? formatDate(agg.latest) : "—"}</td>
                   <td className="py-2 pr-4">{formatDate(p.created_at)}</td>
-                  <td className="py-2 pr-4">{p.is_admin ? "Admin" : "Learner"}</td>
+                  <td className="py-2 pr-4">{roleLabel(p)}</td>
+                  <td className="py-2 pr-4">
+                    <Link
+                      href={`/admin/users/${p.id}`}
+                      className="text-muted-foreground hover:bg-muted rounded-md border px-2 py-1 text-xs"
+                    >
+                      View
+                    </Link>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      ) : rawQuery.length > 0 ? (
+        <p className="text-muted-foreground text-sm">No profiles match &quot;{rawQuery}&quot;.</p>
       ) : (
         <p className="text-muted-foreground text-sm">No profiles yet.</p>
       )}
@@ -116,16 +156,46 @@ export default async function AdminUsersPage() {
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ query, children }: { query: string; children: React.ReactNode }) {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
-      <header className="flex flex-col gap-1">
+      <header className="flex flex-col gap-2">
         <p className="text-muted-foreground text-sm tracking-widest uppercase">Admin</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Users</h1>
       </header>
+      <form action="/admin/users" method="get" className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          name="q"
+          defaultValue={query}
+          placeholder="Search by name or roll number…"
+          className="border-input bg-background h-9 flex-1 rounded-md border px-3 text-sm"
+          data-testid="admin-users-search"
+        />
+        <button
+          type="submit"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-sm"
+        >
+          Search
+        </button>
+        {query.length > 0 ? (
+          <Link
+            href="/admin/users"
+            className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+          >
+            Clear
+          </Link>
+        ) : null}
+      </form>
       {children}
     </main>
   );
+}
+
+function roleLabel(p: ProfileRow): string {
+  if (p.is_admin) return "Admin";
+  if (p.is_faculty) return "Faculty";
+  return "Learner";
 }
 
 function formatDate(iso: string): string {
