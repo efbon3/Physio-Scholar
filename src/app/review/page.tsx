@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { Watermark } from "@/components/watermark";
+import {
+  applyCardFilters,
+  parseDifficultyFilter,
+  parsePriorityFilter,
+} from "@/lib/content/card-filters";
 import { extractCards, type Card } from "@/lib/content/cards";
 import { normaliseMechanismId } from "@/lib/content/filters";
 import { readAllMechanisms } from "@/lib/content/source";
@@ -12,7 +17,11 @@ export const metadata = {
   title: "Review",
 };
 
-type SearchParams = { mechanism?: string | string[] };
+type SearchParams = {
+  mechanism?: string | string[];
+  priority?: string | string[];
+  difficulty?: string | string[];
+};
 
 /**
  * Review-session entry point. Server-rendered so the card universe is
@@ -39,6 +48,13 @@ export default async function ReviewPage({
 }) {
   const resolvedParams = await searchParams;
   const mechanismFilter = normaliseMechanismId(resolvedParams.mechanism);
+  // J7: priority + difficulty filter chips. Either axis can be a CSV
+  // ("must,should") or omitted entirely; null means "no filter on this
+  // axis". Drives `applyCardFilters` below — the learner can ask for
+  // just must-know foundationals, or any combination, without losing
+  // the per-mechanism / per-system filters that already exist.
+  const priorityFilter = parsePriorityFilter(resolvedParams.priority);
+  const difficultyFilter = parseDifficultyFilter(resolvedParams.difficulty);
 
   // Same graceful posture as the middleware: when Supabase env vars are
   // absent (CI, unconfigured Vercel preview), skip the auth lookup and
@@ -102,6 +118,18 @@ export default async function ReviewPage({
         focusTitle = match.frontmatter.title;
       }
     }
+  }
+
+  // Apply priority / difficulty filters last. Same fallback posture as
+  // the mechanism filter: if the combination yields zero cards we keep
+  // the unfiltered list rather than trapping the learner on the empty
+  // state. The session-player UI then surfaces "Nothing due" naturally.
+  if (priorityFilter || difficultyFilter) {
+    const filtered = applyCardFilters(cards, {
+      priority: priorityFilter,
+      difficulty: difficultyFilter,
+    });
+    if (filtered.length > 0) cards = filtered;
   }
 
   // NOTE: Build spec §2.11 mandates "80 questions served / account / day."

@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import {
+  DIFFICULTY_FILTER_OPTIONS,
+  FilterChips,
+  PRIORITY_FILTER_OPTIONS,
+} from "@/components/filter-chips";
 import { buttonVariants } from "@/components/ui/button";
+import { encodeFilterParam } from "@/lib/content/card-filters";
 import type { Card } from "@/lib/content/cards";
 import { loadAllCardStates, loadAllReviews } from "@/lib/srs/local";
 import {
@@ -67,6 +73,37 @@ export function TodayDashboard({
   studySystems: string[] | null;
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
+  // Local state for the filter chips. Empty Set = no filter on that
+  // axis (default — show everything). Toggling a chip flips its
+  // membership; if all chips are off the caller treats it as "all".
+  const [priorityFilter, setPriorityFilter] = useState<Set<string>>(() => new Set());
+  const [difficultyFilter, setDifficultyFilter] = useState<Set<string>>(() => new Set());
+
+  function toggle(set: Set<string>, value: string, options: ReadonlyArray<{ value: string }>) {
+    const next = new Set(set);
+    // First click on any chip when "all" is implicit: drop into single-select for that chip.
+    if (next.size === 0) {
+      next.add(value);
+    } else if (next.has(value)) {
+      next.delete(value);
+    } else {
+      next.add(value);
+    }
+    // If selection grew to cover every option, collapse back to "all" (empty set).
+    if (next.size === options.length) next.clear();
+    return next;
+  }
+
+  // Build the URL query the Start review / Exam mode buttons should use,
+  // so a click respects the current chip selection.
+  const filterQuery = useMemo(() => {
+    const parts: string[] = [];
+    const p = encodeFilterParam(Array.from(priorityFilter));
+    const d = encodeFilterParam(Array.from(difficultyFilter));
+    if (p) parts.push(`priority=${encodeURIComponent(p)}`);
+    if (d) parts.push(`difficulty=${encodeURIComponent(d)}`);
+    return parts.length === 0 ? "" : `?${parts.join("&")}`;
+  }, [priorityFilter, difficultyFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,11 +204,49 @@ export function TodayDashboard({
               ) : null}
               .
             </p>
+            <section
+              aria-label="Filter by importance and difficulty"
+              className="border-input bg-muted/20 flex flex-col gap-3 rounded-md border p-3"
+            >
+              <FilterChips
+                legend="Priority"
+                options={PRIORITY_FILTER_OPTIONS as unknown as { value: string; label: string }[]}
+                selected={priorityFilter}
+                onToggle={(v) =>
+                  setPriorityFilter((s) =>
+                    toggle(s, v, PRIORITY_FILTER_OPTIONS as unknown as { value: string }[]),
+                  )
+                }
+                helper={
+                  priorityFilter.size === 0
+                    ? "All priorities included."
+                    : `Showing only ${Array.from(priorityFilter).join(", ")}.`
+                }
+              />
+              <FilterChips
+                legend="Difficulty"
+                options={DIFFICULTY_FILTER_OPTIONS as unknown as { value: string; label: string }[]}
+                selected={difficultyFilter}
+                onToggle={(v) =>
+                  setDifficultyFilter((s) =>
+                    toggle(s, v, DIFFICULTY_FILTER_OPTIONS as unknown as { value: string }[]),
+                  )
+                }
+                helper={
+                  difficultyFilter.size === 0
+                    ? "All levels included."
+                    : `Showing only ${Array.from(difficultyFilter).join(", ")}.`
+                }
+              />
+            </section>
             <div className="flex flex-wrap gap-2">
-              <Link href="/review" className={cn(buttonVariants({ size: "lg" }))}>
+              <Link href={`/review${filterQuery}`} className={cn(buttonVariants({ size: "lg" }))}>
                 Start review
               </Link>
-              <Link href="/exam" className={cn(buttonVariants({ size: "lg", variant: "outline" }))}>
+              <Link
+                href={`/exam${filterQuery}`}
+                className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
+              >
                 Exam mode
               </Link>
             </div>
