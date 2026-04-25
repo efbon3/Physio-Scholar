@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { estimateExamMinutes, PreflightModal } from "@/components/preflight-modal";
 import type { ExamPattern, McqQuestion } from "@/lib/content/exam";
+import { buildRetakeQuestions } from "@/lib/content/mcq-retake";
 import { cn } from "@/lib/utils";
 
 type Status = "preflight" | "drilling" | "complete";
@@ -43,17 +44,15 @@ export function ExamSession({
   // while the disclaimer is visible.
   const [status, setStatus] = useState<Status>("preflight");
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Answer[]>(() =>
-    questions.map((q) => ({
-      cardId: q.cardId,
-      selectedIndex: null,
-      correctIndex: q.options.findIndex((o) => o.isCorrect),
-      stem: q.stem,
-      options: q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
-      elaborativeExplanation: q.elaborativeExplanation,
-    })),
-  );
-  const totalSeconds = questions.length * SECONDS_PER_QUESTION;
+  // `activeQuestions` is the deck currently being drilled. Initially
+  // equal to the `questions` prop; when the learner taps "Retake
+  // mistakes" we replace it with the filtered + option-shuffled subset
+  // and reset the per-question state. Lookups in render code
+  // (`activeQuestions[index].stem`, etc.) stay correct on retake
+  // without touching the parent's prop.
+  const [activeQuestions, setActiveQuestions] = useState<McqQuestion[]>(questions);
+  const [answers, setAnswers] = useState<Answer[]>(() => buildAnswers(questions));
+  const totalSeconds = activeQuestions.length * SECONDS_PER_QUESTION;
   const [secondsRemaining, setSecondsRemaining] = useState(totalSeconds);
 
   useEffect(() => {
@@ -73,16 +72,19 @@ export function ExamSession({
 
   // Hooks must run unconditionally — keep all useMemo/useState/useEffect
   // calls above the conditional render branches below.
-  const current = questions[index];
-  const progress = useMemo(() => ({ index, total: questions.length }), [index, questions.length]);
+  const current = activeQuestions[index];
+  const progress = useMemo(
+    () => ({ index, total: activeQuestions.length }),
+    [index, activeQuestions.length],
+  );
 
   if (status === "preflight") {
     return (
       <PreflightModal
         open
         kind={`Exam drill · ${pattern === "mbbs" ? "MBBS" : "Pre-PG"}`}
-        questionCount={questions.length}
-        estimatedMinutes={estimateExamMinutes(questions.length)}
+        questionCount={activeQuestions.length}
+        estimatedMinutes={estimateExamMinutes(activeQuestions.length)}
         context="One minute per question. Skipped questions do not count against you."
         cancelHref="/exam"
         onAccept={() => setStatus("drilling")}
@@ -98,11 +100,29 @@ export function ExamSession({
   }
 
   function advance() {
-    if (index + 1 >= questions.length) {
+    if (index + 1 >= activeQuestions.length) {
       setStatus("complete");
       return;
     }
     setIndex(index + 1);
+  }
+
+  function handleRetakeMistakes() {
+    // Build a lookup of mechanism ids from the original deck so the
+    // retake subset can carry the correct mechanism label per question.
+    const mechMap = new Map(activeQuestions.map((q) => [q.cardId, q.mechanismId] as const));
+    const retake = buildRetakeQuestions({
+      answers,
+      mechanismIdByCardId: mechMap,
+    });
+    if (retake.length === 0) return;
+    setActiveQuestions(retake);
+    setAnswers(buildAnswers(retake));
+    setIndex(0);
+    setSecondsRemaining(retake.length * SECONDS_PER_QUESTION);
+    // Skip the pre-flight modal — the learner already opted in to the
+    // focused-study session; this is a continuation, not a fresh start.
+    setStatus("drilling");
   }
 
   if (status === "complete") {
@@ -164,9 +184,23 @@ export function ExamSession({
         )}
 
         <div className="mt-4 flex flex-wrap gap-3">
+          {incorrect.length + skipped.length > 0 ? (
+            <button
+              type="button"
+              onClick={handleRetakeMistakes}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium"
+              data-testid="retake-mistakes"
+            >
+              Retake mistakes ({incorrect.length + skipped.length})
+            </button>
+          ) : null}
           <Link
             href="/exam"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium"
+            className={cn(
+              incorrect.length + skipped.length > 0
+                ? "hover:bg-muted rounded-md border px-4 py-2 text-sm"
+                : "bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium",
+            )}
           >
             Start another drill
           </Link>
@@ -244,7 +278,7 @@ export function ExamSession({
                 disabled={answers[index].selectedIndex === null}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm disabled:opacity-50"
               >
-                {index + 1 === questions.length ? "Submit drill" : "Next"}
+                {index + 1 === activeQuestions.length ? "Submit drill" : "Next"}
               </button>
             </div>
           </div>
@@ -258,4 +292,20 @@ function formatTime(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Map a deck of MCQs into the per-question Answer rows the drill UI
+ * mutates. Pulled out as a helper because both the initial mount and
+ * the "Retake mistakes" handler need to build it the same way.
+ */
+function buildAnswers(deck: readonly McqQuestion[]): Answer[] {
+  return deck.map((q) => ({
+    cardId: q.cardId,
+    selectedIndex: null,
+    correctIndex: q.options.findIndex((o) => o.isCorrect),
+    stem: q.stem,
+    options: q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
+    elaborativeExplanation: q.elaborativeExplanation,
+  }));
 }
