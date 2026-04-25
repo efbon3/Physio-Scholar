@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import {
+  applyCardFilters,
+  parseDifficultyFilter,
+  parsePriorityFilter,
+} from "@/lib/content/card-filters";
 import { extractCards, type Card } from "@/lib/content/cards";
 import { assembleExamSession, EXAM_PATTERNS, type ExamPattern } from "@/lib/content/exam";
 import { readAllMechanisms } from "@/lib/content/source";
@@ -12,7 +17,12 @@ export const metadata = {
   title: "Exam drill",
 };
 
-type SearchParams = { type?: string; count?: string };
+type SearchParams = {
+  type?: string;
+  count?: string;
+  priority?: string | string[];
+  difficulty?: string | string[];
+};
 
 function normaliseType(raw: string | undefined): ExamPattern | null {
   if (!raw) return null;
@@ -55,6 +65,18 @@ export default async function ExamSessionPage({
   const mechanisms = await readAllMechanisms();
   const allCards: Card[] = mechanisms.flatMap(extractCards);
 
+  // J7: priority + difficulty filters narrow the deck before MCQ
+  // assembly. If the combination yields too few cards we fall back to
+  // the unfiltered universe so the learner doesn't hit "No questions
+  // available" purely because of a strict filter.
+  const priorityFilter = parsePriorityFilter(params.priority);
+  const difficultyFilter = parseDifficultyFilter(params.difficulty);
+  const filteredCards =
+    priorityFilter || difficultyFilter
+      ? applyCardFilters(allCards, { priority: priorityFilter, difficulty: difficultyFilter })
+      : allCards;
+  const cards = filteredCards.length > 0 ? filteredCards : allCards;
+
   // Build a fresh session each page load. Combining Date.now() with a
   // per-request random uuid means two refreshes in the same millisecond
   // still get different seeds — Date.now() alone can collide.
@@ -67,7 +89,7 @@ export default async function ExamSessionPage({
   // eslint-disable-next-line react-hooks/purity
   const sessionSalt = `${Date.now()}-${crypto.randomUUID()}`;
   const questions = assembleExamSession({
-    cards: allCards,
+    cards,
     pattern,
     count,
     sessionSalt,

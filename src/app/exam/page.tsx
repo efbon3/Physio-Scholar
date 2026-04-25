@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { parseDifficultyFilter, parsePriorityFilter } from "@/lib/content/card-filters";
 import { EXAM_PATTERNS } from "@/lib/content/exam";
 
 export const metadata = {
@@ -8,12 +9,41 @@ export const metadata = {
 
 const COUNT_OPTIONS = [20, 50, 100] as const;
 
+const PRIORITY_OPTIONS = [
+  { value: "must", label: "Must-know" },
+  { value: "should", label: "Should-know" },
+  { value: "good", label: "Good-to-know" },
+] as const;
+
+const DIFFICULTY_OPTIONS = [
+  { value: "foundational", label: "Foundational" },
+  { value: "standard", label: "Standard" },
+  { value: "advanced", label: "Advanced" },
+] as const;
+
+type SearchParams = {
+  priority?: string | string[];
+  difficulty?: string | string[];
+};
+
 /**
  * Exam mode landing — student picks MBBS or pre-PG + a drill size.
  * Submits via GET to /exam/session so a refresh re-seeds the session
  * without server state.
+ *
+ * Priority + difficulty checkboxes carry over any pre-selection from
+ * the Today dashboard's filter chips (linked here with `?priority=…`
+ * & `?difficulty=…`) and pass through to the session URL when the
+ * learner submits the form.
  */
-export default function ExamLandingPage() {
+export default async function ExamLandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
+  const incomingPriority = new Set(parsePriorityFilter(params.priority) ?? []);
+  const incomingDifficulty = new Set(parseDifficultyFilter(params.difficulty) ?? []);
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-1">
@@ -70,6 +100,56 @@ export default function ExamLandingPage() {
           <p className="text-muted-foreground text-xs">
             One minute per question. A 20-question drill is about 20 minutes.
           </p>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-heading text-lg font-medium">
+            Importance{" "}
+            <span className="text-muted-foreground text-xs font-normal">
+              (uncheck all = include every level)
+            </span>
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {PRIORITY_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className="border-input hover:bg-muted flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  name="priority"
+                  value={opt.value}
+                  defaultChecked={incomingPriority.has(opt.value)}
+                />
+                <span>{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-heading text-lg font-medium">
+            Difficulty{" "}
+            <span className="text-muted-foreground text-xs font-normal">
+              (uncheck all = include every level)
+            </span>
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {DIFFICULTY_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className="border-input hover:bg-muted flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  name="difficulty"
+                  value={opt.value}
+                  defaultChecked={incomingDifficulty.has(opt.value)}
+                />
+                <span>{opt.label}</span>
+              </label>
+            ))}
+          </div>
         </fieldset>
 
         <div className="flex items-center gap-3">
