@@ -12,8 +12,14 @@
 -- 2. profiles_select_admin policy — admins can SELECT every profile
 --    (needed for /admin/users which shipped in F1 and was silently
 --    only showing the admin's own row due to the missing policy).
---    Recursive subquery is safe because auth.uid() always matches
---    profiles_select_own, breaking the loop.
+--
+--    Implementation note: a naive `(select is_admin from profiles
+--    where id = auth.uid())` inside the policy's USING clause causes
+--    `infinite recursion detected in policy for relation profiles`
+--    — the SELECT on profiles re-triggers all SELECT policies,
+--    including this one. We sidestep with a SECURITY DEFINER helper
+--    that bypasses RLS for its own internal lookup. The function is
+--    `stable` so Postgres can cache the result per statement.
 
 alter table public.profiles
   add column study_systems text[] not null
@@ -34,10 +40,23 @@ alter table public.profiles
 comment on column public.profiles.study_systems is
   'Organ systems the learner has actively selected. Review queue filters cards to mechanisms whose organ_system is in this array. Defaults to all systems for new profiles.';
 
+create or replace function public.is_current_user_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select coalesce(p.is_admin, false)
+  from public.profiles p
+  where p.id = (select auth.uid());
+$$;
+
+revoke all on function public.is_current_user_admin() from public;
+grant execute on function public.is_current_user_admin() to authenticated;
+
 create policy profiles_select_admin
   on public.profiles
   for select
   to authenticated
-  using (
-    (select is_admin from public.profiles where id = (select auth.uid())) = true
-  );
+  using (public.is_current_user_admin());
