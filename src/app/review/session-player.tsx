@@ -93,6 +93,12 @@ type Props = {
    * confusing for general queues.
    */
   mechanismTitles?: Record<string, { title: string; organSystem: string }>;
+  /**
+   * Card ids to surface earlier in the queue (J7 exam-aware weighting).
+   * Pre-computed by the page from the active exam window so this
+   * client component doesn't need to know about exam_events.
+   */
+  boostCardIds?: readonly string[];
 };
 
 export function SessionPlayer({
@@ -100,6 +106,7 @@ export function SessionPlayer({
   profileId,
   focusMechanism = null,
   mechanismTitles = {},
+  boostCardIds = [],
 }: Props) {
   const [status, setStatus] = useState<Status>("loading");
   const [queue, setQueue] = useState<QueuedCard[]>([]);
@@ -112,6 +119,7 @@ export function SessionPlayer({
 
   // Must run unconditionally — hooks rule. Consumed only when reviewing.
   const progress = useMemo(() => ({ index, total: queue.length }), [index, queue.length]);
+  const boostSet = useMemo(() => new Set(boostCardIds), [boostCardIds]);
 
   // Load local card_states and assemble the queue once on mount. Any
   // offline-queued reviews are already in Dexie from prior sessions, so
@@ -128,6 +136,7 @@ export function SessionPlayer({
           cardStates: stateMap,
           now: new Date(),
           maxNewCards: DEFAULT_MAX_NEW_CARDS,
+          boostCardIds: boostSet,
         });
         if (cancelled) return;
         setQueue(q);
@@ -145,7 +154,7 @@ export function SessionPlayer({
     return () => {
       cancelled = true;
     };
-  }, [cards, profileId]);
+  }, [cards, profileId, boostSet]);
 
   const current = queue[index];
 
