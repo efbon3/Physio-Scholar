@@ -236,7 +236,11 @@ export function SessionPlayer({
   if (status === "preflight") {
     return (
       <>
-        {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+        <ReviewHeader
+          title={focusMechanism?.title ?? "Review session"}
+          organSystem={currentMechanismInfo.organSystem}
+          isFiltered={Boolean(focusMechanism)}
+        />
         {/* Calm placeholder behind the modal so the page isn't blank if
             the dialog fails to render (e.g., browsers without
             <dialog> showModal — none we target, but harmless). */}
@@ -248,7 +252,10 @@ export function SessionPlayer({
           kind="Review session"
           questionCount={queue.length}
           estimatedMinutes={estimateReviewMinutes(queue.length)}
-          context={focusMechanism ? `Studying: ${focusMechanism.title}` : null}
+          // ReviewHeader (just behind the modal) already shows the
+          // focus title; using "Focus:" here avoids duplicating the
+          // header copy verbatim.
+          context={focusMechanism ? `Focus: ${focusMechanism.title}` : null}
           onAccept={() => setStatus("reviewing")}
         />
       </>
