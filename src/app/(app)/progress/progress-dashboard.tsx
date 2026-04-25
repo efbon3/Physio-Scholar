@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import type { BloomsLevel, Card } from "@/lib/content/cards";
 import { buildActivityCalendar, type ActivityCell } from "@/lib/srs/activity";
-import type { Card } from "@/lib/content/cards";
+import { computeBloomBreakdown, type BloomBreakdown } from "@/lib/srs/bloom-breakdown";
+import type { StoredReview } from "@/lib/srs/db";
 import { loadAllCardStates, loadAllReviews } from "@/lib/srs/local";
 import {
   computeProgressSnapshot,
   PROGRESS_SPARK_DAYS,
   type ProgressSnapshot,
 } from "@/lib/srs/progress";
+import { computeTimePatterns, DAY_LABELS, type TimePatternGrid } from "@/lib/srs/time-patterns";
 
 import { ActivityTimeline } from "./activity-timeline";
 
@@ -19,6 +22,27 @@ type Props = {
   mechanismTitles: Record<string, string>;
   profileId: string;
 };
+
+const BLOOM_LABELS: Record<BloomsLevel, string> = {
+  remember: "Remember",
+  understand: "Understand",
+  apply: "Apply",
+  analyze: "Analyze",
+};
+
+const BLOOM_DESCRIPTIONS: Record<BloomsLevel, string> = {
+  remember: "Recall facts and definitions",
+  understand: "Explain concepts in your own words",
+  apply: "Use the concept to solve a new problem",
+  analyze: "Break a scenario down and weigh competing factors",
+};
+
+function formatHour(h: number): string {
+  if (h === 0) return "12 am";
+  if (h === 12) return "12 pm";
+  if (h < 12) return `${h} am`;
+  return `${h - 12} pm`;
+}
 
 function formatMinutes(seconds: number): string {
   if (seconds <= 0) return "0 min";
@@ -56,35 +80,38 @@ function formatRelative(ms: number | null, now: Date): string {
 export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) {
   const [snapshot, setSnapshot] = useState<ProgressSnapshot | null>(null);
   const [activityCells, setActivityCells] = useState<ActivityCell[]>([]);
+  const [reviews, setReviews] = useState<readonly StoredReview[]>([]);
   const titlesMap = useMemo(() => new Map(Object.entries(mechanismTitles)), [mechanismTitles]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const [reviews, states] = await Promise.all([
+        const [allReviews, states] = await Promise.all([
           loadAllReviews(profileId),
           loadAllCardStates(profileId),
         ]);
         const now = new Date();
         const snap = computeProgressSnapshot({
-          reviews,
+          reviews: allReviews,
           cardStates: states,
           allCards: cards,
           mechanismTitles: titlesMap,
           now,
         });
         const cells = buildActivityCalendar({
-          reviews,
+          reviews: allReviews,
           now,
           mechanismTitles: titlesMap,
         });
         if (!cancelled) {
+          setReviews(allReviews);
           setSnapshot(snap);
           setActivityCells(cells);
         }
       } catch {
         if (!cancelled) {
+          setReviews([]);
           setSnapshot({
             totalCards: cards.length,
             totalReviews: 0,
@@ -106,6 +133,13 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
       cancelled = true;
     };
   }, [cards, titlesMap, profileId]);
+
+  const bloomBreakdown: BloomBreakdown = useMemo(
+    () => computeBloomBreakdown({ reviews, allCards: cards }),
+    [reviews, cards],
+  );
+
+  const timePatterns: TimePatternGrid = useMemo(() => computeTimePatterns({ reviews }), [reviews]);
 
   if (snapshot === null) {
     return (
@@ -216,6 +250,24 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
         )}
       </section>
 
+      <section aria-label="Bloom's level breakdown" className="flex flex-col gap-3">
+        <h2 className="font-heading text-xl font-medium">Cognitive depth</h2>
+        <p className="text-muted-foreground text-xs">
+          How you score across Bloom&apos;s pyramid. Recall-level (remember) tends to peak first;
+          analyze-level lags as it requires reasoning under uncertainty.
+        </p>
+        <BloomBreakdownTable breakdown={bloomBreakdown} />
+      </section>
+
+      <section aria-label="Study time patterns" className="flex flex-col gap-3">
+        <h2 className="font-heading text-xl font-medium">When you study</h2>
+        <p className="text-muted-foreground text-xs">
+          Reviews bucketed by day-of-week and hour. Spotting your peak hour helps schedule the
+          hardest cards there — and protect that slot from collisions.
+        </p>
+        <TimePatternHeatmap patterns={timePatterns} />
+      </section>
+
       <section
         aria-label="Coming next on Progress"
         className="text-muted-foreground flex flex-col gap-2 border-t pt-4 text-xs"
@@ -226,6 +278,138 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
         </p>
       </section>
     </main>
+  );
+}
+
+function BloomBreakdownTable({ breakdown }: { breakdown: BloomBreakdown }) {
+  if (!breakdown.hasAnyReviews) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        No reviews yet — start a session to see your accuracy by cognitive level.
+      </p>
+    );
+  }
+  return (
+    <ul className="flex flex-col gap-2 text-sm">
+      {breakdown.buckets.map((b) => {
+        const label = BLOOM_LABELS[b.level];
+        const desc = BLOOM_DESCRIPTIONS[b.level];
+        const pct = b.retentionPct;
+        const barWidth = pct === null ? 0 : pct;
+        return (
+          <li key={b.level} className="border-border flex flex-col gap-1 rounded-md border p-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="flex flex-col">
+                <span className="font-medium">{label}</span>
+                <span className="text-muted-foreground text-xs">{desc}</span>
+              </div>
+              <div
+                className="font-medium"
+                aria-label={
+                  pct === null
+                    ? `${label} — no reviews yet`
+                    : `${label} retention ${pct}% over ${b.totalReviews} reviews`
+                }
+              >
+                {pct === null ? "—" : `${pct}%`}
+              </div>
+            </div>
+            <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full" aria-hidden>
+              <div className="bg-primary h-full" style={{ width: `${barWidth}%` }} />
+            </div>
+            <span className="text-muted-foreground text-xs">
+              {b.totalReviews} review{b.totalReviews === 1 ? "" : "s"}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function TimePatternHeatmap({ patterns }: { patterns: TimePatternGrid }) {
+  if (patterns.totalReviews === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        No timing data yet — once you study, this heatmap fills in.
+      </p>
+    );
+  }
+  // Compute peak cell value across the grid for shading. Single-bucket
+  // edge-case: floor at 1 so we don't divide by 0.
+  let max = 1;
+  for (const row of patterns.grid) for (const c of row) if (c > max) max = c;
+
+  // Render condensed: 4-hour slots (8 columns) so the grid fits a
+  // 3xl page without horizontal scroll. The full 24-column matrix is
+  // available in the DOM via aria-label for assistive tech that can
+  // navigate it.
+  const slotBoundaries = [0, 3, 6, 9, 12, 15, 18, 21];
+  const slotLabels = ["12-3a", "3-6a", "6-9a", "9-12p", "12-3p", "3-6p", "6-9p", "9-12a"];
+  const condensed: number[][] = patterns.grid.map((row) => {
+    const out: number[] = [];
+    for (let i = 0; i < slotBoundaries.length; i += 1) {
+      const start = slotBoundaries[i];
+      const end = slotBoundaries[i + 1] ?? 24;
+      let sum = 0;
+      for (let h = start; h < end; h += 1) sum += row[h] ?? 0;
+      out.push(sum);
+    }
+    return out;
+  });
+  let condensedMax = 1;
+  for (const row of condensed) for (const c of row) if (c > condensedMax) condensedMax = c;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        role="img"
+        aria-label={`Study time heatmap — ${patterns.totalReviews} review${patterns.totalReviews === 1 ? "" : "s"} bucketed by day and 3-hour slot. Peak day ${patterns.peakDayOfWeek === null ? "n/a" : DAY_LABELS[patterns.peakDayOfWeek]}, peak hour ${patterns.peakHour === null ? "n/a" : formatHour(patterns.peakHour)}.`}
+        className="border-border overflow-x-auto rounded-md border p-3"
+      >
+        <table className="w-full border-separate border-spacing-1 text-xs">
+          <thead>
+            <tr>
+              <th className="text-muted-foreground text-left font-normal" scope="col">
+                {""}
+              </th>
+              {slotLabels.map((s) => (
+                <th key={s} scope="col" className="text-muted-foreground text-center font-normal">
+                  {s}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {DAY_LABELS.map((day, dow) => (
+              <tr key={day}>
+                <th scope="row" className="text-muted-foreground pr-2 text-left font-normal">
+                  {day}
+                </th>
+                {condensed[dow].map((count, slot) => {
+                  const intensity = count === 0 ? 0 : Math.max(0.15, count / condensedMax);
+                  return (
+                    <td
+                      key={slot}
+                      className="bg-primary aspect-square h-6 w-6 rounded-sm"
+                      style={{ opacity: intensity }}
+                      title={`${day} ${slotLabels[slot]} — ${count} review${count === 1 ? "" : "s"}`}
+                    />
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Peak: {patterns.peakDayOfWeek === null ? "—" : DAY_LABELS[patterns.peakDayOfWeek]}
+        {" · "}
+        {patterns.peakHour === null ? "—" : formatHour(patterns.peakHour)}
+        {" · "}
+        cell shading scaled to {condensedMax} review{condensedMax === 1 ? "" : "s"} max
+      </p>
+    </div>
   );
 }
 
