@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { buildActivityCalendar, type ActivityCell } from "@/lib/srs/activity";
 import type { Card } from "@/lib/content/cards";
 import { loadAllCardStates, loadAllReviews } from "@/lib/srs/local";
 import {
@@ -10,6 +11,8 @@ import {
   PROGRESS_SPARK_DAYS,
   type ProgressSnapshot,
 } from "@/lib/srs/progress";
+
+import { ActivityTimeline } from "./activity-timeline";
 
 type Props = {
   cards: readonly Card[];
@@ -52,6 +55,8 @@ function formatRelative(ms: number | null, now: Date): string {
  */
 export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) {
   const [snapshot, setSnapshot] = useState<ProgressSnapshot | null>(null);
+  const [activityCells, setActivityCells] = useState<ActivityCell[]>([]);
+  const titlesMap = useMemo(() => new Map(Object.entries(mechanismTitles)), [mechanismTitles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,15 +66,23 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
           loadAllReviews(profileId),
           loadAllCardStates(profileId),
         ]);
-        const titlesMap = new Map(Object.entries(mechanismTitles));
+        const now = new Date();
         const snap = computeProgressSnapshot({
           reviews,
           cardStates: states,
           allCards: cards,
           mechanismTitles: titlesMap,
-          now: new Date(),
+          now,
         });
-        if (!cancelled) setSnapshot(snap);
+        const cells = buildActivityCalendar({
+          reviews,
+          now,
+          mechanismTitles: titlesMap,
+        });
+        if (!cancelled) {
+          setSnapshot(snap);
+          setActivityCells(cells);
+        }
       } catch {
         if (!cancelled) {
           setSnapshot({
@@ -85,13 +98,14 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
             dailyReviews: [],
             byMechanism: [],
           });
+          setActivityCells([]);
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [cards, mechanismTitles, profileId]);
+  }, [cards, titlesMap, profileId]);
 
   if (snapshot === null) {
     return (
@@ -158,6 +172,8 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
         </h2>
         <ActivitySparkline buckets={snapshot.dailyReviews} />
       </section>
+
+      <ActivityTimeline cells={activityCells} />
 
       <section aria-label="Per-mechanism mastery" className="flex flex-col gap-3">
         <h2 className="font-heading text-xl font-medium">Mechanisms</h2>
