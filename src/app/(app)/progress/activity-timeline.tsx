@@ -48,7 +48,7 @@ export function ActivityTimeline({ cells }: { cells: readonly ActivityCell[] }) 
         {monthSpan ? <p className="text-muted-foreground text-xs">{monthSpan}</p> : null}
       </header>
 
-      <div role="grid" aria-label="Daily activity, 5 weeks" className="grid grid-cols-7 gap-1.5">
+      <div role="grid" aria-label="Activity grid, 5 weeks" className="grid grid-cols-7 gap-1.5">
         {cells.map((cell) => {
           const shade = activityShade(cell.count, thresholds);
           const isSelected = cell.dateKey === selectedKey;
