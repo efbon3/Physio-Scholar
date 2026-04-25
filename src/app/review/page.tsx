@@ -47,11 +47,20 @@ export default async function ReviewPage({
   // the E2E suite honest.
   const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   let userId: string | null = null;
+  let studySystems: string[] | null = null;
   if (hasSupabase) {
     try {
       const supabase = await createClient();
       const result = await supabase.auth.getUser();
       userId = result.data.user?.id ?? null;
+      if (userId) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("study_systems")
+          .eq("id", userId)
+          .single();
+        studySystems = profile?.study_systems ?? null;
+      }
     } catch {
       // Supabase unreachable — fall through to the preview id.
     }
@@ -67,7 +76,18 @@ export default async function ReviewPage({
   // here today via the Phase 2 loader + C3a parser. As the cohort grows,
   // every file in content/mechanisms/ automatically contributes cards.
   const mechanisms = await readAllMechanisms();
-  let cards: Card[] = mechanisms.flatMap(extractCards);
+
+  // Apply the per-student "active organ systems" filter (J0). If the
+  // learner has narrowed their study scope (e.g., cardiovascular only),
+  // exclude mechanisms outside that scope. A `?mechanism=<id>` filter
+  // takes precedence — explicit topic intent wins over the general
+  // preference. When no preference is set (CI / preview), all systems
+  // remain active.
+  const filteredMechanisms = studySystems
+    ? mechanisms.filter((m) => studySystems!.includes(m.frontmatter.organ_system))
+    : mechanisms;
+
+  let cards: Card[] = filteredMechanisms.flatMap(extractCards);
   let focusTitle: string | null = null;
 
   if (mechanismFilter) {

@@ -36,10 +36,13 @@ export function TodayDashboard({
   cards,
   email,
   profileId,
+  studySystems,
 }: {
   cards: readonly Card[];
   email: string | null;
   profileId: string;
+  /** Active organ-systems preference. Null = no preference (CI / preview). */
+  studySystems: string[] | null;
 }) {
   const [summary, setSummary] = useState<QueueSummary | null>(null);
 
@@ -70,9 +73,21 @@ export function TodayDashboard({
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="flex flex-col gap-1">
+      <header className="flex flex-col gap-2">
         <p className="text-muted-foreground text-sm tracking-widest uppercase">Today</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Hi, {greetingName}.</h1>
+        {studySystems && studySystems.length > 0 ? (
+          <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+            <span>Studying:</span>
+            <span className="font-medium capitalize">{studySystems.join(" · ")}</span>
+            <Link
+              href="/settings"
+              className="hover:bg-muted text-foreground rounded-md border px-2 py-0.5"
+            >
+              Change
+            </Link>
+          </p>
+        ) : null}
       </header>
 
       <section aria-label="Review queue" className="flex flex-col gap-4">

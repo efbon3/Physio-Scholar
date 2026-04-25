@@ -70,6 +70,11 @@ describe("Database type", () => {
     expectTypeOf<ProfileRow>().toHaveProperty("avatar_url");
   });
 
+  it("profiles carry the per-student study_systems preference", () => {
+    expectTypeOf<ProfileRow>().toHaveProperty("study_systems");
+    expectTypeOf<ProfileRow["study_systems"]>().toEqualTypeOf<string[]>();
+  });
+
   it("subscriptions.tier is the enum type", () => {
     expectTypeOf<SubscriptionRow["tier"]>().toEqualTypeOf<PublicEnums["subscription_tier"]>();
   });

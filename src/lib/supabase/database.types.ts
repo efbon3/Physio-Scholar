@@ -130,6 +130,7 @@ export type Database = {
           is_minor: boolean | null
           phone: string | null
           roll_number: string | null
+          study_systems: string[]
           updated_at: string
           year_of_study: number | null
         }
@@ -151,6 +152,7 @@ export type Database = {
           is_minor?: boolean | null
           phone?: string | null
           roll_number?: string | null
+          study_systems?: string[]
           updated_at?: string
           year_of_study?: number | null
         }
@@ -172,6 +174,7 @@ export type Database = {
           is_minor?: boolean | null
           phone?: string | null
           roll_number?: string | null
+          study_systems?: string[]
           updated_at?: string
           year_of_study?: number | null
         }
