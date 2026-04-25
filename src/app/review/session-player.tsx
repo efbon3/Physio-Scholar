@@ -32,7 +32,24 @@ type Status = "loading" | "empty" | "reviewing" | "complete";
 type ActiveCardState = {
   attempt: string;
   hintsShown: number;
+  /**
+   * Has the answer been revealed at least once for this card. Drives:
+   *   - textarea-disabled state (one-way commit, no editing the
+   *     attempt after the first reveal — that would game the recall)
+   *   - rating row visibility (you can't rate before seeing the answer)
+   *   - flag-card affordance availability
+   *
+   * Once true, stays true for the rest of this card's display.
+   */
   revealed: boolean;
+  /**
+   * Is the answer pane currently visible. Toggled by the Show / Hide
+   * answer button. Independent of `revealed` so the learner can collapse
+   * the pane (e.g., to re-read the stem without the answer in their
+   * peripheral) but the textarea stays disabled and the rating row
+   * stays available.
+   */
+  answerVisible: boolean;
   /** Post-reveal self-explanation (build spec §2.6). Optional in Review mode. */
   selfExplanation: string;
   /** ms epoch when the reveal happened — drives the 2s rating delay + timing telemetry. */
@@ -46,6 +63,7 @@ function freshCardState(): ActiveCardState {
     attempt: "",
     hintsShown: 0,
     revealed: false,
+    answerVisible: false,
     selfExplanation: "",
     revealedAt: null,
     startedAt: Date.now(),
@@ -244,9 +262,11 @@ export function SessionPlayer({
           setCardState((s) => ({
             ...s,
             revealed: true,
+            answerVisible: true,
             revealedAt: s.revealedAt ?? Date.now(),
           }))
         }
+        onToggleAnswer={() => setCardState((s) => ({ ...s, answerVisible: !s.answerVisible }))}
         onSelfExplanationChange={(selfExplanation) =>
           setCardState((s) => ({ ...s, selfExplanation }))
         }
