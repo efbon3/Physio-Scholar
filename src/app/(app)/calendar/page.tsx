@@ -1,16 +1,37 @@
 import Link from "next/link";
 
+import { buttonVariants } from "@/components/ui/button";
 import {
   daysUntil,
   groupByMonth,
   readVisibleEvents,
   type ExamEventRow,
 } from "@/lib/calendar/events";
+import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
   title: "Calendar",
 };
+
+async function loadFacultyFlag(): Promise<{ isFaculty: boolean; isAdmin: boolean }> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return { isFaculty: false, isAdmin: false };
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { isFaculty: false, isAdmin: false };
+    const { data } = await supabase
+      .from("profiles")
+      .select("is_faculty, is_admin")
+      .eq("id", user.id)
+      .single();
+    return { isFaculty: Boolean(data?.is_faculty), isAdmin: Boolean(data?.is_admin) };
+  } catch {
+    return { isFaculty: false, isAdmin: false };
+  }
+}
 
 const KIND_LABELS: Record<string, string> = {
   exam: "Exam",
@@ -35,7 +56,7 @@ const KIND_TONE: Record<string, string> = {
  * page is the surface they will both link to.
  */
 export default async function CalendarPage() {
-  const events = await readVisibleEvents();
+  const [events, role] = await Promise.all([readVisibleEvents(), loadFacultyFlag()]);
   const now = new Date();
   const upcoming = events.filter((e) => e.starts_at >= toDateKey(now));
   const past = events.filter((e) => e.starts_at < toDateKey(now));
@@ -50,6 +71,23 @@ export default async function CalendarPage() {
           Institutional exams + your own personal events. Personal events are visible only to you;
           institutional events are set by your faculty.
         </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link
+            href="/calendar/new"
+            className={cn(buttonVariants({ size: "sm" }))}
+            data-testid="add-personal-event"
+          >
+            Add personal event
+          </Link>
+          {role.isFaculty || role.isAdmin ? (
+            <Link
+              href="/admin/calendar"
+              className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+            >
+              Manage institution events
+            </Link>
+          ) : null}
+        </div>
       </header>
 
       {upcoming.length === 0 ? (
