@@ -93,12 +93,24 @@ export default async function ReviewPage({
   // not when the page renders. Tracked as a pilot-launch item in the
   // author runbook; removing the misfiring check is the safer interim.
 
+  // Build the title-and-organ-system map once at request time so the
+  // ReviewHeader can show "Frank-Starling Mechanism · Cardiovascular"
+  // instead of the kebab-case slug.
+  const mechanismTitles: Record<string, { title: string; organSystem: string }> = {};
+  for (const m of mechanisms) {
+    mechanismTitles[m.frontmatter.id] = {
+      title: m.frontmatter.title,
+      organSystem: m.frontmatter.organ_system,
+    };
+  }
+
   return (
     <>
       <SessionPlayer
         cards={cards}
         profileId={userId ?? "preview"}
         focusMechanism={focusTitle ? { id: mechanismFilter!, title: focusTitle } : null}
+        mechanismTitles={mechanismTitles}
       />
       <Watermark userId={userId} />
     </>

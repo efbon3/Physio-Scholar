@@ -27,6 +27,7 @@ export function CardView({
   onAttemptChange,
   onShowHint,
   onReveal,
+  onToggleAnswer,
   onSelfExplanationChange,
   onRate,
   ratingDelayMs,
@@ -37,12 +38,14 @@ export function CardView({
     attempt: string;
     hintsShown: number;
     revealed: boolean;
+    answerVisible: boolean;
     selfExplanation: string;
     revealedAt: number | null;
   };
   onAttemptChange: (value: string) => void;
   onShowHint: () => void;
   onReveal: () => void;
+  onToggleAnswer: () => void;
   onSelfExplanationChange: (value: string) => void;
   onRate: (rating: Rating) => void;
   ratingDelayMs: number;
@@ -110,13 +113,31 @@ export function CardView({
             Show answer
           </button>
         </section>
-      ) : null}
+      ) : (
+        // Once revealed, the show-answer button becomes a toggle so the
+        // learner can hide the answer + explanation pane (e.g., to
+        // re-read the stem without the answer in their peripheral
+        // vision). The textarea stays disabled — first-reveal is a
+        // one-way commit, no editing the attempt after seeing the
+        // answer. Rating row also stays visible because they've already
+        // seen the answer; hiding just clears the screen.
+        <section aria-label="Reveal controls" className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onToggleAnswer}
+            className="hover:bg-muted rounded-md border px-3 py-1.5 text-sm"
+            aria-pressed={active.answerVisible}
+          >
+            {active.answerVisible ? "Hide answer" : "Show answer again"}
+          </button>
+        </section>
+      )}
 
       {active.hintsShown > 0 ? (
         <HintLadder hints={card.hints} shownCount={active.hintsShown} />
       ) : null}
 
-      {active.revealed ? (
+      {active.answerVisible ? (
         <section aria-label="Answer reveal" className="flex flex-col gap-4 border-t pt-4">
           <div className="flex flex-col gap-2">
             <h2 className="font-heading text-lg font-medium">Correct answer</h2>
@@ -144,7 +165,7 @@ export function CardView({
         </section>
       ) : null}
 
-      {active.revealed ? (
+      {active.answerVisible ? (
         <section aria-label="Self-explanation" className="flex flex-col gap-2">
           <label htmlFor="self-explanation" className="text-sm font-medium">
             In your own words — why?

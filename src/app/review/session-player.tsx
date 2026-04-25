@@ -32,7 +32,24 @@ type Status = "loading" | "empty" | "reviewing" | "complete";
 type ActiveCardState = {
   attempt: string;
   hintsShown: number;
+  /**
+   * Has the answer been revealed at least once for this card. Drives:
+   *   - textarea-disabled state (one-way commit, no editing the
+   *     attempt after the first reveal — that would game the recall)
+   *   - rating row visibility (you can't rate before seeing the answer)
+   *   - flag-card affordance availability
+   *
+   * Once true, stays true for the rest of this card's display.
+   */
   revealed: boolean;
+  /**
+   * Is the answer pane currently visible. Toggled by the Show / Hide
+   * answer button. Independent of `revealed` so the learner can collapse
+   * the pane (e.g., to re-read the stem without the answer in their
+   * peripheral) but the textarea stays disabled and the rating row
+   * stays available.
+   */
+  answerVisible: boolean;
   /** Post-reveal self-explanation (build spec §2.6). Optional in Review mode. */
   selfExplanation: string;
   /** ms epoch when the reveal happened — drives the 2s rating delay + timing telemetry. */
@@ -46,6 +63,7 @@ function freshCardState(): ActiveCardState {
     attempt: "",
     hintsShown: 0,
     revealed: false,
+    answerVisible: false,
     selfExplanation: "",
     revealedAt: null,
     startedAt: Date.now(),
@@ -66,9 +84,22 @@ type Props = {
    * identical to a general one.
    */
   focusMechanism?: { id: string; title: string } | null;
+  /**
+   * Map of mechanism_id → { title, organSystem } so the always-on
+   * ReviewHeader can show the proper title of the current card's
+   * mechanism. Earlier we only showed the kebab-case slug, which
+   * looked like "FRANK STARLING" — fine for one-mechanism pilots,
+   * confusing for general queues.
+   */
+  mechanismTitles?: Record<string, { title: string; organSystem: string }>;
 };
 
-export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props) {
+export function SessionPlayer({
+  cards,
+  profileId,
+  focusMechanism = null,
+  mechanismTitles = {},
+}: Props) {
   const [status, setStatus] = useState<Status>("loading");
   const [queue, setQueue] = useState<QueuedCard[]>([]);
   const [index, setIndex] = useState(0);
@@ -147,10 +178,36 @@ export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props
     void autoSync.runSync();
   }
 
+  // Resolve the title + organ system of whichever mechanism the
+  // current card belongs to, falling back to focusMechanism (filtered
+  // mode) or the kebab-case id if no titles map was supplied.
+  const currentMechanismInfo = (() => {
+    if (focusMechanism) {
+      return {
+        title: focusMechanism.title,
+        organSystem: mechanismTitles[focusMechanism.id]?.organSystem ?? "",
+      };
+    }
+    if (current?.card.mechanism_id && mechanismTitles[current.card.mechanism_id]) {
+      return mechanismTitles[current.card.mechanism_id];
+    }
+    if (current?.card.mechanism_id) {
+      return {
+        title: current.card.mechanism_id.replace(/-/g, " "),
+        organSystem: "",
+      };
+    }
+    return { title: "", organSystem: "" };
+  })();
+
   if (status === "loading") {
     return (
       <>
-        {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+        <ReviewHeader
+          title={focusMechanism?.title ?? "Loading…"}
+          organSystem={currentMechanismInfo.organSystem}
+          isFiltered={Boolean(focusMechanism)}
+        />
         <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-6">
           <p className="text-muted-foreground text-sm">Loading your session…</p>
         </main>
@@ -161,7 +218,11 @@ export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props
   if (status === "empty") {
     return (
       <>
-        {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+        <ReviewHeader
+          title={focusMechanism?.title ?? "Review queue"}
+          organSystem={currentMechanismInfo.organSystem}
+          isFiltered={Boolean(focusMechanism)}
+        />
         <EmptyState focusMechanism={focusMechanism} />
       </>
     );
@@ -170,7 +231,11 @@ export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props
   if (status === "complete") {
     return (
       <>
-        {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+        <ReviewHeader
+          title={focusMechanism?.title ?? "Session complete"}
+          organSystem={currentMechanismInfo.organSystem}
+          isFiltered={Boolean(focusMechanism)}
+        />
         <CompleteState ratedCount={ratedCount} focusMechanism={focusMechanism} />
       </>
     );
@@ -179,7 +244,11 @@ export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props
   // reviewing
   return (
     <>
-      {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+      <ReviewHeader
+        title={currentMechanismInfo.title}
+        organSystem={currentMechanismInfo.organSystem}
+        isFiltered={Boolean(focusMechanism)}
+      />
       <CardView
         queued={current!}
         active={cardState}
@@ -193,9 +262,11 @@ export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props
           setCardState((s) => ({
             ...s,
             revealed: true,
+            answerVisible: true,
             revealedAt: s.revealedAt ?? Date.now(),
           }))
         }
+        onToggleAnswer={() => setCardState((s) => ({ ...s, answerVisible: !s.answerVisible }))}
         onSelfExplanationChange={(selfExplanation) =>
           setCardState((s) => ({ ...s, selfExplanation }))
         }
@@ -208,24 +279,50 @@ export function SessionPlayer({ cards, profileId, focusMechanism = null }: Props
 }
 
 /**
- * Confirms which mechanism is being drilled when the learner arrived via
- * `/review?mechanism=<id>`. Sits at the top of every session state
- * (loading / empty / reviewing / complete) so the context is always visible.
+ * Sticky header bar for every review-session state. Always shows a
+ * "← Today" escape hatch (so the learner is never trapped) plus the
+ * proper title of the mechanism the current card belongs to.
+ *
+ * `isFiltered=true` dims the title to "Studying: X" framing so the
+ * learner knows they're inside a `/review?mechanism=<id>` filtered
+ * session, not a general queue.
  */
-function FocusBanner({ mechanism }: { mechanism: { id: string; title: string } }) {
+function ReviewHeader({
+  title,
+  organSystem,
+  isFiltered,
+}: {
+  title: string;
+  organSystem: string;
+  isFiltered: boolean;
+}) {
   return (
-    <div className="border-border bg-muted/40 sticky top-0 z-10 w-full border-b">
+    <div
+      role="banner"
+      className="border-border bg-background/95 sticky top-0 z-10 w-full border-b backdrop-blur"
+    >
       <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center justify-between gap-2 px-6 py-2 text-xs">
-        <p>
-          <span className="text-muted-foreground">Studying:</span>{" "}
-          <span className="font-medium">{mechanism.title}</span>
-        </p>
         <Link
-          href={`/systems`}
-          className="text-muted-foreground underline-offset-2 hover:underline"
+          href="/today"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+          aria-label="Back to Today"
         >
-          Leave
+          ← Today
         </Link>
+        <p className="flex flex-wrap items-center gap-1.5 text-right">
+          {isFiltered ? (
+            <span className="text-muted-foreground">Studying:</span>
+          ) : (
+            <span className="text-muted-foreground">Reviewing:</span>
+          )}
+          <span className="font-medium">{title}</span>
+          {organSystem ? (
+            <>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground capitalize">{organSystem}</span>
+            </>
+          ) : null}
+        </p>
       </div>
     </div>
   );
