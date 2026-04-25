@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { BloomsLevel, Card } from "@/lib/content/cards";
 import { computeBloomBreakdown, type BloomBreakdown } from "@/lib/srs/bloom-breakdown";
 import type { StoredReview } from "@/lib/srs/db";
+import { computeForgettingCurve, type ForgettingCurveEstimate } from "@/lib/srs/forgetting-curve";
 import { loadAllCardStates, loadAllReviews } from "@/lib/srs/local";
 import {
   computeProgressSnapshot,
@@ -128,6 +129,11 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
   );
 
   const timePatterns: TimePatternGrid = useMemo(() => computeTimePatterns({ reviews }), [reviews]);
+
+  const forgettingCurve: ForgettingCurveEstimate = useMemo(
+    () => computeForgettingCurve({ reviews }),
+    [reviews],
+  );
 
   if (snapshot === null) {
     return (
@@ -254,16 +260,71 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
         <TimePatternHeatmap patterns={timePatterns} />
       </section>
 
+      <section aria-label="Forgetting curve" className="flex flex-col gap-3">
+        <h2 className="font-heading text-xl font-medium">Your forgetting curve</h2>
+        <p className="text-muted-foreground text-xs">
+          For every card you&apos;ve reviewed twice or more, we record (days since last review) and
+          whether you got it right. The bars below show retention by gap — if they stay flat as the
+          gap widens, your spacing is calibrated. A steep drop means the schedule&apos;s pulling
+          cards too late.
+        </p>
+        <ForgettingCurveChart estimate={forgettingCurve} />
+      </section>
+
       <section
         aria-label="Coming next on Progress"
         className="text-muted-foreground flex flex-col gap-2 border-t pt-4 text-xs"
       >
         <p>
           Coming soon: weekly metacognitive calibration (predicted vs. actual accuracy) once the
-          Phase 4 grader is live, plus true forgetting-curve retention.
+          Phase 4 grader is live.
         </p>
       </section>
     </main>
+  );
+}
+
+function ForgettingCurveChart({ estimate }: { estimate: ForgettingCurveEstimate }) {
+  if (!estimate.hasAnyData) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Not enough history yet — review the same card twice to start populating this chart.
+      </p>
+    );
+  }
+  // Plot is a column chart: x = bucket label, y = retention%. Empty
+  // buckets get a faint marker so the grid still reads as continuous.
+  return (
+    <div className="border-border flex flex-col gap-2 rounded-md border p-3">
+      <div
+        role="img"
+        aria-label={`Forgetting curve — ${estimate.totalAttempts} review pair${estimate.totalAttempts === 1 ? "" : "s"} bucketed by gap`}
+        className="flex items-end gap-2"
+      >
+        {estimate.buckets.map((b) => {
+          const empty = b.attempts === 0;
+          const height = empty ? 4 : Math.max(6, b.retentionPct ?? 0);
+          return (
+            <div key={b.label} className="flex flex-1 flex-col items-center gap-1">
+              <div className="text-muted-foreground text-[10px]">
+                {empty ? "—" : `${b.retentionPct}%`}
+              </div>
+              <div
+                className={empty ? "bg-muted w-full rounded-sm" : "bg-primary w-full rounded-sm"}
+                style={{ height: `${height}%`, minHeight: "4px" }}
+                title={`${b.label}: ${b.attempts} attempt${b.attempts === 1 ? "" : "s"}, ${b.retentionPct === null ? "no data" : `${b.retentionPct}% retention`}`}
+                aria-hidden
+              />
+              <div className="text-muted-foreground text-[10px]">{b.label}</div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-muted-foreground text-xs">
+        {estimate.totalAttempts} review pair{estimate.totalAttempts === 1 ? "" : "s"} analysed.
+        Retention here counts good / easy as recall, hard / again as forgotten.
+      </p>
+    </div>
   );
 }
 
