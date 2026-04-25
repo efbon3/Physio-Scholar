@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { estimateReviewMinutes, PreflightModal } from "@/components/preflight-modal";
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import { incrementSessionCount } from "@/lib/pwa/install-state";
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 import { CardView } from "./components/card-view";
 
-type Status = "loading" | "empty" | "reviewing" | "complete";
+type Status = "loading" | "empty" | "preflight" | "reviewing" | "complete";
 
 /**
  * Session state machine. One browser mount = one session.
@@ -130,7 +131,11 @@ export function SessionPlayer({
         });
         if (cancelled) return;
         setQueue(q);
-        setStatus(q.length === 0 ? "empty" : "reviewing");
+        // Pre-flight gate (J1/J2): non-empty queues land on the
+        // disclaimer modal first. The learner accepts, fullscreen is
+        // requested in the same gesture, and the session transitions
+        // to "reviewing". Empty queues skip the modal entirely.
+        setStatus(q.length === 0 ? "empty" : "preflight");
         setCardState(freshCardState());
       } catch (err) {
         console.error("Failed to assemble review queue", err);
@@ -224,6 +229,28 @@ export function SessionPlayer({
           isFiltered={Boolean(focusMechanism)}
         />
         <EmptyState focusMechanism={focusMechanism} />
+      </>
+    );
+  }
+
+  if (status === "preflight") {
+    return (
+      <>
+        {focusMechanism ? <FocusBanner mechanism={focusMechanism} /> : null}
+        {/* Calm placeholder behind the modal so the page isn't blank if
+            the dialog fails to render (e.g., browsers without
+            <dialog> showModal — none we target, but harmless). */}
+        <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-6">
+          <p className="text-muted-foreground text-sm">Ready when you are.</p>
+        </main>
+        <PreflightModal
+          open
+          kind="Review session"
+          questionCount={queue.length}
+          estimatedMinutes={estimateReviewMinutes(queue.length)}
+          context={focusMechanism ? `Studying: ${focusMechanism.title}` : null}
+          onAccept={() => setStatus("reviewing")}
+        />
       </>
     );
   }

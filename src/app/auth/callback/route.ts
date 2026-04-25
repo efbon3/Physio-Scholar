@@ -15,7 +15,10 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") ?? "/";
+  // Default to /today (the dashboard) rather than the marketing home —
+  // anyone landing here just authenticated, so they should see their
+  // queue summary, not the public landing page.
+  const next = url.searchParams.get("next") ?? "/today";
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=missing_code", url.origin));
@@ -63,6 +66,6 @@ export async function GET(request: Request) {
   // Only allow relative redirects so a malicious `next` param can't send
   // the user to an external site after login. See src/lib/auth/redirects.ts
   // for the guarded criteria and its unit tests.
-  const target = isSafeRelativePath(next) ? next : "/";
+  const target = isSafeRelativePath(next) ? next : "/today";
   return NextResponse.redirect(new URL(target, url.origin));
 }
