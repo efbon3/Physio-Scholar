@@ -10,7 +10,7 @@ create extension if not exists pgtap with schema extensions;
 
 begin;
 
-select plan(15);
+select plan(17);
 
 -- -------------------------------------------------------------
 -- Fixtures (run as service_role / postgres, bypasses RLS + trigger)
