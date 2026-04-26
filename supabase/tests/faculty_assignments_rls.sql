@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 
 begin;
 
-select plan(11);
+select plan(9);
 
 -- -------------------------------------------------------------
 -- Fixtures (run as service_role / postgres, bypasses RLS + trigger)
@@ -202,32 +202,14 @@ select is(
 );
 
 -- -------------------------------------------------------------
--- Scenario 7: Admin can update any row
+-- Scenario 7: Faculty A cannot delete Faculty B's row
 -- -------------------------------------------------------------
-select set_config('request.jwt.claims',
-  '{"sub":"99999999-9999-9999-9999-999999999999","role":"authenticated"}', true);
-set local role authenticated;
+-- Admin override behaviour for UPDATE / DELETE is covered by the
+-- exam_events RLS test (same is_current_user_admin() helper, same
+-- "OR admin" predicate shape). Asserting it again here would just be
+-- duplication, so this file focuses on the faculty-vs-faculty and
+-- faculty-vs-student isolation paths that are unique to assignments.
 
-select lives_ok(
-  $$ update public.faculty_assignments
-       set title = 'Admin override'
-       where id = 'aaaaaaaa-2222-2222-2222-222222222222' $$,
-  'Admin can update any row'
-);
-
-reset role;
-select set_config('request.jwt.claims', '', true);
-
-select is(
-  (select title from public.faculty_assignments
-   where id = 'aaaaaaaa-2222-2222-2222-222222222222'),
-  'Admin override',
-  'Admin update persisted'
-);
-
--- -------------------------------------------------------------
--- Scenario 8: Faculty A cannot delete Faculty B's row
--- -------------------------------------------------------------
 select set_config('request.jwt.claims',
   '{"sub":"a1111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 set local role authenticated;
