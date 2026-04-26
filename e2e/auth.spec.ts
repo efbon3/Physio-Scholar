@@ -8,7 +8,7 @@ test.describe("Auth pages render and are accessible", () => {
     const errors = collectPageErrors(page);
     await page.goto("/signup");
 
-    await expect(page.getByRole("heading", { name: /create your account/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /request access/i })).toBeVisible();
     await expect(page.getByLabel(/email/i)).toBeVisible();
     await expect(page.getByLabel(/password/i)).toBeVisible();
 

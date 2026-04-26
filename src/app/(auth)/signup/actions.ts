@@ -8,32 +8,29 @@ import { createClient } from "@/lib/supabase/server";
 type SignupResult = { error: string } | undefined;
 
 /**
- * Sign up a new user with email + password, recording DPDPA consent on the
- * auto-created profile row (the `handle_new_user` trigger creates the row;
- * we update it here to capture when consent was given).
+ * Sign up a new user with email + password, recording DPDPA consent on
+ * the auto-created profile row. The full set of identifying details
+ * (name, nickname, mobile, college, roll, etc) is collected on the
+ * /complete-profile page after email confirmation — that's why this
+ * action is intentionally minimal.
  *
- * Returns `{ error }` on validation or Supabase errors; on success, redirects
- * to /check-email where Supabase's confirmation link is awaited.
+ * Returns `{ error }` on validation or Supabase errors; on success,
+ * redirects to /check-email where Supabase's confirmation link is awaited.
+ * Once the user clicks the confirmation link, the auth callback drops
+ * them on the home page; the (app) layout's gate then sends them to
+ * /complete-profile, then /pending-approval, then /today.
  */
 export async function signUpAction(formData: FormData): Promise<SignupResult> {
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  const rollNumber = String(formData.get("roll_number") ?? "").trim();
   const consentTerms = formData.get("consent_terms") === "on";
   const consentPrivacy = formData.get("consent_privacy") === "on";
   const consentAnalytics = formData.get("consent_analytics") === "on";
 
   if (!email || !password) {
     return { error: "Email and password are required." };
-  }
-  if (!fullName) {
-    return { error: "Full name is required for admin verification." };
-  }
-  if (!rollNumber) {
-    return { error: "Roll number is required for admin verification." };
   }
   if (password.length < 12) {
     return { error: "Password must be at least 12 characters." };
@@ -54,16 +51,15 @@ export async function signUpAction(formData: FormData): Promise<SignupResult> {
   if (error) return { error: error.message };
   if (!data.user) return { error: "Signup failed for an unknown reason." };
 
-  // Record the consent + verification details on the profile the
-  // trigger just created. Done with the same just-signed-up session
-  // (RLS permits self-update). approved_at stays NULL — admin must
-  // approve before the learner can reach /today.
+  // Record the consent timestamps on the profile the trigger just
+  // created. Done with the same just-signed-up session (RLS permits
+  // self-update). approved_at + profile_completed_at both stay NULL —
+  // the user is sent through /complete-profile then /pending-approval
+  // before they can reach /today.
   const now = new Date().toISOString();
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
-      full_name: fullName,
-      roll_number: rollNumber,
       consent_terms_accepted_at: now,
       consent_privacy_accepted_at: now,
       consent_analytics: consentAnalytics,

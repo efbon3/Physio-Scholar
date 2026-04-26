@@ -38,27 +38,32 @@ export default async function PendingApprovalPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("approved_at, is_admin, full_name, roll_number, year_of_study")
+    .select(
+      "approved_at, is_admin, full_name, nickname, phone, college_name, roll_number, profile_completed_at",
+    )
     .eq("id", user.id)
     .single();
 
   if (profile?.is_admin || profile?.approved_at) {
     redirect("/today");
   }
+  // Haven't filled in the form yet — send them through it first.
+  if (!profile?.profile_completed_at) {
+    redirect("/complete-profile");
+  }
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-5 px-6 py-12 text-center">
       <header className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Pending approval</p>
+        <p className="text-muted-foreground text-sm tracking-widest uppercase">Step 2 of 2</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
           Waiting on admin verification
         </h1>
       </header>
 
       <p className="text-muted-foreground text-sm leading-7">
-        Thanks for signing up. Access to Physio-Scholar is gated — an administrator needs to verify
-        your details before you can start studying. You&apos;ll be able to sign in normally once
-        you&apos;re approved.
+        Thanks for filling in your details. An administrator will verify them and approve your
+        account — you&apos;ll be able to sign in normally once that&apos;s done.
       </p>
 
       <section
@@ -66,21 +71,15 @@ export default async function PendingApprovalPage() {
         className="border-border bg-muted/30 flex w-full flex-col gap-1 rounded-md border p-4 text-left text-sm"
       >
         <DetailRow label="Email" value={user.email ?? "—"} />
-        <DetailRow label="Name" value={profile?.full_name ?? "(not set)"} />
+        <DetailRow label="Full name" value={profile?.full_name ?? "(not set)"} />
+        <DetailRow label="Nickname" value={profile?.nickname ?? "(not set)"} />
+        <DetailRow label="Mobile" value={profile?.phone ?? "(not set)"} />
+        <DetailRow label="College" value={profile?.college_name ?? "(not set)"} />
         <DetailRow label="Roll number" value={profile?.roll_number ?? "(not set)"} />
-        <DetailRow
-          label="Year"
-          value={
-            profile?.year_of_study !== undefined && profile?.year_of_study !== null
-              ? `${profile.year_of_study}`
-              : "(not set)"
-          }
-        />
       </section>
 
       <p className="text-muted-foreground text-xs">
-        Missing details above? Email the admin so they can verify you — or sign out, sign back in,
-        and complete your profile under Settings before approval lands.
+        Need to fix something? Sign out and sign back in to edit, or email the admin directly.
       </p>
 
       <form action={signOutAction}>
