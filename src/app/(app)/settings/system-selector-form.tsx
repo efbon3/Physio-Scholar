@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { saveStudySystemsAction } from "./actions";
@@ -25,6 +26,13 @@ export function SystemSelectorForm({ allSystems, initiallyChecked }: Props) {
   const [checked, setChecked] = useState<Set<string>>(() => new Set(initiallyChecked));
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const router = useRouter();
+
+  // Re-syncing local state when `initiallyChecked` changes is handled
+  // by the parent passing a `key` derived from the saved selection
+  // (see settings/page.tsx). When the saved set changes, React
+  // remounts this component with a fresh `useState` initializer —
+  // simpler than an in-component effect and keeps renders pure.
 
   function toggle(system: string) {
     setChecked((prev) => {
@@ -47,10 +55,19 @@ export function SystemSelectorForm({ allSystems, initiallyChecked }: Props) {
         formData.delete("systems");
         for (const s of checked) formData.append("systems", s);
         setFeedback(null);
+        // Snapshot what we just submitted so we can re-seed local state
+        // on success — defensive belt for the case where the parent
+        // re-render arrives before router.refresh() resolves.
+        const submitted = new Set(checked);
         startTransition(async () => {
           const result = await saveStudySystemsAction(formData);
           if (result.status === "ok") {
+            setChecked(submitted);
             setFeedback({ kind: "ok", message: "Saved." });
+            // Bust the Next.js Router Cache for the current page so
+            // server components re-fetch from the DB. Without this,
+            // navigating away and back can show pre-save data.
+            router.refresh();
           } else {
             setFeedback({ kind: "error", message: result.message });
           }
