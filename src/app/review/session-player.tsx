@@ -348,9 +348,9 @@ function ReviewHeader({
         <Link
           href="/today"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
-          aria-label="Back to Today"
+          aria-label="Back to Dashboard"
         >
-          ← Today
+          ← Dashboard
         </Link>
         <p className="flex flex-wrap items-center gap-1.5 text-right">
           {isFiltered ? (
@@ -386,7 +386,7 @@ function SessionExitLinks({
   return (
     <div className="mt-2 flex flex-wrap justify-center gap-2">
       <Link href="/today" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
-        Back to Today
+        Back to Dashboard
       </Link>
       {focusMechanism ? (
         <Link href={`/systems`} className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>

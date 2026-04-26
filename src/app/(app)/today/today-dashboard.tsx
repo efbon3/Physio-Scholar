@@ -186,7 +186,7 @@ export function TodayDashboard({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Today</p>
+        <p className="text-muted-foreground text-sm tracking-widest uppercase">Dashboard</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Hi, {greetingName}.</h1>
         {studySystems && studySystems.length > 0 ? (
           <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
