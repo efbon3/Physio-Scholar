@@ -233,6 +233,9 @@ export type Database = {
           nickname: string | null
           phone: string | null
           profile_completed_at: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
           requested_role: string
           roll_number: string | null
           study_systems: string[]
@@ -262,6 +265,9 @@ export type Database = {
           nickname?: string | null
           phone?: string | null
           profile_completed_at?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           requested_role?: string
           roll_number?: string | null
           study_systems?: string[]
@@ -291,6 +297,9 @@ export type Database = {
           nickname?: string | null
           phone?: string | null
           profile_completed_at?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           requested_role?: string
           roll_number?: string | null
           study_systems?: string[]

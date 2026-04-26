@@ -7,7 +7,12 @@ vi.mock("@/lib/admin/audit", () => ({ writeAuditEntry: vi.fn() }));
 import { writeAuditEntry } from "@/lib/admin/audit";
 import { createClient } from "@/lib/supabase/server";
 
-import { approveUserAction, revokeApprovalAction } from "./actions";
+import {
+  approveUserAction,
+  rejectUserAction,
+  revokeApprovalAction,
+  unrejectUserAction,
+} from "./actions";
 
 /**
  * Builds a Supabase mock that handles the two distinct from("profiles")
@@ -193,5 +198,127 @@ describe("revokeApprovalAction", () => {
     const result = await revokeApprovalAction("admin-1");
     expect(result.status).toBe("error");
     if (result.status === "error") expect(result.message).toMatch(/your own/i);
+  });
+});
+
+describe("rejectUserAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  });
+
+  it("rejects the target with an audit entry, clearing approval + role flags", async () => {
+    const supabase = buildSupabaseMock({ userId: "admin-1" });
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const result = await rejectUserAction("user-1", "Roll number doesn't match the cohort.");
+    expect(result.status).toBe("ok");
+    const updatePayload = supabase.from("profiles").update as ReturnType<typeof vi.fn>;
+    const callArg = updatePayload.mock.calls.at(-1)?.[0];
+    expect(callArg).toMatchObject({
+      rejected_by: "admin-1",
+      rejection_reason: "Roll number doesn't match the cohort.",
+      approved_at: null,
+      approved_by: null,
+      is_admin: false,
+      is_faculty: false,
+    });
+    expect(callArg.rejected_at).toEqual(expect.any(String));
+    expect(writeAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "user.reject",
+        target_id: "user-1",
+        details: expect.objectContaining({ reason: "Roll number doesn't match the cohort." }),
+      }),
+    );
+  });
+
+  it("stores rejection_reason as null when an empty string is passed", async () => {
+    const supabase = buildSupabaseMock({ userId: "admin-1" });
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const result = await rejectUserAction("user-1", "   ");
+    expect(result.status).toBe("ok");
+    const updatePayload = supabase.from("profiles").update as ReturnType<typeof vi.fn>;
+    const callArg = updatePayload.mock.calls.at(-1)?.[0];
+    expect(callArg.rejection_reason).toBeNull();
+  });
+
+  it("trims and caps the reason at 500 characters", async () => {
+    const supabase = buildSupabaseMock({ userId: "admin-1" });
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const longReason = "x".repeat(800);
+    await rejectUserAction("user-1", longReason);
+    const updatePayload = supabase.from("profiles").update as ReturnType<typeof vi.fn>;
+    const callArg = updatePayload.mock.calls.at(-1)?.[0];
+    expect(callArg.rejection_reason).toHaveLength(500);
+  });
+
+  it("rejects when caller is not an admin", async () => {
+    const supabase = buildSupabaseMock({ userId: "user-2", callerIsAdmin: false });
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const result = await rejectUserAction("user-1");
+    expect(result.status).toBe("error");
+    if (result.status === "error") expect(result.message).toMatch(/only admins/i);
+  });
+
+  it("blocks an admin from rejecting their own account", async () => {
+    const supabase = buildSupabaseMock({ userId: "admin-1" });
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const result = await rejectUserAction("admin-1");
+    expect(result.status).toBe("error");
+    if (result.status === "error") expect(result.message).toMatch(/your own/i);
+  });
+});
+
+describe("unrejectUserAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  });
+
+  it("clears rejection state and writes an audit entry", async () => {
+    const supabase = buildSupabaseMock({ userId: "admin-1" });
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const result = await unrejectUserAction("user-1");
+    expect(result.status).toBe("ok");
+    const updatePayload = supabase.from("profiles").update as ReturnType<typeof vi.fn>;
+    const callArg = updatePayload.mock.calls.at(-1)?.[0];
+    expect(callArg).toEqual({
+      rejected_at: null,
+      rejected_by: null,
+      rejection_reason: null,
+    });
+    expect(writeAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "user.unreject", target_id: "user-1" }),
+    );
+  });
+
+  it("rejects when caller is not an admin", async () => {
+    const supabase = buildSupabaseMock({ userId: "user-2", callerIsAdmin: false });
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const result = await unrejectUserAction("user-1");
+    expect(result.status).toBe("error");
+    if (result.status === "error") expect(result.message).toMatch(/only admins/i);
   });
 });
