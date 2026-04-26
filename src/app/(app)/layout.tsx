@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AppNav } from "@/components/nav/app-nav";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { Watermark } from "@/components/watermark";
+import { requireApprovedUser } from "@/lib/auth/approval";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -32,6 +33,10 @@ async function resolveProfileId(): Promise<string> {
 }
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
+  // Approval gate — bounces signed-in-but-unapproved users to
+  // /pending-approval before any learner surface renders. Admins
+  // bypass; CI / preview envs without Supabase env vars also bypass.
+  await requireApprovedUser();
   const profileId = await resolveProfileId();
   return (
     <div className="flex min-h-screen flex-col">

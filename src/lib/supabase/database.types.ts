@@ -212,6 +212,8 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          approved_at: string | null
+          approved_by: string | null
           avatar_url: string | null
           consent_analytics: boolean
           consent_analytics_updated_at: string | null
@@ -235,6 +237,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
           consent_analytics?: boolean
           consent_analytics_updated_at?: string | null
@@ -258,6 +262,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
           consent_analytics?: boolean
           consent_analytics_updated_at?: string | null
@@ -570,6 +576,7 @@ export type Database = {
         }[]
       }
       is_current_user_admin: { Args: never; Returns: boolean }
+      is_current_user_approved: { Args: never; Returns: boolean }
       is_current_user_faculty: { Args: never; Returns: boolean }
       current_user_institution_id: { Args: never; Returns: string | null }
       can_view_cohort: { Args: { p_institution_id: string }; Returns: boolean }

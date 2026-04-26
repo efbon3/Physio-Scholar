@@ -11,6 +11,7 @@ import {
 import { extractCards, type Card } from "@/lib/content/cards";
 import { normaliseMechanismId } from "@/lib/content/filters";
 import { readAllMechanisms } from "@/lib/content/source";
+import { requireApprovedUser } from "@/lib/auth/approval";
 import { createClient } from "@/lib/supabase/server";
 
 import { SessionPlayer } from "./session-player";
@@ -57,6 +58,11 @@ export default async function ReviewPage({
   // the per-mechanism / per-system filters that already exist.
   const priorityFilter = parsePriorityFilter(resolvedParams.priority);
   const difficultyFilter = parseDifficultyFilter(resolvedParams.difficulty);
+
+  // Approval gate before anything else — unapproved learners bounce
+  // to /pending-approval. (app) layout enforces this for /today etc;
+  // /review is outside the layout so we re-enforce here.
+  await requireApprovedUser();
 
   // Same graceful posture as the middleware: when Supabase env vars are
   // absent (CI, unconfigured Vercel preview), skip the auth lookup and

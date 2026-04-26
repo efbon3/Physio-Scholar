@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 
+import { approveUserAction, revokeApprovalAction } from "./actions";
+
 export const metadata = {
   title: "Users · Admin",
 };
@@ -28,6 +30,7 @@ type ProfileRow = {
   year_of_study: number | null;
   is_admin: boolean;
   is_faculty: boolean;
+  approved_at: string | null;
   created_at: string;
 };
 
@@ -51,8 +54,10 @@ export default async function AdminUsersPage({
   let profilesQuery = supabase
     .from("profiles")
     .select(
-      "id, full_name, roll_number, institution_id, year_of_study, is_admin, is_faculty, created_at",
+      "id, full_name, roll_number, institution_id, year_of_study, is_admin, is_faculty, approved_at, created_at",
     )
+    // Pending users first (approved_at = null), then by joined-desc.
+    .order("approved_at", { ascending: true, nullsFirst: true })
     .order("created_at", { ascending: false });
 
   if (rawQuery.length > 0) {
@@ -116,6 +121,7 @@ export default async function AdminUsersPage({
               <th className="py-2 pr-4">Last review</th>
               <th className="py-2 pr-4">Joined</th>
               <th className="py-2 pr-4">Role</th>
+              <th className="py-2 pr-4">Status</th>
               <th className="py-2 pr-4" />
             </tr>
           </thead>
@@ -135,12 +141,18 @@ export default async function AdminUsersPage({
                   <td className="py-2 pr-4">{formatDate(p.created_at)}</td>
                   <td className="py-2 pr-4">{roleLabel(p)}</td>
                   <td className="py-2 pr-4">
-                    <Link
-                      href={`/admin/users/${p.id}`}
-                      className="text-muted-foreground hover:bg-muted rounded-md border px-2 py-1 text-xs"
-                    >
-                      View
-                    </Link>
+                    <ApprovalBadge profile={p} />
+                  </td>
+                  <td className="py-2 pr-4">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Link
+                        href={`/admin/users/${p.id}`}
+                        className="text-muted-foreground hover:bg-muted rounded-md border px-2 py-1 text-xs"
+                      >
+                        View
+                      </Link>
+                      {!p.is_admin ? <ApprovalToggle profile={p} /> : null}
+                    </div>
                   </td>
                 </tr>
               );
@@ -196,6 +208,55 @@ function roleLabel(p: ProfileRow): string {
   if (p.is_admin) return "Admin";
   if (p.is_faculty) return "Faculty";
   return "Learner";
+}
+
+function ApprovalBadge({ profile }: { profile: ProfileRow }) {
+  if (profile.is_admin) {
+    return (
+      <span className="text-muted-foreground inline-flex items-center rounded-md border px-2 py-0.5 text-xs">
+        n/a
+      </span>
+    );
+  }
+  if (profile.approved_at) {
+    return (
+      <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+        Approved
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+      Pending
+    </span>
+  );
+}
+
+function ApprovalToggle({ profile }: { profile: ProfileRow }) {
+  const isApproved = profile.approved_at !== null;
+  return (
+    <form
+      action={async () => {
+        "use server";
+        if (isApproved) {
+          await revokeApprovalAction(profile.id);
+        } else {
+          await approveUserAction(profile.id);
+        }
+      }}
+    >
+      <button
+        type="submit"
+        className={
+          isApproved
+            ? "text-muted-foreground hover:bg-muted rounded-md border px-2 py-1 text-xs"
+            : "bg-primary text-primary-foreground hover:bg-primary/80 rounded-md px-2 py-1 text-xs"
+        }
+      >
+        {isApproved ? "Revoke" : "Approve"}
+      </button>
+    </form>
+  );
 }
 
 function formatDate(iso: string): string {
