@@ -32,7 +32,6 @@ export async function signUpAction(formData: FormData): Promise<SignupResult> {
   const requestedRole = parseRequestedRole(formData.get("requested_role"));
   const consentTerms = formData.get("consent_terms") === "on";
   const consentPrivacy = formData.get("consent_privacy") === "on";
-  const consentAnalytics = formData.get("consent_analytics") === "on";
 
   if (!email || !password) {
     return { error: "Email and password are required." };
@@ -60,7 +59,9 @@ export async function signUpAction(formData: FormData): Promise<SignupResult> {
   // created. Done with the same just-signed-up session (RLS permits
   // self-update). approved_at + profile_completed_at both stay NULL —
   // the user is sent through /complete-profile then /pending-approval
-  // before they can reach /today.
+  // before they can reach /today. Analytics consent is left at its
+  // default (false) — we no longer ask at signup; the user can opt
+  // in later via /settings.
   const now = new Date().toISOString();
   const { error: profileError } = await supabase
     .from("profiles")
@@ -68,8 +69,6 @@ export async function signUpAction(formData: FormData): Promise<SignupResult> {
       requested_role: requestedRole,
       consent_terms_accepted_at: now,
       consent_privacy_accepted_at: now,
-      consent_analytics: consentAnalytics,
-      consent_analytics_updated_at: now,
     })
     .eq("id", data.user.id);
 
