@@ -74,9 +74,18 @@ export default async function AdminUsersPage({
     );
 
   if (rawQuery.length > 0) {
-    const safe = rawQuery.replace(/[%_]/g, (m) => `\\${m}`);
+    // PostgREST .or() is a comma-separated list of clauses; commas in
+    // the search value would otherwise break out of the value and inject
+    // extra clauses (or just 400 the request — bad either way for a
+    // college name like "St. Stephen's College, Delhi"). Wrap each value
+    // in double quotes and escape backslashes / quotes / ilike
+    // wildcards. Double-quoted PostgREST values may contain commas.
+    const safe = rawQuery
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/[%_]/g, (m) => `\\${m}`);
     profilesQuery = profilesQuery.or(
-      `full_name.ilike.%${safe}%,roll_number.ilike.%${safe}%,college_name.ilike.%${safe}%`,
+      `full_name.ilike."%${safe}%",roll_number.ilike."%${safe}%",college_name.ilike."%${safe}%"`,
     );
   }
 
