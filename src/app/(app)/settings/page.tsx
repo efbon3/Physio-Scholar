@@ -71,6 +71,11 @@ export default async function SettingsPage() {
       </header>
 
       <SystemSelectorForm
+        // React `key` derived from the saved selection. When the user
+        // saves a new set and `router.refresh()` re-fetches the page,
+        // a different key re-mounts the form with a fresh useState
+        // initializer — no stale local state, no useEffect needed.
+        key={[...activeSystems].sort().join("|")}
         allSystems={ALL_SYSTEMS as unknown as string[]}
         initiallyChecked={activeSystems}
       />
