@@ -19,8 +19,8 @@ export default async function SignupPage({ searchParams }: PageProps) {
       <CardHeader>
         <h1 className="font-heading text-2xl font-medium">Request access</h1>
         <CardDescription>
-          Physio-Scholar is open to enrolled MBBS students. After you sign up, an admin verifies
-          your details and approves your account before you can start studying.
+          Physio-Scholar is open to enrolled MBBS students. Sign up here, complete your profile on
+          the next page, and an admin will verify and approve you before you can start studying.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -47,24 +47,6 @@ export default async function SignupPage({ searchParams }: PageProps) {
           }}
           className="flex flex-col gap-5"
         >
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="full_name">Full name</Label>
-            <Input id="full_name" name="full_name" type="text" required autoComplete="name" />
-            <p className="text-muted-foreground text-xs">As it appears on your roll list.</p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="roll_number">Roll number</Label>
-            <Input
-              id="roll_number"
-              name="roll_number"
-              type="text"
-              required
-              placeholder="e.g. MBBS/2026/01"
-            />
-            <p className="text-muted-foreground text-xs">
-              Used by the admin to verify your enrolment.
-            </p>
-          </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" required autoComplete="email" />

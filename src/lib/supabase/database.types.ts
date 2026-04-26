@@ -215,6 +215,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           avatar_url: string | null
+          college_name: string | null
           consent_analytics: boolean
           consent_analytics_updated_at: string | null
           consent_privacy_accepted_at: string | null
@@ -229,7 +230,9 @@ export type Database = {
           is_admin: boolean
           is_faculty: boolean
           is_minor: boolean | null
+          nickname: string | null
           phone: string | null
+          profile_completed_at: string | null
           roll_number: string | null
           study_systems: string[]
           updated_at: string
@@ -240,6 +243,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           avatar_url?: string | null
+          college_name?: string | null
           consent_analytics?: boolean
           consent_analytics_updated_at?: string | null
           consent_privacy_accepted_at?: string | null
@@ -254,7 +258,9 @@ export type Database = {
           is_admin?: boolean
           is_faculty?: boolean
           is_minor?: boolean | null
+          nickname?: string | null
           phone?: string | null
+          profile_completed_at?: string | null
           roll_number?: string | null
           study_systems?: string[]
           updated_at?: string
@@ -265,6 +271,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           avatar_url?: string | null
+          college_name?: string | null
           consent_analytics?: boolean
           consent_analytics_updated_at?: string | null
           consent_privacy_accepted_at?: string | null
@@ -279,7 +286,9 @@ export type Database = {
           is_admin?: boolean
           is_faculty?: boolean
           is_minor?: boolean | null
+          nickname?: string | null
           phone?: string | null
+          profile_completed_at?: string | null
           roll_number?: string | null
           study_systems?: string[]
           updated_at?: string

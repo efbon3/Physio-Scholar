@@ -1,5 +1,12 @@
 import Link from "next/link";
 
+import {
+  makeComparator,
+  parseDir,
+  parseSort,
+  type SortDir,
+  type SortKey,
+} from "@/lib/admin/users-sort";
 import { createClient } from "@/lib/supabase/server";
 
 import { approveUserAction, revokeApprovalAction } from "./actions";
@@ -13,34 +20,41 @@ export const metadata = {
  * activity. The guard runs in src/app/admin/layout.tsx so by the time
  * this renders we know the caller is an admin.
  *
- * J6 search: `?q=<text>` filters by full_name or roll_number
- * (case-insensitive substring). Empty query returns everyone, sorted
- * by most-recently-joined.
+ * J6 search: `?q=<text>` filters by full_name, college_name, or
+ * roll_number (case-insensitive substring). Empty query returns
+ * everyone.
  *
- * We stick to RLS-visible columns — no auth.users lookup — because
- * profiles carries the fields the pilot actually needs. If email
- * becomes essential later, add a materialised view + RLS that admins
- * can select.
+ * Sort: `?sort=name|college|roll|joined|status` and `?dir=asc|desc`.
+ * Click a column header to toggle. The clickable header is a `<form>`
+ * GET with hidden inputs preserving the other params, so sort state
+ * round-trips through the URL and is bookmarkable / sharable. We do
+ * the ordering server-side so deep cohorts don't bloat the client.
+ *
+ * Click the user's name to open their full profile at /admin/users/[id].
  */
+
 type ProfileRow = {
   id: string;
   full_name: string | null;
+  nickname: string | null;
   roll_number: string | null;
+  college_name: string | null;
+  phone: string | null;
   institution_id: string | null;
   year_of_study: number | null;
   is_admin: boolean;
   is_faculty: boolean;
   approved_at: string | null;
+  profile_completed_at: string | null;
   created_at: string;
 };
 
 type ReviewAgg = {
-  profile_id: string;
   count: number;
   latest: string | null;
 };
 
-type SearchParams = { q?: string };
+type SearchParams = { q?: string; sort?: string; dir?: string };
 
 export default async function AdminUsersPage({
   searchParams,
@@ -49,30 +63,28 @@ export default async function AdminUsersPage({
 }) {
   const params = await searchParams;
   const rawQuery = (params.q ?? "").trim();
+  const sort = parseSort(params.sort);
+  const dir = parseDir(params.dir);
   const supabase = await createClient();
 
   let profilesQuery = supabase
     .from("profiles")
     .select(
-      "id, full_name, roll_number, institution_id, year_of_study, is_admin, is_faculty, approved_at, created_at",
-    )
-    // Pending users first (approved_at = null), then by joined-desc.
-    .order("approved_at", { ascending: true, nullsFirst: true })
-    .order("created_at", { ascending: false });
+      "id, full_name, nickname, roll_number, college_name, phone, institution_id, year_of_study, is_admin, is_faculty, approved_at, profile_completed_at, created_at",
+    );
 
   if (rawQuery.length > 0) {
-    // Postgres `or` filter supports comma-separated `column.op.value`
-    // clauses; ilike is case-insensitive substring match. We escape
-    // wildcards to avoid `%` injecting outside our intent.
     const safe = rawQuery.replace(/[%_]/g, (m) => `\\${m}`);
-    profilesQuery = profilesQuery.or(`full_name.ilike.%${safe}%,roll_number.ilike.%${safe}%`);
+    profilesQuery = profilesQuery.or(
+      `full_name.ilike.%${safe}%,roll_number.ilike.%${safe}%,college_name.ilike.%${safe}%`,
+    );
   }
 
   const { data: profiles, error: profilesError } = await profilesQuery;
 
   if (profilesError) {
     return (
-      <Shell query={rawQuery}>
+      <Shell query={rawQuery} sort={sort} dir={dir}>
         <p className="text-destructive text-sm">Failed to load profiles: {profilesError.message}</p>
       </Shell>
     );
@@ -85,7 +97,7 @@ export default async function AdminUsersPage({
 
   if (reviewsError) {
     return (
-      <Shell query={rawQuery}>
+      <Shell query={rawQuery} sort={sort} dir={dir}>
         <p className="text-destructive text-sm">
           Failed to load review aggregates: {reviewsError.message}
         </p>
@@ -100,65 +112,106 @@ export default async function AdminUsersPage({
       existing.count += 1;
       if (!existing.latest || row.created_at > existing.latest) existing.latest = row.created_at;
     } else {
-      byProfile.set(row.profile_id, {
-        profile_id: row.profile_id,
-        count: 1,
-        latest: row.created_at,
-      });
+      byProfile.set(row.profile_id, { count: 1, latest: row.created_at });
     }
   }
 
+  // Server-side sort. We sort here rather than in Postgres because we
+  // want a "pending first" tier on the status column (admins have a
+  // separate n/a tier) which doesn't map cleanly to a single ORDER BY.
+  const sorted = [...(profiles ?? [])].sort(makeComparator(sort, dir));
+
   return (
-    <Shell query={rawQuery}>
-      {profiles && profiles.length > 0 ? (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-muted-foreground border-b text-left text-xs tracking-widest uppercase">
-              <th className="py-2 pr-4">Profile</th>
-              <th className="py-2 pr-4">Roll</th>
-              <th className="py-2 pr-4">Year</th>
-              <th className="py-2 pr-4">Reviews</th>
-              <th className="py-2 pr-4">Last review</th>
-              <th className="py-2 pr-4">Joined</th>
-              <th className="py-2 pr-4">Role</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4" />
-            </tr>
-          </thead>
-          <tbody>
-            {profiles.map((p: ProfileRow) => {
-              const agg = byProfile.get(p.id);
-              return (
-                <tr key={p.id} className="border-border/50 border-b">
-                  <td className="py-2 pr-4">
-                    <span className="font-medium">{p.full_name ?? "(no name)"}</span>
-                    <div className="text-muted-foreground font-mono text-xs">{p.id}</div>
-                  </td>
-                  <td className="py-2 pr-4">{p.roll_number ?? "—"}</td>
-                  <td className="py-2 pr-4">{p.year_of_study ?? "—"}</td>
-                  <td className="py-2 pr-4 font-medium">{agg?.count ?? 0}</td>
-                  <td className="py-2 pr-4">{agg?.latest ? formatDate(agg.latest) : "—"}</td>
-                  <td className="py-2 pr-4">{formatDate(p.created_at)}</td>
-                  <td className="py-2 pr-4">{roleLabel(p)}</td>
-                  <td className="py-2 pr-4">
-                    <ApprovalBadge profile={p} />
-                  </td>
-                  <td className="py-2 pr-4">
-                    <div className="flex flex-wrap items-center gap-1">
+    <Shell query={rawQuery} sort={sort} dir={dir}>
+      {sorted.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="admin-users-table">
+            <thead>
+              <tr className="text-muted-foreground border-b text-left text-xs tracking-widest uppercase">
+                <SortableHeader
+                  label="Full name"
+                  column="name"
+                  current={sort}
+                  dir={dir}
+                  query={rawQuery}
+                />
+                <SortableHeader
+                  label="College"
+                  column="college"
+                  current={sort}
+                  dir={dir}
+                  query={rawQuery}
+                />
+                <SortableHeader
+                  label="Roll"
+                  column="roll"
+                  current={sort}
+                  dir={dir}
+                  query={rawQuery}
+                />
+                <th className="py-2 pr-4">Reviews</th>
+                <th className="py-2 pr-4">Last review</th>
+                <SortableHeader
+                  label="Joined"
+                  column="joined"
+                  current={sort}
+                  dir={dir}
+                  query={rawQuery}
+                />
+                <SortableHeader
+                  label="Status"
+                  column="status"
+                  current={sort}
+                  dir={dir}
+                  query={rawQuery}
+                />
+                <th className="py-2 pr-4" />
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((p) => {
+                const agg = byProfile.get(p.id);
+                return (
+                  <tr key={p.id} className="border-border/50 border-b">
+                    <td className="py-2 pr-4">
                       <Link
                         href={`/admin/users/${p.id}`}
-                        className="text-muted-foreground hover:bg-muted rounded-md border px-2 py-1 text-xs"
+                        className="font-medium hover:underline"
+                        data-testid={`admin-user-name-${p.id}`}
                       >
-                        View
+                        {p.full_name ?? "(no name)"}
                       </Link>
-                      {!p.is_admin ? <ApprovalToggle profile={p} /> : null}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      {p.nickname ? (
+                        <div className="text-muted-foreground text-xs">
+                          &ldquo;{p.nickname}&rdquo;
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="py-2 pr-4">{p.college_name ?? "—"}</td>
+                    <td className="py-2 pr-4">{p.roll_number ?? "—"}</td>
+                    <td className="py-2 pr-4 font-medium">{agg?.count ?? 0}</td>
+                    <td className="py-2 pr-4">{agg?.latest ? formatDate(agg.latest) : "—"}</td>
+                    <td className="py-2 pr-4">{formatDate(p.created_at)}</td>
+                    <td className="py-2 pr-4">
+                      <ApprovalBadge profile={p} />
+                    </td>
+                    <td className="py-2 pr-4">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Link
+                          href={`/admin/users/${p.id}`}
+                          className="text-muted-foreground hover:bg-muted rounded-md border px-2 py-1 text-xs"
+                        >
+                          View
+                        </Link>
+                        {!p.is_admin ? <ApprovalToggle profile={p} /> : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : rawQuery.length > 0 ? (
         <p className="text-muted-foreground text-sm">No profiles match &quot;{rawQuery}&quot;.</p>
       ) : (
@@ -168,7 +221,17 @@ export default async function AdminUsersPage({
   );
 }
 
-function Shell({ query, children }: { query: string; children: React.ReactNode }) {
+function Shell({
+  query,
+  sort,
+  dir,
+  children,
+}: {
+  query: string;
+  sort: SortKey;
+  dir: SortDir;
+  children: React.ReactNode;
+}) {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-col gap-2">
@@ -180,10 +243,12 @@ function Shell({ query, children }: { query: string; children: React.ReactNode }
           type="search"
           name="q"
           defaultValue={query}
-          placeholder="Search by name or roll number…"
+          placeholder="Search by name, college, or roll number…"
           className="border-input bg-background h-9 flex-1 rounded-md border px-3 text-sm"
           data-testid="admin-users-search"
         />
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="dir" value={dir} />
         <button
           type="submit"
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-sm"
@@ -192,7 +257,7 @@ function Shell({ query, children }: { query: string; children: React.ReactNode }
         </button>
         {query.length > 0 ? (
           <Link
-            href="/admin/users"
+            href={buildHref({ q: "", sort, dir })}
             className="text-muted-foreground text-xs underline-offset-2 hover:underline"
           >
             Clear
@@ -204,10 +269,50 @@ function Shell({ query, children }: { query: string; children: React.ReactNode }
   );
 }
 
-function roleLabel(p: ProfileRow): string {
-  if (p.is_admin) return "Admin";
-  if (p.is_faculty) return "Faculty";
-  return "Learner";
+/**
+ * Column header that toggles the `?sort=`/`?dir=` query params. Click
+ * a fresh column → asc. Click the active column → flip dir. We render
+ * a real `<a>` with the precomputed href so the sort works without
+ * JavaScript and the URL is shareable.
+ */
+function SortableHeader({
+  label,
+  column,
+  current,
+  dir,
+  query,
+}: {
+  label: string;
+  column: SortKey;
+  current: SortKey;
+  dir: SortDir;
+  query: string;
+}) {
+  const active = current === column;
+  const nextDir: SortDir = active ? (dir === "asc" ? "desc" : "asc") : "asc";
+  const indicator = active ? (dir === "asc" ? "▲" : "▼") : "";
+  return (
+    <th
+      className="py-2 pr-4"
+      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <Link
+        href={buildHref({ q: query, sort: column, dir: nextDir })}
+        className="hover:text-foreground inline-flex items-center gap-1"
+        data-testid={`admin-users-sort-${column}`}
+      >
+        {label} <span aria-hidden="true">{indicator}</span>
+      </Link>
+    </th>
+  );
+}
+
+function buildHref({ q, sort, dir }: { q: string; sort: SortKey; dir: SortDir }): string {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  params.set("sort", sort);
+  params.set("dir", dir);
+  return `/admin/users?${params.toString()}`;
 }
 
 function ApprovalBadge({ profile }: { profile: ProfileRow }) {
@@ -222,6 +327,13 @@ function ApprovalBadge({ profile }: { profile: ProfileRow }) {
     return (
       <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
         Approved
+      </span>
+    );
+  }
+  if (!profile.profile_completed_at) {
+    return (
+      <span className="text-muted-foreground inline-flex items-center rounded-md border px-2 py-0.5 text-xs">
+        Profile incomplete
       </span>
     );
   }
