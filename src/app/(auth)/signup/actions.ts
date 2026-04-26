@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { parseRequestedRole } from "@/lib/auth/requested-role";
 import { createClient } from "@/lib/supabase/server";
 
 type SignupResult = { error: string } | undefined;
@@ -25,6 +26,10 @@ export async function signUpAction(formData: FormData): Promise<SignupResult> {
     .trim()
     .toLowerCase();
   const password = String(formData.get("password") ?? "");
+  // parseRequestedRole rejects unknown values back to 'student' so a tampered
+  // form can't slip an arbitrary string past the CHECK constraint. The column
+  // is informational; the actual role grant is gated by admin approval.
+  const requestedRole = parseRequestedRole(formData.get("requested_role"));
   const consentTerms = formData.get("consent_terms") === "on";
   const consentPrivacy = formData.get("consent_privacy") === "on";
   const consentAnalytics = formData.get("consent_analytics") === "on";
@@ -60,6 +65,7 @@ export async function signUpAction(formData: FormData): Promise<SignupResult> {
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
+      requested_role: requestedRole,
       consent_terms_accepted_at: now,
       consent_privacy_accepted_at: now,
       consent_analytics: consentAnalytics,

@@ -7,6 +7,11 @@ import {
   type SortDir,
   type SortKey,
 } from "@/lib/admin/users-sort";
+import {
+  parseRequestedRole,
+  requestedRoleLabel,
+  type RequestedRole,
+} from "@/lib/auth/requested-role";
 import { createClient } from "@/lib/supabase/server";
 
 import { approveUserAction, revokeApprovalAction } from "./actions";
@@ -46,6 +51,7 @@ type ProfileRow = {
   is_faculty: boolean;
   approved_at: string | null;
   profile_completed_at: string | null;
+  requested_role: string;
   created_at: string;
 };
 
@@ -70,7 +76,7 @@ export default async function AdminUsersPage({
   let profilesQuery = supabase
     .from("profiles")
     .select(
-      "id, full_name, nickname, roll_number, college_name, phone, institution_id, year_of_study, is_admin, is_faculty, approved_at, profile_completed_at, created_at",
+      "id, full_name, nickname, roll_number, college_name, phone, institution_id, year_of_study, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, created_at",
     );
 
   if (rawQuery.length > 0) {
@@ -158,6 +164,7 @@ export default async function AdminUsersPage({
                   dir={dir}
                   query={rawQuery}
                 />
+                <th className="py-2 pr-4">Requested</th>
                 <th className="py-2 pr-4">Reviews</th>
                 <th className="py-2 pr-4">Last review</th>
                 <SortableHeader
@@ -198,6 +205,9 @@ export default async function AdminUsersPage({
                     </td>
                     <td className="py-2 pr-4">{p.college_name ?? "—"}</td>
                     <td className="py-2 pr-4">{p.roll_number ?? "—"}</td>
+                    <td className="py-2 pr-4">
+                      <RequestedRoleBadge role={parseRequestedRole(p.requested_role)} />
+                    </td>
                     <td className="py-2 pr-4 font-medium">{agg?.count ?? 0}</td>
                     <td className="py-2 pr-4">{agg?.latest ? formatDate(agg.latest) : "—"}</td>
                     <td className="py-2 pr-4">{formatDate(p.created_at)}</td>
@@ -353,8 +363,15 @@ function ApprovalBadge({ profile }: { profile: ProfileRow }) {
   );
 }
 
+/**
+ * Compact approve / revoke control. For unapproved users we approve at
+ * the role they requested at signup, since that's almost always what
+ * the admin wants. Promotion to a different role happens on the user
+ * detail page where the action is explicit and confirmable.
+ */
 function ApprovalToggle({ profile }: { profile: ProfileRow }) {
   const isApproved = profile.approved_at !== null;
+  const requestedRole = parseRequestedRole(profile.requested_role);
   return (
     <form
       action={async () => {
@@ -362,7 +379,7 @@ function ApprovalToggle({ profile }: { profile: ProfileRow }) {
         if (isApproved) {
           await revokeApprovalAction(profile.id);
         } else {
-          await approveUserAction(profile.id);
+          await approveUserAction(profile.id, requestedRole);
         }
       }}
     >
@@ -374,9 +391,23 @@ function ApprovalToggle({ profile }: { profile: ProfileRow }) {
             : "bg-primary text-primary-foreground hover:bg-primary/80 rounded-md px-2 py-1 text-xs"
         }
       >
-        {isApproved ? "Revoke" : "Approve"}
+        {isApproved ? "Revoke" : `Approve as ${requestedRoleLabel(requestedRole).toLowerCase()}`}
       </button>
     </form>
+  );
+}
+
+function RequestedRoleBadge({ role }: { role: RequestedRole }) {
+  const tone =
+    role === "admin"
+      ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200"
+      : role === "faculty"
+        ? "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200"
+        : "border-input text-muted-foreground";
+  return (
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs ${tone}`}>
+      {requestedRoleLabel(role)}
+    </span>
   );
 }
 

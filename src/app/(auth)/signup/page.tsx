@@ -5,14 +5,21 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  parseRequestedRole,
+  REQUESTED_ROLES,
+  requestedRoleLabel,
+  type RequestedRole,
+} from "@/lib/auth/requested-role";
 
 import { GoogleSignInButton } from "../google-sign-in-button";
 import { signUpAction } from "./actions";
 
-type PageProps = { searchParams: Promise<{ error?: string }> };
+type PageProps = { searchParams: Promise<{ error?: string; role?: string }> };
 
 export default async function SignupPage({ searchParams }: PageProps) {
-  const { error } = await searchParams;
+  const { error, role } = await searchParams;
+  const initialRole = parseRequestedRole(role);
 
   return (
     <Card>
@@ -47,6 +54,32 @@ export default async function SignupPage({ searchParams }: PageProps) {
           }}
           className="flex flex-col gap-5"
         >
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium">I am signing up as a…</legend>
+            <div className="flex flex-col gap-2 pt-1">
+              {REQUESTED_ROLES.map((r: RequestedRole) => (
+                <label
+                  key={r}
+                  className="border-input hover:bg-muted/40 flex items-center gap-3 rounded-md border p-3 text-sm"
+                >
+                  <input
+                    type="radio"
+                    name="requested_role"
+                    value={r}
+                    defaultChecked={r === initialRole}
+                    required
+                    data-testid={`signup-role-${r}`}
+                  />
+                  <span className="font-medium">{requestedRoleLabel(r)}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Faculty and admin requests are subject to verification by an existing admin before the
+              matching role is granted.
+            </p>
+          </fieldset>
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" required autoComplete="email" />
