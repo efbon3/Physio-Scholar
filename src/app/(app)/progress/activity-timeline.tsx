@@ -13,8 +13,11 @@ const SHADE_CLASS: Record<0 | 1 | 2 | 3 | 4, string> = {
   4: "bg-emerald-700",
 };
 
+// Day-number text on each cell. Shade 0 (no activity) had failing
+// contrast with text-muted-foreground at the small 10px size axe checks
+// at; using text-foreground keeps it above 4.5:1.
 const SHADE_TEXT: Record<0 | 1 | 2 | 3 | 4, string> = {
-  0: "text-muted-foreground",
+  0: "text-foreground",
   1: "text-foreground",
   2: "text-foreground",
   3: "text-emerald-50",
@@ -48,32 +51,33 @@ export function ActivityTimeline({ cells }: { cells: readonly ActivityCell[] }) 
         {monthSpan ? <p className="text-muted-foreground text-xs">{monthSpan}</p> : null}
       </header>
 
-      <div role="grid" aria-label="Activity grid, 5 weeks" className="grid grid-cols-7 gap-1.5">
+      <ul aria-label="Activity grid, 5 weeks" className="grid list-none grid-cols-7 gap-1.5 p-0">
         {cells.map((cell) => {
           const shade = activityShade(cell.count, thresholds);
           const isSelected = cell.dateKey === selectedKey;
           const day = cell.dateKey.slice(8, 10);
           return (
-            <button
-              key={cell.dateKey}
-              type="button"
-              onClick={() => setSelectedKey(isSelected ? null : cell.dateKey)}
-              aria-pressed={isSelected}
-              aria-label={`${cell.dateKey}: ${cell.count} review${cell.count === 1 ? "" : "s"}`}
-              className={cn(
-                "flex aspect-square flex-col items-center justify-center rounded-md text-xs font-medium ring-offset-2 transition-shadow",
-                SHADE_CLASS[shade],
-                SHADE_TEXT[shade],
-                isSelected ? "ring-primary ring-2" : "hover:ring-input hover:ring-2",
-              )}
-              data-testid={`activity-cell-${cell.dateKey}`}
-            >
-              <span className="text-[10px] opacity-80">{day}</span>
-              <span>{cell.count > 0 ? cell.count : ""}</span>
-            </button>
+            <li key={cell.dateKey}>
+              <button
+                type="button"
+                onClick={() => setSelectedKey(isSelected ? null : cell.dateKey)}
+                aria-pressed={isSelected}
+                aria-label={`${cell.dateKey}: ${cell.count} review${cell.count === 1 ? "" : "s"}`}
+                className={cn(
+                  "flex aspect-square w-full flex-col items-center justify-center rounded-md text-xs font-medium ring-offset-2 transition-shadow",
+                  SHADE_CLASS[shade],
+                  SHADE_TEXT[shade],
+                  isSelected ? "ring-primary ring-2" : "hover:ring-input hover:ring-2",
+                )}
+                data-testid={`activity-cell-${cell.dateKey}`}
+              >
+                <span className="text-[10px]">{day}</span>
+                <span>{cell.count > 0 ? cell.count : ""}</span>
+              </button>
+            </li>
           );
         })}
-      </div>
+      </ul>
 
       <Legend />
 
