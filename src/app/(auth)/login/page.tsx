@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { GoogleSignInButton } from "../google-sign-in-button";
 import { loginAction } from "./actions";
 
-type PageProps = { searchParams: Promise<{ error?: string; next?: string }> };
+type PageProps = {
+  searchParams: Promise<{ error?: string; next?: string; deleted?: string }>;
+};
 
 export default async function LoginPage({ searchParams }: PageProps) {
-  const { error, next } = await searchParams;
+  const { error, next, deleted } = await searchParams;
 
   return (
     <Card>
@@ -20,6 +22,15 @@ export default async function LoginPage({ searchParams }: PageProps) {
         <CardDescription>Welcome back to Physio-Scholar.</CardDescription>
       </CardHeader>
       <CardContent>
+        {deleted === "1" ? (
+          <p
+            role="status"
+            className="border-border bg-muted text-muted-foreground mb-4 rounded-md border p-3 text-sm"
+          >
+            Your account is queued for deletion. Your data will be erased on the next processing
+            cycle. You can re-sign-up at any time, but your history will not be recovered.
+          </p>
+        ) : null}
         <div className="mb-4 flex flex-col gap-3">
           <GoogleSignInButton next={next} />
           <div className="text-muted-foreground flex items-center gap-3 text-xs">

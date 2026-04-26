@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 
+import { PrivacyPanel } from "./privacy-panel";
 import { SystemSelectorForm } from "./system-selector-form";
 
 export const metadata = {
@@ -73,6 +74,8 @@ export default async function SettingsPage() {
         allSystems={ALL_SYSTEMS as unknown as string[]}
         initiallyChecked={activeSystems}
       />
+
+      <PrivacyPanel />
     </main>
   );
 }
