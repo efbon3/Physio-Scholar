@@ -24,12 +24,16 @@ import { SyncIndicator } from "./sync-indicator";
  * the page underneath doesn't drift behind the overlay.
  */
 
+// "Dashboard" intentionally not listed — it's the / and /today landing
+// surface, the brand link in the header already takes the user back
+// there, so a separate tab would just be a duplicate. Review and Exam
+// modes live here so they're one tap away from any page.
 const TABS = [
-  { label: "Dashboard", href: "/today" },
   { label: "Topics", href: "/topics" },
   { label: "Systems", href: "/systems" },
   { label: "Facts", href: "/facts" },
   { label: "Values", href: "/values" },
+  { label: "Review", href: "/review" },
   { label: "Self-test", href: "/self-test" },
   { label: "Exam", href: "/exam" },
   { label: "Calendar", href: "/calendar" },

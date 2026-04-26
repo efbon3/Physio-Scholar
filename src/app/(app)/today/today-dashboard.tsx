@@ -4,14 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
-import {
-  DIFFICULTY_FILTER_OPTIONS,
-  FilterChips,
-  PRIORITY_FILTER_OPTIONS,
-} from "@/components/filter-chips";
-import { buttonVariants } from "@/components/ui/button";
-import { encodeFilterParam } from "@/lib/content/card-filters";
 import type { Card } from "@/lib/content/cards";
+import type { Quote } from "@/lib/motivation/quotes";
 import { loadAllCardStates, loadAllReviews } from "@/lib/srs/local";
 import {
   computeProgressSnapshot,
@@ -19,15 +13,8 @@ import {
   type ProgressSnapshot,
 } from "@/lib/srs/progress";
 import { assembleQueue, summariseQueue } from "@/lib/srs/queue";
-import {
-  pickDailyChallenge,
-  pickWeakestMechanism,
-  uniqueMechanisms,
-  type DailyChallenge,
-  type WeakArea,
-} from "@/lib/srs/today-widgets";
+import { pickWeakestMechanism, type WeakArea } from "@/lib/srs/today-widgets";
 import type { CardState } from "@/lib/srs/types";
-import { cn } from "@/lib/utils";
 
 const DEFAULT_MAX_NEW_CARDS = 10;
 
@@ -39,86 +26,57 @@ type QueueSummary = {
 
 type DashboardData = {
   queue: QueueSummary;
-  streakDays: number;
-  longestStreakDays: number;
   weakArea: WeakArea | null;
-  challenge: DailyChallenge | null;
+};
+
+export type UpcomingGoal = {
+  id: string;
+  title: string;
+  startsAt: string;
+  audience: string;
+  daysAway: number;
 };
 
 /**
- * Today tab — the post-login landing dashboard. Reads card_states and
- * the review history out of Dexie, computes a single
- * `ProgressSnapshot`, and renders three follow-on widgets atop the
- * queue summary:
- *   - Streak (current day count + longest as a subtitle)
- *   - Weak-area callout (lowest mastery mechanism, with a Drill CTA)
- *   - Daily clinical challenge (deterministic per-day pick)
+ * Today tab — post-login landing dashboard.
  *
- * The widgets degrade gracefully:
- *   - No reviews yet → streak 0, weak-area "review some cards first"
- *   - No cards in scope → challenge hidden
- * so a brand-new account never sees a broken-looking surface.
+ * Layout (top to bottom):
+ *   1. Greeting + "What would you like to study today?" study scope chip
+ *   2. Cards-due summary (only "due" — cards the SM-2 scheduler says
+ *      it's time to revisit; new cards aren't surfaced here because
+ *      the user wanted just the revision reminder)
+ *   3. Random motivational quote (server-picked from the 400+ corpus)
+ *   4. Three reminder cards: upcoming calendar goals, the system the
+ *      learner is scoring lowest on, and a placeholder for faculty
+ *      homework (the schema for that lands in a follow-up).
+ *
+ * Start review / Exam mode buttons used to live here; they're now in
+ * the global nav (Review, Exam) so the dashboard stays read-only.
  */
-export type ExamWidget = {
-  title: string;
-  startsAt: string;
-  daysAway: number;
-  topics: string[];
-  audience: string;
-};
-
 export function TodayDashboard({
   cards,
-  email,
+  greetingName,
   mechanismTitles,
   profileId,
   studySystems,
   boostCardIds = [],
-  examWidget = null,
+  upcomingGoals,
+  quote,
 }: {
   cards: readonly Card[];
-  email: string | null;
+  greetingName: string;
   mechanismTitles: Record<string, string>;
   profileId: string;
   /** Active organ-systems preference. Null = no preference (CI / preview). */
   studySystems: string[] | null;
   /** Card ids to boost in queue ordering — derived from the active exam window. */
   boostCardIds?: readonly string[];
-  /** Active exam window; null when no exam falls in the next 14 days. */
-  examWidget?: ExamWidget | null;
+  /** Up to three upcoming calendar events. */
+  upcomingGoals: readonly UpcomingGoal[];
+  /** Server-picked quote — refreshes on every page render. */
+  quote: Quote;
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
-  // Local state for the filter chips. Empty Set = no filter on that
-  // axis (default — show everything). Toggling a chip flips its
-  // membership; if all chips are off the caller treats it as "all".
-  const [priorityFilter, setPriorityFilter] = useState<Set<string>>(() => new Set());
-  const [difficultyFilter, setDifficultyFilter] = useState<Set<string>>(() => new Set());
-
-  function toggle(set: Set<string>, value: string, options: ReadonlyArray<{ value: string }>) {
-    const next = new Set(set);
-    // First click on any chip when "all" is implicit: drop into single-select for that chip.
-    if (next.size === 0) {
-      next.add(value);
-    } else if (next.has(value)) {
-      next.delete(value);
-    } else {
-      next.add(value);
-    }
-    // If selection grew to cover every option, collapse back to "all" (empty set).
-    if (next.size === options.length) next.clear();
-    return next;
-  }
-
-  // Build the URL query the Start review / Exam mode buttons should use,
-  // so a click respects the current chip selection.
-  const filterQuery = useMemo(() => {
-    const parts: string[] = [];
-    const p = encodeFilterParam(Array.from(priorityFilter));
-    const d = encodeFilterParam(Array.from(difficultyFilter));
-    if (p) parts.push(`priority=${encodeURIComponent(p)}`);
-    if (d) parts.push(`difficulty=${encodeURIComponent(d)}`);
-    return parts.length === 0 ? "" : `?${parts.join("&")}`;
-  }, [priorityFilter, difficultyFilter]);
 
   // Stable Set across renders so assembleQueue's reference comparison
   // doesn't rebuild on every keystroke. boostCardIds comes in as an
@@ -154,23 +112,13 @@ export function TodayDashboard({
           now,
         });
         const weakArea = pickWeakestMechanism(snapshot.byMechanism as MechanismProgress[]);
-        const challenge = pickDailyChallenge(now, uniqueMechanisms(cards, titlesMap));
         if (cancelled) return;
-        setData({
-          queue,
-          streakDays: snapshot.currentStreakDays,
-          longestStreakDays: snapshot.longestStreakDays,
-          weakArea,
-          challenge,
-        });
+        setData({ queue, weakArea });
       } catch {
         if (!cancelled) {
           setData({
             queue: { due: 0, new: 0, total: 0 },
-            streakDays: 0,
-            longestStreakDays: 0,
             weakArea: null,
-            challenge: null,
           });
         }
       }
@@ -180,224 +128,149 @@ export function TodayDashboard({
     };
   }, [cards, mechanismTitles, profileId, boostSet]);
 
-  const greetingName = email?.split("@")[0] ?? "there";
   const queue = data?.queue;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Dashboard</p>
+      <header className="flex flex-col gap-3">
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Hi, {greetingName}.</h1>
-        {studySystems && studySystems.length > 0 ? (
-          <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-            <span>Studying:</span>
-            <span className="font-medium capitalize">{studySystems.join(" · ")}</span>
-            <Link
-              href="/settings"
-              className="hover:bg-muted text-foreground rounded-md border px-2 py-0.5"
-            >
-              Change
-            </Link>
-          </p>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">What would you like to study today?</span>
+          <span className="font-medium capitalize">
+            {studySystems && studySystems.length > 0 ? studySystems.join(" · ") : "All topics"}
+          </span>
+          <Link
+            href="/settings"
+            className="text-muted-foreground hover:bg-muted text-foreground rounded-md border px-2 py-0.5 text-xs"
+          >
+            Change topic
+          </Link>
+        </div>
       </header>
 
-      <section aria-label="Review queue" className="flex flex-col gap-4">
+      <section aria-label="Review queue" className="flex flex-col gap-3">
         {data === null ? (
           <p className="text-muted-foreground text-sm">Loading queue…</p>
-        ) : queue!.total === 0 ? (
+        ) : queue!.due === 0 ? (
           <EmptyState
             icon="✓"
-            title="You're caught up"
-            description="No cards are due, and today's new-card budget is spent. Come back tomorrow, or get ahead by exploring a mechanism."
-            actions={[
-              { label: "Browse mechanisms", href: "/systems", variant: "primary" },
-              { label: "See your progress", href: "/progress", variant: "secondary" },
-            ]}
+            title="Nothing due right now"
+            description="The SM-2 scheduler hasn't surfaced any cards for revision today. Open a topic if you want to push ahead."
+            actions={[{ label: "Browse topics", href: "/topics", variant: "primary" }]}
           />
         ) : (
-          <>
-            <p className="text-base leading-7">
-              <strong className="font-medium">{queue!.total}</strong> card
-              {queue!.total === 1 ? "" : "s"} waiting
-              {queue!.due > 0 ? (
-                <>
-                  {" "}
-                  ({queue!.due} due
-                  {queue!.new > 0 ? `, ${queue!.new} new` : ""})
-                </>
-              ) : queue!.new > 0 ? (
-                <> ({queue!.new} new)</>
-              ) : null}
-              .
-            </p>
-            <section
-              aria-label="Filter by importance and difficulty"
-              className="border-input bg-muted/20 flex flex-col gap-3 rounded-md border p-3"
-            >
-              <FilterChips
-                legend="Priority"
-                options={PRIORITY_FILTER_OPTIONS as unknown as { value: string; label: string }[]}
-                selected={priorityFilter}
-                onToggle={(v) =>
-                  setPriorityFilter((s) =>
-                    toggle(s, v, PRIORITY_FILTER_OPTIONS as unknown as { value: string }[]),
-                  )
-                }
-                helper={
-                  priorityFilter.size === 0
-                    ? "All priorities included."
-                    : `Showing only ${Array.from(priorityFilter).join(", ")}.`
-                }
-              />
-              <FilterChips
-                legend="Difficulty"
-                options={DIFFICULTY_FILTER_OPTIONS as unknown as { value: string; label: string }[]}
-                selected={difficultyFilter}
-                onToggle={(v) =>
-                  setDifficultyFilter((s) =>
-                    toggle(s, v, DIFFICULTY_FILTER_OPTIONS as unknown as { value: string }[]),
-                  )
-                }
-                helper={
-                  difficultyFilter.size === 0
-                    ? "All levels included."
-                    : `Showing only ${Array.from(difficultyFilter).join(", ")}.`
-                }
-              />
-            </section>
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/review${filterQuery}`} className={cn(buttonVariants({ size: "lg" }))}>
-                Start review
-              </Link>
-              <Link
-                href={`/exam${filterQuery}`}
-                className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
-              >
-                Exam mode
-              </Link>
-            </div>
-          </>
+          <p className="text-base leading-7">
+            <strong className="font-medium">{queue!.due}</strong> card
+            {queue!.due === 1 ? "" : "s"} due for revision.
+          </p>
         )}
       </section>
 
-      {data && queue!.total === 0 ? (
-        <section aria-label="Secondary actions" className="flex flex-col gap-3">
-          <p className="text-sm">
-            Nothing to review? Still worth a drill — try an exam-mode MCQ run.
-          </p>
-          <div>
-            <Link href="/exam" className={cn(buttonVariants({ size: "lg", variant: "outline" }))}>
-              Go to exam mode
-            </Link>
-          </div>
-        </section>
-      ) : null}
+      <QuoteCard quote={quote} />
 
-      {examWidget ? <ExamCountdown examWidget={examWidget} boosting={boostSet.size > 0} /> : null}
-
-      {data ? (
-        <section
-          aria-label="Today widgets"
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          <StreakCard streakDays={data.streakDays} longestStreakDays={data.longestStreakDays} />
-          <WeakAreaCard weakArea={data.weakArea} />
-          <ChallengeCard challenge={data.challenge} />
-        </section>
-      ) : null}
+      <section
+        aria-label="Today reminders"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <UpcomingGoalsCard goals={upcomingGoals} />
+        <WeakSystemCard weakArea={data?.weakArea ?? null} />
+        <FacultyHomeworkCard />
+      </section>
     </main>
   );
 }
 
-function ExamCountdown({ examWidget, boosting }: { examWidget: ExamWidget; boosting: boolean }) {
-  const days = examWidget.daysAway;
-  const dayLabel = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+function QuoteCard({ quote }: { quote: Quote }) {
   return (
     <section
-      aria-label="Next exam"
-      className="border-destructive/30 bg-destructive/5 flex flex-col gap-2 rounded-md border p-4"
+      aria-label="Motivation"
+      className="border-input bg-muted/20 flex flex-col gap-1 rounded-md border p-4"
     >
-      <p className="text-xs tracking-widest uppercase">
-        Next exam · {examWidget.audience === "personal" ? "Personal" : "Institution"}
-      </p>
-      <p className="font-heading text-xl font-semibold">{examWidget.title}</p>
-      <p className="text-sm">
-        <span className="font-medium">{dayLabel}</span>{" "}
-        <span className="text-muted-foreground">({examWidget.startsAt})</span>
-      </p>
-      {examWidget.topics.length > 0 ? (
-        <p className="text-muted-foreground text-xs capitalize">
-          Topics: {examWidget.topics.join(" · ")}
-        </p>
+      <p className="font-heading text-base leading-7 italic">&ldquo;{quote.text}&rdquo;</p>
+      {quote.attribution ? (
+        <p className="text-muted-foreground text-xs">— {quote.attribution}</p>
       ) : null}
-      {boosting ? (
-        <p className="text-muted-foreground text-xs">
-          Cards from these systems are surfacing first in your review queue.
-        </p>
-      ) : null}
-      <div className="mt-1 flex flex-wrap gap-2 text-xs">
-        <Link
-          href="/calendar"
-          className="hover:bg-muted text-foreground rounded-md border px-2 py-1"
-        >
-          See full calendar
-        </Link>
-      </div>
     </section>
   );
 }
 
-function StreakCard({
-  streakDays,
-  longestStreakDays,
-}: {
-  streakDays: number;
-  longestStreakDays: number;
-}) {
+function UpcomingGoalsCard({ goals }: { goals: readonly UpcomingGoal[] }) {
+  if (goals.length === 0) {
+    return (
+      <article
+        aria-label="Upcoming goals"
+        className="border-input flex flex-col gap-2 rounded-md border p-4"
+      >
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">Upcoming goals</p>
+        <p className="font-heading text-base font-medium">Nothing scheduled.</p>
+        <p className="text-muted-foreground text-xs">
+          Add an exam or personal goal to keep your calendar honest.
+        </p>
+        <Link
+          href="/calendar/new"
+          className="text-foreground mt-1 self-start rounded-md border px-2 py-1 text-xs hover:underline"
+        >
+          Add to calendar
+        </Link>
+      </article>
+    );
+  }
   return (
     <article
-      aria-label="Study streak"
+      aria-label="Upcoming goals"
       className="border-input flex flex-col gap-2 rounded-md border p-4"
     >
-      <p className="text-muted-foreground text-xs tracking-widest uppercase">Streak</p>
-      {streakDays === 0 ? (
-        <p className="font-heading text-2xl font-semibold tracking-tight">Start a streak today</p>
-      ) : (
-        <p className="font-heading text-2xl font-semibold tracking-tight">
-          {streakDays} day{streakDays === 1 ? "" : "s"}
-        </p>
-      )}
-      <p className="text-muted-foreground text-xs">
-        {longestStreakDays > 0
-          ? `Best: ${longestStreakDays} day${longestStreakDays === 1 ? "" : "s"}.`
-          : "Rate at least one card to begin."}
-      </p>
+      <p className="text-muted-foreground text-xs tracking-widest uppercase">Upcoming goals</p>
+      <ul className="flex flex-col gap-2">
+        {goals.map((g) => {
+          const dayLabel =
+            g.daysAway === 0 ? "today" : g.daysAway === 1 ? "tomorrow" : `in ${g.daysAway} days`;
+          return (
+            <li key={g.id} className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">{g.title}</span>
+              <span className="text-muted-foreground text-xs">
+                {dayLabel} · {g.audience === "personal" ? "Your goal" : "Institution"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <Link
+        href="/calendar"
+        className="text-muted-foreground mt-1 self-start text-xs underline-offset-2 hover:underline"
+      >
+        See full calendar
+      </Link>
     </article>
   );
 }
 
-function WeakAreaCard({ weakArea }: { weakArea: WeakArea | null }) {
+function WeakSystemCard({ weakArea }: { weakArea: WeakArea | null }) {
   if (weakArea === null) {
     return (
       <article
-        aria-label="Weak area"
+        aria-label="Lowest-scoring system"
         className="border-input flex flex-col gap-2 rounded-md border p-4"
       >
-        <p className="text-muted-foreground text-xs tracking-widest uppercase">Weak area</p>
-        <p className="font-heading text-base font-medium">Review some cards first.</p>
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">
+          Where you&apos;re slipping
+        </p>
+        <p className="font-heading text-base font-medium">No data yet.</p>
         <p className="text-muted-foreground text-xs">
-          Once you&apos;ve rated a few cards, we&apos;ll surface where you&apos;re slipping.
+          Once you&apos;ve rated a few cards, this card will surface the system you&apos;re scoring
+          lowest in.
         </p>
       </article>
     );
   }
   return (
     <article
-      aria-label="Weak area"
+      aria-label="Lowest-scoring system"
       className="border-input flex flex-col gap-2 rounded-md border p-4"
     >
-      <p className="text-muted-foreground text-xs tracking-widest uppercase">Weak area</p>
+      <p className="text-muted-foreground text-xs tracking-widest uppercase">
+        Where you&apos;re slipping
+      </p>
       <p className="font-heading text-base font-medium">{weakArea.title}</p>
       <p className="text-muted-foreground text-xs">
         {weakArea.masteryPct}% mastery across {weakArea.seen} reviewed card
@@ -405,7 +278,7 @@ function WeakAreaCard({ weakArea }: { weakArea: WeakArea | null }) {
       </p>
       <Link
         href={`/review?mechanism=${encodeURIComponent(weakArea.mechanismId)}`}
-        className={cn(buttonVariants({ size: "sm", variant: "outline" }), "mt-1 self-start")}
+        className="text-foreground mt-1 self-start rounded-md border px-2 py-1 text-xs hover:underline"
       >
         Drill this mechanism
       </Link>
@@ -413,41 +286,23 @@ function WeakAreaCard({ weakArea }: { weakArea: WeakArea | null }) {
   );
 }
 
-function ChallengeCard({ challenge }: { challenge: DailyChallenge | null }) {
-  if (challenge === null) {
-    return (
-      <article
-        aria-label="Daily challenge"
-        className="border-input flex flex-col gap-2 rounded-md border p-4"
-      >
-        <p className="text-muted-foreground text-xs tracking-widest uppercase">
-          Today&apos;s challenge
-        </p>
-        <p className="font-heading text-base font-medium">No mechanisms in scope.</p>
-        <p className="text-muted-foreground text-xs">
-          Add a study system in Settings to unlock the daily challenge.
-        </p>
-      </article>
-    );
-  }
+function FacultyHomeworkCard() {
+  // Placeholder. The faculty-assigned homework feature needs its own
+  // schema (faculty_assignments table + RLS for the assigning faculty
+  // / receiving cohort) and an admin UI to create the assignments.
+  // Until that lands, the card explains what it'll show so the dashboard
+  // shape is final and the data-fill is the only thing missing.
   return (
     <article
-      aria-label="Daily challenge"
+      aria-label="Faculty homework"
       className="border-input flex flex-col gap-2 rounded-md border p-4"
     >
-      <p className="text-muted-foreground text-xs tracking-widest uppercase">
-        Today&apos;s challenge
-      </p>
-      <p className="font-heading text-base font-medium">{challenge.title}</p>
+      <p className="text-muted-foreground text-xs tracking-widest uppercase">Faculty homework</p>
+      <p className="font-heading text-base font-medium">No homework assigned yet.</p>
       <p className="text-muted-foreground text-xs">
-        Stretch goal — drop in for one focused pass through this mechanism.
+        When a faculty member assigns reading or a task, it&apos;ll show up here so you don&apos;t
+        miss it.
       </p>
-      <Link
-        href={`/review?mechanism=${encodeURIComponent(challenge.mechanismId)}`}
-        className={cn(buttonVariants({ size: "sm", variant: "outline" }), "mt-1 self-start")}
-      >
-        Try it
-      </Link>
     </article>
   );
 }
