@@ -405,6 +405,26 @@ left atrium dilates over years to absorb the regurgitant volume.
 - **Sub-phases of filling**: rapid filling, diastasis, atrial systole.
 - **Heart sounds**: S1 (mitral + tricuspid closure), S2 (aortic + pulmonic closure), S3 (rapid filling), S4 (atrial systole).
 
+# Values
+
+- **End-diastolic volume (EDV)**: 120 mL (range 100–160 mL, resting adult).
+- **End-systolic volume (ESV)**: 50 mL (range 40–70 mL).
+- **Stroke volume (SV)**: 70 mL (range 60–100 mL).
+- **Ejection fraction (EF)**: 60% (normal 55–70%).
+- **Heart rate (resting adult)**: 75 bpm (normal 60–100 bpm awake).
+- **Cardiac cycle length at HR 75**: ~800 ms.
+- **Systole duration at rest**: ~300 ms.
+- **Diastole duration at rest**: ~500 ms.
+- **Diastole at HR 150 bpm**: ~200 ms.
+- **Aortic diastolic pressure**: ~80 mmHg.
+- **Aortic systolic pressure (peak LV)**: ~120 mmHg.
+- **Pulmonary peak (peak RV)**: ~25 mmHg.
+- **Atrial systole contribution to EDV**: 15–25%.
+- **Isovolumetric contraction duration**: ~50 ms.
+- **Isovolumetric relaxation duration**: ~80 ms.
+- **Rapid filling duration**: ~110 ms.
+- **Diastasis duration at rest**: ~190 ms.
+
 # Sources
 
 - Primary: Guyton & Hall, 14th ed, Chapter 9.
