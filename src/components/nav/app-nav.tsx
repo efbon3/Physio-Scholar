@@ -23,6 +23,7 @@ import { SyncIndicator } from "./sync-indicator";
 const TABS = [
   { label: "Today", href: "/today" },
   { label: "Systems", href: "/systems" },
+  { label: "Self-test", href: "/self-test" },
   { label: "Calendar", href: "/calendar" },
   { label: "Progress", href: "/progress" },
 ] as const;
