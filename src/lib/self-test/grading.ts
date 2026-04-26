@@ -127,3 +127,20 @@ export function selfTestRating(
   const finalScore = computeFinalScore(grade, hintsUsed);
   return { finalScore, rating: scoreToSrsRating(finalScore) };
 }
+
+/**
+ * Render the 0–100 score on a 0–10 scale for display. Uses one decimal
+ * when the result isn't a whole number (e.g. partially-wrong = 7.5),
+ * otherwise no decimal so the UI stays uncluttered for whole values.
+ *
+ *   100 → "10"
+ *    80 → "8"
+ *    75 → "7.5"
+ *    55 → "5.5"
+ *    50 → "5"
+ *     0 → "0"
+ */
+export function formatScoreOutOfTen(finalScore: number): string {
+  const tenths = finalScore / 10;
+  return Number.isInteger(tenths) ? `${tenths}` : tenths.toFixed(1);
+}

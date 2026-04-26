@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeFinalScore,
+  formatScoreOutOfTen,
   hintPenaltyFor,
   scoreToSrsRating,
   selfTestRating,
@@ -120,5 +121,20 @@ describe("SELF_GRADE_BASE_POINTS — published values", () => {
     expect(SELF_GRADE_BASE_POINTS["partially-wrong"]).toBe(75);
     expect(SELF_GRADE_BASE_POINTS["partially-correct"]).toBe(50);
     expect(SELF_GRADE_BASE_POINTS.wrong).toBe(20);
+  });
+});
+
+describe("formatScoreOutOfTen", () => {
+  it("renders whole tenths without a decimal point", () => {
+    expect(formatScoreOutOfTen(100)).toBe("10");
+    expect(formatScoreOutOfTen(80)).toBe("8");
+    expect(formatScoreOutOfTen(50)).toBe("5");
+    expect(formatScoreOutOfTen(0)).toBe("0");
+  });
+
+  it("renders fractional tenths with one decimal place", () => {
+    expect(formatScoreOutOfTen(75)).toBe("7.5");
+    expect(formatScoreOutOfTen(55)).toBe("5.5");
+    expect(formatScoreOutOfTen(35)).toBe("3.5");
   });
 });
