@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { EmptyState } from "@/components/empty-state";
 import { readAllMechanisms } from "@/lib/content/source";
 
 export const metadata = {
@@ -34,7 +35,12 @@ export default async function SystemsPage() {
       </header>
 
       {groups.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No mechanisms have been published yet.</p>
+        <EmptyState
+          icon="📚"
+          title="No mechanisms yet"
+          description="Mechanisms appear here as soon as content is published. The author edits markdown under content/mechanisms/ and a deploy ships them."
+          tone="muted"
+        />
       ) : (
         <ul className="flex flex-col gap-6">
           {groups.map((g) => (

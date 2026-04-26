@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import {
   DIFFICULTY_FILTER_OPTIONS,
   FilterChips,
@@ -205,9 +206,15 @@ export function TodayDashboard({
         {data === null ? (
           <p className="text-muted-foreground text-sm">Loading queue…</p>
         ) : queue!.total === 0 ? (
-          <p className="text-sm">
-            Nothing due right now. You&apos;re all caught up — come back tomorrow.
-          </p>
+          <EmptyState
+            icon="✓"
+            title="You're caught up"
+            description="No cards are due, and today's new-card budget is spent. Come back tomorrow, or get ahead by exploring a mechanism."
+            actions={[
+              { label: "Browse mechanisms", href: "/systems", variant: "primary" },
+              { label: "See your progress", href: "/progress", variant: "secondary" },
+            ]}
+          />
         ) : (
           <>
             <p className="text-base leading-7">
