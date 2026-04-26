@@ -24,6 +24,7 @@ const TABS = [
   { label: "Dashboard", href: "/today" },
   { label: "Topics", href: "/topics" },
   { label: "Systems", href: "/systems" },
+  { label: "Facts", href: "/facts" },
   { label: "Self-test", href: "/self-test" },
   { label: "Exam", href: "/exam" },
   { label: "Calendar", href: "/calendar" },
