@@ -7,7 +7,7 @@ import { readAllMechanisms } from "@/lib/content/source";
 import { pickRandomQuote } from "@/lib/motivation/quotes";
 import { createClient } from "@/lib/supabase/server";
 
-import { TodayDashboard, type UpcomingGoal } from "./today-dashboard";
+import { TodayDashboard, type FacultyAssignment, type UpcomingGoal } from "./today-dashboard";
 
 export const metadata = {
   title: "Dashboard",
@@ -116,6 +116,34 @@ export default async function TodayPage() {
   const greetingName =
     nickname?.trim() || fullName?.trim() || user?.email?.split("@")[0]?.trim() || "there";
 
+  // Faculty homework — RLS scopes the result to the caller's
+  // institution, so the page just orders + slices. We surface the next
+  // 3: anything with a future due_at, then anything with no deadline,
+  // dropping rows whose deadline already passed (the dashboard isn't a
+  // graveyard for stale assignments — faculty can manage those at
+  // /faculty/assignments).
+  let assignments: FacultyAssignment[] = [];
+  if (user) {
+    try {
+      const supabaseForReads = await createClient();
+      const { data: rows } = await supabaseForReads
+        .from("faculty_assignments")
+        .select("id, title, due_at")
+        .or(`due_at.gte.${now.toISOString()},due_at.is.null`)
+        .order("due_at", { ascending: true, nullsFirst: false })
+        .limit(3);
+      assignments = (rows ?? []).map((r) => ({
+        id: r.id,
+        title: r.title,
+        dueAt: r.due_at,
+      }));
+    } catch {
+      // RLS hit / table not yet migrated → empty list, the card shows the
+      // "no homework yet" copy. Don't surface as an error.
+      assignments = [];
+    }
+  }
+
   return (
     <TodayDashboard
       cards={cards}
@@ -126,6 +154,7 @@ export default async function TodayPage() {
       boostCardIds={Array.from(boostCardIds)}
       upcomingGoals={upcomingGoals}
       quote={quote}
+      assignments={assignments}
     />
   );
 }

@@ -119,6 +119,54 @@ export type Database = {
           },
         ]
       }
+      faculty_assignments: {
+        Row: {
+          created_at: string
+          description: string | null
+          due_at: string | null
+          faculty_id: string
+          id: string
+          institution_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          faculty_id: string
+          id?: string
+          institution_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          faculty_id?: string
+          id?: string
+          institution_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faculty_assignments_faculty_id_fkey"
+            columns: ["faculty_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faculty_assignments_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exam_events: {
         Row: {
           audience: string

@@ -89,4 +89,5 @@ const PROTECTED_PREFIXES = [
   "/topics",
   "/settings",
   "/update-password",
+  "/faculty",
 ] as const;
