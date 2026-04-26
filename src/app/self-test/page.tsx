@@ -45,7 +45,15 @@ export default async function SelfTestPage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Self-test</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-muted-foreground text-sm tracking-widest uppercase">Self-test</p>
+          <Link
+            href="/today"
+            className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+          >
+            Back to Dashboard
+          </Link>
+        </div>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
           Pick a mechanism to test yourself on
         </h1>
