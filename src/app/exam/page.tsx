@@ -163,7 +163,7 @@ export default async function ExamLandingPage({
             href="/today"
             className="text-muted-foreground text-xs underline-offset-2 hover:underline"
           >
-            Back to Today
+            Back to Dashboard
           </Link>
         </div>
       </form>

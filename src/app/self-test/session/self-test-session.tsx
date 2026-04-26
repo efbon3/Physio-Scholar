@@ -408,7 +408,7 @@ export function SelfTestSession({
       </p>
       <div className="flex flex-wrap justify-center gap-2 pt-2">
         <Link href="/today" className={cn(buttonVariants({ variant: "default", size: "sm" }))}>
-          Back to today
+          Back to Dashboard
         </Link>
         <Link href="/self-test" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
           Self-test another mechanism

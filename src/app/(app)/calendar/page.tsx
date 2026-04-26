@@ -130,7 +130,7 @@ export default async function CalendarPage() {
           href="/today"
           className="text-muted-foreground text-xs underline-offset-2 hover:underline"
         >
-          Back to Today
+          Back to Dashboard
         </Link>
       </div>
     </main>

@@ -205,7 +205,7 @@ export function ExamSession({
             Start another drill
           </Link>
           <Link href="/today" className="text-muted-foreground rounded-md border px-4 py-2 text-sm">
-            Back to Today
+            Back to Dashboard
           </Link>
         </div>
       </main>

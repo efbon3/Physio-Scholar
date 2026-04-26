@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TodayDashboard } from "./today-dashboard";
 
 export const metadata = {
-  title: "Today",
+  title: "Dashboard",
 };
 
 /**
