@@ -20,12 +20,20 @@ export async function signUpAction(formData: FormData): Promise<SignupResult> {
     .trim()
     .toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const fullName = String(formData.get("full_name") ?? "").trim();
+  const rollNumber = String(formData.get("roll_number") ?? "").trim();
   const consentTerms = formData.get("consent_terms") === "on";
   const consentPrivacy = formData.get("consent_privacy") === "on";
   const consentAnalytics = formData.get("consent_analytics") === "on";
 
   if (!email || !password) {
     return { error: "Email and password are required." };
+  }
+  if (!fullName) {
+    return { error: "Full name is required for admin verification." };
+  }
+  if (!rollNumber) {
+    return { error: "Roll number is required for admin verification." };
   }
   if (password.length < 12) {
     return { error: "Password must be at least 12 characters." };
@@ -46,12 +54,16 @@ export async function signUpAction(formData: FormData): Promise<SignupResult> {
   if (error) return { error: error.message };
   if (!data.user) return { error: "Signup failed for an unknown reason." };
 
-  // Record the consent on the profile the trigger just created. Done with the
-  // same just-signed-up session (RLS permits self-update).
+  // Record the consent + verification details on the profile the
+  // trigger just created. Done with the same just-signed-up session
+  // (RLS permits self-update). approved_at stays NULL — admin must
+  // approve before the learner can reach /today.
   const now = new Date().toISOString();
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
+      full_name: fullName,
+      roll_number: rollNumber,
       consent_terms_accepted_at: now,
       consent_privacy_accepted_at: now,
       consent_analytics: consentAnalytics,
