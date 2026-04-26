@@ -1,10 +1,18 @@
 import Link from "next/link";
 
+import { parseDifficultyFilter, parsePriorityFilter } from "@/lib/content/card-filters";
 import { extractCards } from "@/lib/content/cards";
 import { readAllMechanisms } from "@/lib/content/source";
 
+import { SelfTestPicker, type SelfTestGroup } from "./self-test-picker";
+
 export const metadata = {
   title: "Self-test",
+};
+
+type SearchParams = {
+  priority?: string | string[];
+  difficulty?: string | string[];
 };
 
 /**
@@ -15,13 +23,20 @@ export const metadata = {
  * each card themselves. Hint usage costs points; see
  * src/lib/self-test/grading.ts for the full score model.
  *
- * The page lists organ systems → mechanisms within each → a
- * "Start self-test" link per mechanism. A future iteration may add
- * "test the whole system" as a single CTA per system; for now,
- * mechanism-scoped sessions match the spec ("they should be able to
- * choose specific mechanism etc they want to assess").
+ * Priority + difficulty filters live on this page so the learner can
+ * scope a drill before they start. The selection flows into the
+ * session URL as `?priority=…&difficulty=…`; the session entry trims
+ * the card universe before SM-2 begins.
  */
-export default async function SelfTestPage() {
+export default async function SelfTestPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const resolved = await searchParams;
+  const priority = parsePriorityFilter(resolved.priority) ?? [];
+  const difficulty = parseDifficultyFilter(resolved.difficulty) ?? [];
+
   const mechanisms = await readAllMechanisms();
   const grouped = new Map<string, { id: string; title: string; cardCount: number }[]>();
   for (const m of mechanisms) {
@@ -35,7 +50,7 @@ export default async function SelfTestPage() {
     });
     grouped.set(m.frontmatter.organ_system, list);
   }
-  const groups = [...grouped.entries()]
+  const groups: SelfTestGroup[] = [...grouped.entries()]
     .map(([system, items]) => ({
       system,
       mechanisms: items.sort((a, b) => a.title.localeCompare(b.title)),
@@ -64,46 +79,7 @@ export default async function SelfTestPage() {
         </p>
       </header>
 
-      {groups.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No mechanisms with questions yet. Authored content lives under{" "}
-          <code>content/mechanisms/</code>.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-6">
-          {groups.map((g) => (
-            <li key={g.system} className="flex flex-col gap-3">
-              <h2 className="font-heading text-xl font-medium capitalize">{g.system}</h2>
-              <ul className="flex flex-col gap-2">
-                {g.mechanisms.map((m) => (
-                  <li
-                    key={m.id}
-                    className="border-border flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
-                  >
-                    <div className="flex flex-col">
-                      <Link
-                        href={`/mechanisms/${encodeURIComponent(m.id)}`}
-                        className="font-medium underline-offset-2 hover:underline"
-                      >
-                        {m.title}
-                      </Link>
-                      <p className="text-muted-foreground text-xs">
-                        {m.cardCount} question{m.cardCount === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                    <Link
-                      href={`/self-test/session?mechanism=${encodeURIComponent(m.id)}`}
-                      className="bg-primary text-primary-foreground hover:bg-primary/80 rounded-md px-3 py-1.5 text-sm font-medium"
-                    >
-                      Start self-test
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
+      <SelfTestPicker groups={groups} initialPriority={priority} initialDifficulty={difficulty} />
     </main>
   );
 }

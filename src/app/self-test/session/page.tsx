@@ -1,5 +1,10 @@
 import { redirect } from "next/navigation";
 
+import {
+  applyCardFilters,
+  parseDifficultyFilter,
+  parsePriorityFilter,
+} from "@/lib/content/card-filters";
 import { extractCards, type Card } from "@/lib/content/cards";
 import { normaliseMechanismId } from "@/lib/content/filters";
 import { readAllMechanisms } from "@/lib/content/source";
@@ -13,6 +18,8 @@ export const metadata = {
 
 type SearchParams = {
   mechanism?: string | string[];
+  priority?: string | string[];
+  difficulty?: string | string[];
 };
 
 /**
@@ -41,15 +48,29 @@ export default async function SelfTestSessionPage({
   if (!mechanismFilter) {
     redirect("/self-test");
   }
+  const priorityFilter = parsePriorityFilter(resolved.priority);
+  const difficultyFilter = parseDifficultyFilter(resolved.difficulty);
 
   const mechanisms = await readAllMechanisms();
   const target = mechanisms.find((m) => m.frontmatter.id === mechanismFilter);
   if (!target) {
     redirect("/self-test");
   }
-  const cards: Card[] = extractCards(target);
+  let cards: Card[] = extractCards(target);
   if (cards.length === 0) {
     redirect("/self-test");
+  }
+
+  // Apply the chosen priority / difficulty filters from the picker.
+  // Same posture as /review: if the combination collapses to zero
+  // cards, fall back to the unfiltered list rather than dumping the
+  // user on a blank session.
+  if (priorityFilter || difficultyFilter) {
+    const filtered = applyCardFilters(cards, {
+      priority: priorityFilter,
+      difficulty: difficultyFilter,
+    });
+    if (filtered.length > 0) cards = filtered;
   }
 
   const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
