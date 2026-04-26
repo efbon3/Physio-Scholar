@@ -357,6 +357,54 @@ left atrium dilates over years to absorb the regurgitant volume.
 - Wrong answer: "S3 occurs during atrial systole" → Misconception: Swapping S3 and S4. S3 is rapid filling; S4 is atrial systole.
 - Wrong answer: "S2 occurs at the bottom of ejection" → Misconception: Putting the aortic valve closure at the wrong corner of the loop. It is at the top-left corner, where ejection ends and isovolumetric relaxation begins.
 
+# Facts
+
+## Definitions
+
+- **Isovolumetric contraction**: phase of systole between mitral closure and aortic opening — both valves shut, ventricular pressure rises, volume unchanged.
+- **Isovolumetric relaxation**: phase of diastole between aortic closure and mitral opening — both valves shut, pressure falls, volume unchanged.
+- **Diastasis**: middle sub-phase of diastolic filling when atrial and ventricular pressures are nearly equal and inflow slows almost to zero.
+
+## Normal values
+
+- **End-diastolic volume (EDV)**: ~120 mL in a resting adult.
+- **End-systolic volume (ESV)**: ~50 mL.
+- **Stroke volume (SV)**: ~70 mL.
+- **Ejection fraction (EF)**: 55–70%.
+- **Cycle length at HR 75 bpm**: ~800 ms (systole ~300 ms, diastole ~500 ms).
+- **Aortic diastolic pressure**: ~80 mmHg (the threshold isovolumetric contraction must climb past).
+- **Peak left ventricular pressure**: ~120 mmHg.
+- **Peak right ventricular pressure**: ~25 mmHg.
+
+## Functions
+
+- **S1 (first heart sound)**: marks closure of the mitral and tricuspid valves at the start of systole.
+- **S2 (second heart sound)**: marks closure of the aortic and pulmonic valves at the end of systole.
+- **Atrial systole**: tops up the last 15–25% of end-diastolic volume just before ventricular contraction.
+- **Diastasis**: provides a "rest" interval during which ventricular and atrial pressures equalise; disappears at high heart rates.
+
+## Relations
+
+- **Stroke volume formula**: SV = EDV − ESV.
+- **Ejection fraction formula**: EF = SV / EDV.
+- **Cardiac output formula**: CO = HR × SV.
+- **Diastolic filling time**: shortens disproportionately as heart rate rises (~500 ms at 75 bpm → ~200 ms at 150 bpm).
+
+## Associations
+
+- **Inspiratory split S2**: associated with delayed P2 due to transiently increased right ventricular preload.
+- **Fixed split S2**: associated with atrial septal defect (right and left atrial pressures equalise).
+- **S3**: associated with rapid filling into a compliant ventricle; physiological in young adults, pathological in older.
+- **S4**: associated with atrial systole into a stiff ventricle; always pathological in adults.
+- **Atrial fibrillation + exercise intolerance**: associated with loss of atrial kick and shortened diastolic filling time at high rates.
+
+## Classifications
+
+- **Phases of the cardiac cycle**: isovolumetric contraction, ejection, isovolumetric relaxation, filling.
+- **Sub-phases of ejection**: rapid ejection (~70% of stroke volume), reduced ejection (remainder).
+- **Sub-phases of filling**: rapid filling, diastasis, atrial systole.
+- **Heart sounds**: S1 (mitral + tricuspid closure), S2 (aortic + pulmonic closure), S3 (rapid filling), S4 (atrial systole).
+
 # Sources
 
 - Primary: Guyton & Hall, 14th ed, Chapter 9.

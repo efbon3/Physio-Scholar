@@ -22,6 +22,13 @@ export type MechanismLayers = {
   deepDive?: string;
   clinicalIntegration?: string;
   questions?: string;
+  /**
+   * Optional `# Facts` section — short factual recall items grouped
+   * by category (definitions, normal values, functions, etc). Parsed
+   * by extractFacts() in src/lib/content/facts.ts. Independent of
+   * `# Questions`; mechanisms can have one, the other, both, or neither.
+   */
+  facts?: string;
   sources?: string;
 };
 
@@ -69,6 +76,7 @@ const LAYER_HEADINGS = {
     "i",
   ),
   questions: /^#\s+Questions\s*$/i,
+  facts: /^#\s+Facts\s*$/i,
   sources: /^#\s+Sources\s*$/i,
 } as const;
 
