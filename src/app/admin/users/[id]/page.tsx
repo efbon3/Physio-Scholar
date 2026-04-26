@@ -4,7 +4,12 @@ import { notFound } from "next/navigation";
 import { parseRequestedRole, requestedRoleLabel, REQUESTED_ROLES } from "@/lib/auth/requested-role";
 import { createClient } from "@/lib/supabase/server";
 
-import { approveUserAction, revokeApprovalAction } from "../actions";
+import {
+  approveUserAction,
+  rejectUserAction,
+  revokeApprovalAction,
+  unrejectUserAction,
+} from "../actions";
 
 export const metadata = {
   title: "User · Admin",
@@ -32,7 +37,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, full_name, nickname, roll_number, college_name, date_of_birth, address, phone, avatar_url, year_of_study, institution_id, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, consent_terms_accepted_at, consent_privacy_accepted_at, consent_analytics, created_at, updated_at, deletion_requested_at",
+      "id, full_name, nickname, roll_number, college_name, date_of_birth, address, phone, avatar_url, year_of_study, institution_id, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, rejected_at, rejected_by, rejection_reason, consent_terms_accepted_at, consent_privacy_accepted_at, consent_analytics, created_at, updated_at, deletion_requested_at",
     )
     .eq("id", id)
     .single();
@@ -85,7 +90,11 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           {!profile.is_admin && !profile.is_faculty ? (
             <span className="text-muted-foreground rounded-full border px-2 py-0.5">Learner</span>
           ) : null}
-          {profile.approved_at ? (
+          {profile.rejected_at ? (
+            <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
+              Rejected
+            </span>
+          ) : profile.approved_at ? (
             <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
               Approved
             </span>
@@ -204,11 +213,19 @@ function Field({
 }
 
 /**
- * Approval / role-grant controls. We render one button per role so the
- * admin's intent is explicit — clicking "Approve as admin" is a more
- * deliberate action than a single "Approve" that silently picks up the
- * requested_role. The currently-granted role is highlighted; revoke
- * clears approval and both flags.
+ * Approval, role-grant, AND reject controls. The list view exposes a
+ * compact Approve/Reject pair; this is the deliberate version where
+ * the admin can pick which role to grant or write a rejection reason.
+ *
+ * State machine:
+ *   - profile_completed_at = null → wait, no buttons (user hasn't
+ *     finished /complete-profile yet).
+ *   - rejected_at = not null     → "Rejected" panel + Unreject (which
+ *                                  drops them back into pending).
+ *   - approved_at = null         → Approve-as-X buttons + Reject form.
+ *   - approved_at = not null     → Switch-to-X buttons + Revoke +
+ *                                  Reject (rejecting an approved user
+ *                                  also clears their is_admin/is_faculty).
  */
 function ApprovalControls({
   profile,
@@ -220,6 +237,8 @@ function ApprovalControls({
     approved_at: string | null;
     profile_completed_at: string | null;
     requested_role: string;
+    rejected_at: string | null;
+    rejection_reason: string | null;
   };
 }) {
   const requested = parseRequestedRole(profile.requested_role);
@@ -235,63 +254,136 @@ function ApprovalControls({
         <h2 className="font-heading text-lg font-medium">Approval</h2>
         <p className="text-muted-foreground text-xs">
           User requested <strong>{requestedRoleLabel(requested)}</strong>.{" "}
-          {profile.approved_at
-            ? `Currently approved as ${currentRole}.`
-            : profileIncomplete
-              ? "Waiting for the user to complete their profile before approval."
-              : "Not yet approved."}
+          {profile.rejected_at
+            ? "Currently rejected."
+            : profile.approved_at
+              ? `Currently approved as ${currentRole}.`
+              : profileIncomplete
+                ? "Waiting for the user to complete their profile before approval."
+                : "Not yet approved."}
         </p>
       </div>
 
-      {profileIncomplete ? null : (
-        <div className="flex flex-wrap gap-2">
-          {REQUESTED_ROLES.map((role) => {
-            const isCurrentTier = profile.approved_at !== null && currentRole === role;
-            return (
-              <form
-                key={role}
-                action={async () => {
-                  "use server";
-                  await approveUserAction(profile.id, role);
-                }}
-              >
-                <button
-                  type="submit"
-                  disabled={isCurrentTier}
-                  className={
-                    isCurrentTier
-                      ? "inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
-                      : "bg-primary text-primary-foreground hover:bg-primary/80 rounded-md px-3 py-1.5 text-xs"
-                  }
-                  data-testid={`admin-grant-${role}`}
-                >
-                  {isCurrentTier
-                    ? `${requestedRoleLabel(role)} ✓`
-                    : profile.approved_at
-                      ? `Switch to ${requestedRoleLabel(role).toLowerCase()}`
-                      : `Approve as ${requestedRoleLabel(role).toLowerCase()}`}
-                </button>
-              </form>
-            );
-          })}
-
-          {profile.approved_at ? (
+      {profile.rejected_at ? (
+        <div className="flex flex-col gap-3">
+          {profile.rejection_reason ? (
+            <div className="rounded-md border border-rose-200 bg-rose-50/60 px-3 py-2 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+              <p className="text-muted-foreground tracking-widest uppercase opacity-70">Reason</p>
+              <p className="mt-1 whitespace-pre-wrap">{profile.rejection_reason}</p>
+            </div>
+          ) : null}
+          <div>
             <form
               action={async () => {
                 "use server";
-                await revokeApprovalAction(profile.id);
+                await unrejectUserAction(profile.id);
               }}
             >
               <button
                 type="submit"
-                className="text-muted-foreground hover:bg-muted rounded-md border px-3 py-1.5 text-xs"
+                className="hover:bg-muted rounded-md border px-3 py-1.5 text-xs"
+                data-testid="admin-unreject"
               >
-                Revoke approval
+                Unreject (move back to pending)
               </button>
             </form>
-          ) : null}
+          </div>
+        </div>
+      ) : profileIncomplete ? null : (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            {REQUESTED_ROLES.map((role) => {
+              const isCurrentTier = profile.approved_at !== null && currentRole === role;
+              return (
+                <form
+                  key={role}
+                  action={async () => {
+                    "use server";
+                    await approveUserAction(profile.id, role);
+                  }}
+                >
+                  <button
+                    type="submit"
+                    disabled={isCurrentTier}
+                    className={
+                      isCurrentTier
+                        ? "inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
+                        : "bg-primary text-primary-foreground hover:bg-primary/80 rounded-md px-3 py-1.5 text-xs"
+                    }
+                    data-testid={`admin-grant-${role}`}
+                  >
+                    {isCurrentTier
+                      ? `${requestedRoleLabel(role)} ✓`
+                      : profile.approved_at
+                        ? `Switch to ${requestedRoleLabel(role).toLowerCase()}`
+                        : `Approve as ${requestedRoleLabel(role).toLowerCase()}`}
+                  </button>
+                </form>
+              );
+            })}
+
+            {profile.approved_at ? (
+              <form
+                action={async () => {
+                  "use server";
+                  await revokeApprovalAction(profile.id);
+                }}
+              >
+                <button
+                  type="submit"
+                  className="text-muted-foreground hover:bg-muted rounded-md border px-3 py-1.5 text-xs"
+                >
+                  Revoke approval
+                </button>
+              </form>
+            ) : null}
+          </div>
+
+          <RejectForm profileId={profile.id} />
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Reject button + optional reason textarea. Wrapped in a single form
+ * so the textarea value is sent with the submit; the server action
+ * trims and caps at 500 chars. Posting with an empty textarea is fine
+ * — rejection_reason will just be null and the user sees a generic
+ * /access-denied page.
+ */
+function RejectForm({ profileId }: { profileId: string }) {
+  return (
+    <form
+      action={async (formData) => {
+        "use server";
+        const reason = formData.get("rejection_reason");
+        await rejectUserAction(profileId, typeof reason === "string" ? reason : null);
+      }}
+      className="flex flex-col gap-2 rounded-md border border-rose-200 p-3 dark:border-rose-900"
+    >
+      <label
+        htmlFor="rejection_reason"
+        className="text-xs font-medium tracking-widest text-rose-900 uppercase dark:text-rose-200"
+      >
+        Reject sign-up request
+      </label>
+      <textarea
+        id="rejection_reason"
+        name="rejection_reason"
+        rows={2}
+        maxLength={500}
+        placeholder="Optional reason (shown to the user on the access-denied page)"
+        className="border-input bg-background min-h-16 rounded-md border px-3 py-2 text-sm outline-none focus:ring-2"
+      />
+      <button
+        type="submit"
+        className="self-start rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs text-rose-900 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200 dark:hover:bg-rose-900"
+        data-testid="admin-reject"
+      >
+        Reject and deny access
+      </button>
+    </form>
   );
 }

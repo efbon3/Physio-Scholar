@@ -40,11 +40,17 @@ export default async function CompleteProfilePage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "full_name, nickname, phone, college_name, roll_number, date_of_birth, address, avatar_url, profile_completed_at, is_admin",
+      "full_name, nickname, phone, college_name, roll_number, date_of_birth, address, avatar_url, profile_completed_at, is_admin, rejected_at",
     )
     .eq("id", user.id)
     .single();
 
+  // Rejection is terminal — they can't fill in / re-fill in their
+  // profile after the admin denied access. Send them to the
+  // access-denied page; the gate will keep them there.
+  if (profile?.rejected_at) {
+    redirect("/access-denied");
+  }
   if (profile?.is_admin || profile?.profile_completed_at) {
     redirect("/today");
   }

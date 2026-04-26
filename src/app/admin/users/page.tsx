@@ -14,7 +14,7 @@ import {
 } from "@/lib/auth/requested-role";
 import { createClient } from "@/lib/supabase/server";
 
-import { approveUserAction, revokeApprovalAction } from "./actions";
+import { approveUserAction, rejectUserAction, revokeApprovalAction } from "./actions";
 
 export const metadata = {
   title: "Users · Admin",
@@ -52,6 +52,7 @@ type ProfileRow = {
   approved_at: string | null;
   profile_completed_at: string | null;
   requested_role: string;
+  rejected_at: string | null;
   created_at: string;
 };
 
@@ -76,7 +77,7 @@ export default async function AdminUsersPage({
   let profilesQuery = supabase
     .from("profiles")
     .select(
-      "id, full_name, nickname, roll_number, college_name, phone, institution_id, year_of_study, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, created_at",
+      "id, full_name, nickname, roll_number, college_name, phone, institution_id, year_of_study, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, rejected_at, created_at",
     );
 
   if (rawQuery.length > 0) {
@@ -335,6 +336,15 @@ function buildHref({ q, sort, dir }: { q: string; sort: SortKey; dir: SortDir })
 }
 
 function ApprovalBadge({ profile }: { profile: ProfileRow }) {
+  // Rejection wins over everything else — even an admin row that
+  // somehow gets rejected should show "Rejected" so it's loud.
+  if (profile.rejected_at) {
+    return (
+      <span className="inline-flex items-center rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
+        Rejected
+      </span>
+    );
+  }
   if (profile.is_admin) {
     return (
       <span className="text-muted-foreground inline-flex items-center rounded-md border px-2 py-0.5 text-xs">
@@ -364,36 +374,61 @@ function ApprovalBadge({ profile }: { profile: ProfileRow }) {
 }
 
 /**
- * Compact approve / revoke control. For unapproved users we approve at
- * the role they requested at signup, since that's almost always what
- * the admin wants. Promotion to a different role happens on the user
- * detail page where the action is explicit and confirmable.
+ * Inline decision controls: Approve (as requested role) and Reject.
+ * Detailed role switching + reason entry live on the user-detail page;
+ * the list affordances are deliberately quick. A rejected user's row
+ * doesn't show either button — the admin has to click into the detail
+ * page to unreject (deliberate friction so it feels like a decision).
  */
 function ApprovalToggle({ profile }: { profile: ProfileRow }) {
   const isApproved = profile.approved_at !== null;
+  const isRejected = profile.rejected_at !== null;
   const requestedRole = parseRequestedRole(profile.requested_role);
+
+  if (isRejected) {
+    return <span className="text-muted-foreground text-[11px]">View to unreject</span>;
+  }
+
   return (
-    <form
-      action={async () => {
-        "use server";
-        if (isApproved) {
-          await revokeApprovalAction(profile.id);
-        } else {
-          await approveUserAction(profile.id, requestedRole);
-        }
-      }}
-    >
-      <button
-        type="submit"
-        className={
-          isApproved
-            ? "text-muted-foreground hover:bg-muted rounded-md border px-2 py-1 text-xs"
-            : "bg-primary text-primary-foreground hover:bg-primary/80 rounded-md px-2 py-1 text-xs"
-        }
+    <div className="flex flex-wrap gap-1">
+      <form
+        action={async () => {
+          "use server";
+          if (isApproved) {
+            await revokeApprovalAction(profile.id);
+          } else {
+            await approveUserAction(profile.id, requestedRole);
+          }
+        }}
       >
-        {isApproved ? "Revoke" : `Approve as ${requestedRoleLabel(requestedRole).toLowerCase()}`}
-      </button>
-    </form>
+        <button
+          type="submit"
+          className={
+            isApproved
+              ? "text-muted-foreground hover:bg-muted rounded-md border px-2 py-1 text-xs"
+              : "bg-primary text-primary-foreground hover:bg-primary/80 rounded-md px-2 py-1 text-xs"
+          }
+        >
+          {isApproved ? "Revoke" : `Approve as ${requestedRoleLabel(requestedRole).toLowerCase()}`}
+        </button>
+      </form>
+      {!isApproved ? (
+        <form
+          action={async () => {
+            "use server";
+            await rejectUserAction(profile.id);
+          }}
+        >
+          <button
+            type="submit"
+            className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-xs text-rose-900 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200 dark:hover:bg-rose-900"
+            data-testid={`admin-quick-reject-${profile.id}`}
+          >
+            Reject
+          </button>
+        </form>
+      ) : null}
+    </div>
   );
 }
 

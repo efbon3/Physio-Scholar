@@ -38,10 +38,15 @@ export default async function PendingApprovalPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("approved_at, is_admin, profile_completed_at")
+    .select("approved_at, is_admin, profile_completed_at, rejected_at")
     .eq("id", user.id)
     .single();
 
+  // Rejection is terminal — push them to /access-denied so they can't
+  // hang out on this "waiting" page after their access was denied.
+  if (profile?.rejected_at) {
+    redirect("/access-denied");
+  }
   if (profile?.is_admin || profile?.approved_at) {
     redirect("/today");
   }

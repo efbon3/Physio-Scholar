@@ -10,7 +10,7 @@ create extension if not exists pgtap with schema extensions;
 
 begin;
 
-select plan(12);
+select plan(15);
 
 -- -------------------------------------------------------------
 -- Fixtures (run as service_role / postgres, bypasses RLS + trigger)
@@ -200,6 +200,69 @@ select is(
   (select approved_at from public.profiles where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
   '2099-01-01 00:00:00+00'::timestamptz,
   'Admin update for approved_at persisted (lock bypassed for admins)'
+);
+
+-- -------------------------------------------------------------
+-- Scenario 5: rejected_at / rejection_reason are locked too
+-- -------------------------------------------------------------
+-- Admin marks Carla rejected (using the admin session above is fine,
+-- but reset to keep this scenario hermetic).
+update public.profiles
+  set rejected_at = '2026-04-26 09:00:00+00',
+      rejection_reason = 'Initial reason',
+      rejected_by = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
+  where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+select set_config('request.jwt.claims',
+  '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
+set local role authenticated;
+
+-- Rejected user tries to clear their own rejection. Trigger snaps it back.
+select lives_ok(
+  $$ update public.profiles
+       set rejected_at = null,
+           rejection_reason = 'No, I am fine actually',
+           rejected_by = null
+       where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$,
+  'Carla can attempt to clear rejected_at (no error)'
+);
+
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+select is(
+  (select rejected_at from public.profiles where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  '2026-04-26 09:00:00+00'::timestamptz,
+  'Trigger reverted rejected_at — no self-unreject'
+);
+
+select is(
+  (select rejection_reason from public.profiles where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  'Initial reason',
+  'Trigger reverted rejection_reason'
+);
+
+-- Admin can clear the rejection (the proper unreject flow).
+select set_config('request.jwt.claims',
+  '{"sub":"dddddddd-dddd-dddd-dddd-dddddddddddd","role":"authenticated"}', true);
+set local role authenticated;
+
+select lives_ok(
+  $$ update public.profiles
+       set rejected_at = null,
+           rejection_reason = null,
+           rejected_by = null
+       where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc' $$,
+  'Dave (admin) can clear rejected_at on another profile'
+);
+
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+select is(
+  (select rejected_at from public.profiles where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  null::timestamptz,
+  'Admin unreject persisted (lock bypassed for admins)'
 );
 
 select * from finish();
