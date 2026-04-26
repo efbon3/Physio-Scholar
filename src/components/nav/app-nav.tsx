@@ -22,8 +22,10 @@ import { SyncIndicator } from "./sync-indicator";
 
 const TABS = [
   { label: "Today", href: "/today" },
+  { label: "Topics", href: "/topics" },
   { label: "Systems", href: "/systems" },
   { label: "Self-test", href: "/self-test" },
+  { label: "Exam", href: "/exam" },
   { label: "Calendar", href: "/calendar" },
   { label: "Progress", href: "/progress" },
 ] as const;
@@ -75,6 +77,18 @@ export function AppNav({ profileId }: { profileId: string }) {
           )}
         >
           Profile
+        </Link>
+        <Link
+          href="/settings"
+          aria-current={matches(pathname, "/settings") ? "page" : undefined}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-sm transition-colors",
+            matches(pathname, "/settings")
+              ? "bg-secondary text-secondary-foreground"
+              : "hover:bg-muted",
+          )}
+        >
+          Settings
         </Link>
         <SignOutButton />
       </div>
