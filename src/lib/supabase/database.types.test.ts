@@ -16,10 +16,12 @@ type StudySessionRow = PublicTables["study_sessions"]["Row"];
 type CardStateRow = PublicTables["card_states"]["Row"];
 type ReviewRow = PublicTables["reviews"]["Row"];
 type ExamEventRow = PublicTables["exam_events"]["Row"];
+type AuditLogRow = PublicTables["admin_audit_log"]["Row"];
 
 describe("Database type", () => {
-  it("exposes the ten public tables (+ J7 exam_events)", () => {
+  it("exposes the eleven public tables (+ J5 admin_audit_log)", () => {
     expectTypeOf<keyof PublicTables>().toEqualTypeOf<
+      | "admin_audit_log"
       | "card_states"
       | "content_flags"
       | "content_mechanisms"
@@ -31,6 +33,15 @@ describe("Database type", () => {
       | "study_sessions"
       | "subscriptions"
     >();
+  });
+
+  it("admin_audit_log row carries actor + action + target columns", () => {
+    expectTypeOf<AuditLogRow>().toHaveProperty("actor_id");
+    expectTypeOf<AuditLogRow>().toHaveProperty("action");
+    expectTypeOf<AuditLogRow>().toHaveProperty("target_type");
+    expectTypeOf<AuditLogRow>().toHaveProperty("target_id");
+    expectTypeOf<AuditLogRow>().toHaveProperty("details");
+    expectTypeOf<AuditLogRow>().toHaveProperty("created_at");
   });
 
   it("subscription_tier enum matches the migration", () => {
