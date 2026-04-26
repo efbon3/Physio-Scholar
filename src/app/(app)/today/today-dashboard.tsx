@@ -37,6 +37,13 @@ export type UpcomingGoal = {
   daysAway: number;
 };
 
+export type FacultyAssignment = {
+  id: string;
+  title: string;
+  /** ISO timestamp or null when there's no deadline. */
+  dueAt: string | null;
+};
+
 /**
  * Today tab — post-login landing dashboard.
  *
@@ -62,6 +69,7 @@ export function TodayDashboard({
   boostCardIds = [],
   upcomingGoals,
   quote,
+  assignments,
 }: {
   cards: readonly Card[];
   greetingName: string;
@@ -75,6 +83,8 @@ export function TodayDashboard({
   upcomingGoals: readonly UpcomingGoal[];
   /** Server-picked quote — refreshes on every page render. */
   quote: Quote;
+  /** Up to three faculty-assigned homework items, ordered by due_at. */
+  assignments: readonly FacultyAssignment[];
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
 
@@ -174,7 +184,7 @@ export function TodayDashboard({
       >
         <UpcomingGoalsCard goals={upcomingGoals} />
         <WeakSystemCard weakArea={data?.weakArea ?? null} />
-        <FacultyHomeworkCard />
+        <FacultyHomeworkCard assignments={assignments} />
       </section>
     </main>
   );
@@ -286,23 +296,46 @@ function WeakSystemCard({ weakArea }: { weakArea: WeakArea | null }) {
   );
 }
 
-function FacultyHomeworkCard() {
-  // Placeholder. The faculty-assigned homework feature needs its own
-  // schema (faculty_assignments table + RLS for the assigning faculty
-  // / receiving cohort) and an admin UI to create the assignments.
-  // Until that lands, the card explains what it'll show so the dashboard
-  // shape is final and the data-fill is the only thing missing.
+function FacultyHomeworkCard({ assignments }: { assignments: readonly FacultyAssignment[] }) {
+  if (assignments.length === 0) {
+    return (
+      <article
+        aria-label="Faculty homework"
+        className="border-input flex flex-col gap-2 rounded-md border p-4"
+      >
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">Faculty homework</p>
+        <p className="font-heading text-base font-medium">No homework assigned.</p>
+        <p className="text-muted-foreground text-xs">
+          When a faculty member assigns reading or a task, it&apos;ll show up here.
+        </p>
+      </article>
+    );
+  }
   return (
     <article
       aria-label="Faculty homework"
       className="border-input flex flex-col gap-2 rounded-md border p-4"
     >
       <p className="text-muted-foreground text-xs tracking-widest uppercase">Faculty homework</p>
-      <p className="font-heading text-base font-medium">No homework assigned yet.</p>
-      <p className="text-muted-foreground text-xs">
-        When a faculty member assigns reading or a task, it&apos;ll show up here so you don&apos;t
-        miss it.
-      </p>
+      <ul className="flex flex-col gap-2">
+        {assignments.map((a) => (
+          <li key={a.id} className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">{a.title}</span>
+            <span className="text-muted-foreground text-xs">{formatAssignmentDue(a.dueAt)}</span>
+          </li>
+        ))}
+      </ul>
     </article>
   );
+}
+
+function formatAssignmentDue(dueAt: string | null): string {
+  if (!dueAt) return "No deadline";
+  const due = new Date(dueAt);
+  if (!Number.isFinite(due.getTime())) return dueAt;
+  const now = Date.now();
+  const diffDays = Math.ceil((due.getTime() - now) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return `Due today (${due.toISOString().slice(0, 10)})`;
+  if (diffDays === 1) return `Due tomorrow (${due.toISOString().slice(0, 10)})`;
+  return `Due in ${diffDays} days (${due.toISOString().slice(0, 10)})`;
 }
