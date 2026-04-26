@@ -61,8 +61,16 @@ export async function updateSession(request: NextRequest) {
 }
 
 /**
- * Route prefixes that require a signed-in user. Everything else (landing page,
- * auth pages, public assets) is open.
+ * Route prefixes that require a signed-in user. Everything else (landing
+ * page, auth pages, public assets) is open.
+ *
+ * Keep this list in sync with the `(app)` route group in `src/app/(app)/`
+ * — the (app) layout's `requireApprovedUser()` returns silently for
+ * anonymous users (it expects middleware to have already redirected
+ * them), so any (app)-group route that isn't listed here is reachable
+ * by an anonymous visitor. /complete-profile and /pending-approval are
+ * deliberately NOT here because they need to be reachable by signed-in
+ * users who are mid-onboarding.
  */
 const PROTECTED_PREFIXES = [
   "/app",
@@ -75,4 +83,10 @@ const PROTECTED_PREFIXES = [
   "/admin",
   "/profile",
   "/calendar",
+  "/facts",
+  "/values",
+  "/self-test",
+  "/topics",
+  "/settings",
+  "/update-password",
 ] as const;
