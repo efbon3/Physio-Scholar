@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,6 @@ import {
   type RequestedRole,
 } from "@/lib/auth/requested-role";
 
-import { GoogleSignInButton } from "../google-sign-in-button";
 import { signUpAction } from "./actions";
 
 type PageProps = { searchParams: Promise<{ error?: string; role?: string }> };
@@ -25,24 +24,8 @@ export default async function SignupPage({ searchParams }: PageProps) {
     <Card>
       <CardHeader>
         <h1 className="font-heading text-2xl font-medium">Request access</h1>
-        <CardDescription>
-          Physio-Scholar is open to enrolled MBBS students. Sign up here, complete your profile on
-          the next page, and an admin will verify and approve you before you can start studying.
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex flex-col gap-3">
-          <GoogleSignInButton />
-          <p className="text-muted-foreground text-xs">
-            Signing in with Google counts as accepting our Terms of Service and Privacy Policy — the
-            same as ticking both boxes below.
-          </p>
-          <div className="text-muted-foreground flex items-center gap-3 text-xs">
-            <span className="bg-border h-px flex-1" aria-hidden />
-            <span>or sign up with email</span>
-            <span className="bg-border h-px flex-1" aria-hidden />
-          </div>
-        </div>
         <form
           action={async (formData) => {
             "use server";
@@ -119,14 +102,6 @@ export default async function SignupPage({ searchParams }: PageProps) {
                   Privacy Policy
                 </Link>
                 , including the DPDPA notices.
-              </span>
-            </label>
-
-            <label className="flex gap-3 text-sm">
-              <Checkbox id="consent_analytics" name="consent_analytics" />
-              <span>
-                (Optional) Allow anonymous product analytics to help improve the app. You can change
-                this anytime in Settings.
               </span>
             </label>
           </fieldset>
