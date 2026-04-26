@@ -29,6 +29,15 @@ export type MechanismLayers = {
    * `# Questions`; mechanisms can have one, the other, both, or neither.
    */
   facts?: string;
+  /**
+   * Optional `# Values` section — numeric quantity recall items
+   * (cardiac output, stroke volume, ranges, etc). Parsed by
+   * extractValues() in src/lib/content/values.ts. Authored separately
+   * from `# Facts` even though there's overlap with the
+   * "normal-value" fact category — values are a dedicated module
+   * surfaced at /values for focused numeric drill.
+   */
+  values?: string;
   sources?: string;
 };
 
@@ -77,6 +86,7 @@ const LAYER_HEADINGS = {
   ),
   questions: /^#\s+Questions\s*$/i,
   facts: /^#\s+Facts\s*$/i,
+  values: /^#\s+Values\s*$/i,
   sources: /^#\s+Sources\s*$/i,
 } as const;
 
