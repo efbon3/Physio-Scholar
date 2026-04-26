@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { signOutAction } from "@/app/(auth)/login/actions";
 import { Button } from "@/components/ui/button";
+import { parseRequestedRole, requestedRoleLabel } from "@/lib/auth/requested-role";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -39,7 +40,7 @@ export default async function PendingApprovalPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "approved_at, is_admin, full_name, nickname, phone, college_name, roll_number, profile_completed_at",
+      "approved_at, is_admin, full_name, nickname, phone, college_name, roll_number, profile_completed_at, requested_role",
     )
     .eq("id", user.id)
     .single();
@@ -76,6 +77,10 @@ export default async function PendingApprovalPage() {
         <DetailRow label="Mobile" value={profile?.phone ?? "(not set)"} />
         <DetailRow label="College" value={profile?.college_name ?? "(not set)"} />
         <DetailRow label="Roll number" value={profile?.roll_number ?? "(not set)"} />
+        <DetailRow
+          label="Signed up as"
+          value={requestedRoleLabel(parseRequestedRole(profile?.requested_role))}
+        />
       </section>
 
       <p className="text-muted-foreground text-xs">
