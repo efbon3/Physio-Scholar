@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import {
   computeFinalScore,
+  formatScoreOutOfTen,
   hintPenaltyFor,
   scoreToSrsRating,
   selfTestRating,
@@ -245,7 +246,7 @@ export function SelfTestSession({
                 disabled={!canShowHint}
               >
                 {current.hintsShown === 0
-                  ? "Show hint (-20 points)"
+                  ? "Show hint (-2 points)"
                   : canShowHint
                     ? `Next hint (${current.hintsShown}/${totalHints})`
                     : `All hints shown (${totalHints}/${totalHints})`}
@@ -256,8 +257,9 @@ export function SelfTestSession({
             </Button>
           </div>
           <p className="text-muted-foreground text-xs">
-            Each hint after the first costs less: 1 hint = -20 points, 2 hints = -30 points, 3 hints
-            = -40 points (deducted from your self-graded score at the end). The minimum score is 0.
+            Hint penalties (deducted from your self-graded score at the end): 1 hint = -2 points, 2
+            hints = -3 points, 3 hints = -4 points. Each additional hint costs less. Minimum score
+            is 0 / 10.
           </p>
         </section>
 
@@ -342,7 +344,8 @@ export function SelfTestSession({
                       >
                         <span>{SELF_GRADE_LABELS[g]}</span>
                         <span className="text-muted-foreground text-[10px]">
-                          {SELF_GRADE_BASE_POINTS[g]} → {finalScore}
+                          {formatScoreOutOfTen(SELF_GRADE_BASE_POINTS[g])} →{" "}
+                          {formatScoreOutOfTen(finalScore)} / 10
                         </span>
                       </button>
                     );
@@ -351,7 +354,7 @@ export function SelfTestSession({
                 {e.selfGrade !== null ? (
                   <p className="text-muted-foreground text-xs">
                     {SELF_GRADE_DESCRIPTIONS[e.selfGrade]} Final:{" "}
-                    {computeFinalScore(e.selfGrade, e.hintsShown)} / 100 → SRS{" "}
+                    {formatScoreOutOfTen(computeFinalScore(e.selfGrade, e.hintsShown))} / 10 → SRS{" "}
                     <code>{scoreToSrsRating(computeFinalScore(e.selfGrade, e.hintsShown))}</code>.
                   </p>
                 ) : null}
@@ -372,8 +375,9 @@ export function SelfTestSession({
             {totalScore.graded > 0 ? (
               <>
                 {" "}
-                · running score <span className="font-medium">{totalScore.sum}</span> /{" "}
-                {totalScore.max}
+                · running score{" "}
+                <span className="font-medium">{formatScoreOutOfTen(totalScore.sum)}</span> /{" "}
+                {formatScoreOutOfTen(totalScore.max)}
               </>
             ) : null}
           </p>
@@ -401,8 +405,8 @@ export function SelfTestSession({
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="font-heading text-2xl font-medium">Self-test complete</h1>
       <p className="text-muted-foreground text-sm">
-        You scored <span className="font-medium">{totalFinal}</span> /{" "}
-        <span className="font-medium">{max}</span> ({pct}%) across {total} card
+        You scored <span className="font-medium">{formatScoreOutOfTen(totalFinal)}</span> /{" "}
+        <span className="font-medium">{formatScoreOutOfTen(max)}</span> ({pct}%) across {total} card
         {total === 1 ? "" : "s"}. Each card has been added to your review schedule with the
         appropriate SRS rating.
       </p>

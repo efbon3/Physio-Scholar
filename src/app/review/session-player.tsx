@@ -7,11 +7,39 @@ import { estimateReviewMinutes, PreflightModal } from "@/components/preflight-mo
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import { incrementSessionCount } from "@/lib/pwa/install-state";
+import { formatScoreOutOfTen, type SelfGrade } from "@/lib/self-test/grading";
 import { loadAllCardStates, recordReviewLocally } from "@/lib/srs/local";
 import { assembleQueue, type QueuedCard } from "@/lib/srs/queue";
 import type { CardState, Rating } from "@/lib/srs/types";
 import { useAutoSync } from "@/lib/srs/useAutoSync";
 import { cn } from "@/lib/utils";
+
+/**
+ * Embed the self-grade choice + computed score alongside any typed
+ * self-explanation so a single column survives the sync to Supabase.
+ * The grader (Phase 4) can parse the structured prefix when scoring.
+ *
+ * Format:
+ *   "[grade=correct, score=10/10] my actual explanation here"
+ *
+ * If the learner skipped the self-explanation, the bracket prefix is
+ * still recorded so analytics can read it back. Returns null only
+ * when both the explanation is empty AND we'd add no metadata, which
+ * doesn't happen in practice (every grade adds metadata).
+ */
+function combineExplanationAndGrade({
+  selfExplanation,
+  grade,
+  finalScore,
+}: {
+  selfExplanation: string;
+  grade: SelfGrade;
+  finalScore: number;
+}): string | null {
+  const trimmed = selfExplanation.trim();
+  const meta = `[grade=${grade}, score=${formatScoreOutOfTen(finalScore)}/10]`;
+  return trimmed.length > 0 ? `${meta} ${trimmed}` : meta;
+}
 
 import { CardView } from "./components/card-view";
 
@@ -34,10 +62,18 @@ type ActiveCardState = {
   attempt: string;
   hintsShown: number;
   /**
+   * Has the learner submitted their attempt. Drives:
+   *   - textarea-disabled state (one-way commit; no editing after submit)
+   *   - whether the "Show answer" button is available
+   *
+   * Submit is the deliberate commit step before reveal — the author's
+   * 2026-04-26 flow change. Without it, "Show answer" doubled as both
+   * commit and reveal which was confusing.
+   */
+  submitted: boolean;
+  /**
    * Has the answer been revealed at least once for this card. Drives:
-   *   - textarea-disabled state (one-way commit, no editing the
-   *     attempt after the first reveal — that would game the recall)
-   *   - rating row visibility (you can't rate before seeing the answer)
+   *   - self-grade row visibility (you can't grade before seeing the answer)
    *   - flag-card affordance availability
    *
    * Once true, stays true for the rest of this card's display.
@@ -47,7 +83,7 @@ type ActiveCardState = {
    * Is the answer pane currently visible. Toggled by the Show / Hide
    * answer button. Independent of `revealed` so the learner can collapse
    * the pane (e.g., to re-read the stem without the answer in their
-   * peripheral) but the textarea stays disabled and the rating row
+   * peripheral) but the textarea stays disabled and the self-grade row
    * stays available.
    */
   answerVisible: boolean;
@@ -63,6 +99,7 @@ function freshCardState(): ActiveCardState {
   return {
     attempt: "",
     hintsShown: 0,
+    submitted: false,
     revealed: false,
     answerVisible: false,
     selfExplanation: "",
@@ -158,7 +195,13 @@ export function SessionPlayer({
 
   const current = queue[index];
 
-  async function handleRating(rating: Rating) {
+  // Self-grade callback. Receives the SM-2 rating already mapped from
+  // the (selfGrade, hintsUsed) pair by SelfGradeRow, plus the raw
+  // 0-100 final score and the chosen self-grade for telemetry. We
+  // persist the SM-2 rating (so the scheduler keeps working) and
+  // embed the self-grade + score in the self_explanation column for
+  // now — a future migration will split it into dedicated columns.
+  async function handleRating(rating: Rating, finalScore: number, grade: SelfGrade) {
     if (!current) return;
     const now = new Date();
     const timeSpentSeconds = Math.max(0, Math.round((now.getTime() - cardState.startedAt) / 1000));
@@ -170,7 +213,14 @@ export function SessionPlayer({
         rating,
         hintsUsed: cardState.hintsShown,
         timeSpentSeconds,
-        selfExplanation: cardState.selfExplanation,
+        // Combine the typed self-explanation (if any) with the
+        // self-grade metadata so it survives sync without a schema
+        // change. The grader can parse this back out later.
+        selfExplanation: combineExplanationAndGrade({
+          selfExplanation: cardState.selfExplanation,
+          grade,
+          finalScore,
+        }),
         now,
       });
     } catch (err) {
@@ -301,6 +351,7 @@ export function SessionPlayer({
             s.hintsShown >= current!.card.hints.length ? s : { ...s, hintsShown: s.hintsShown + 1 },
           )
         }
+        onSubmit={() => setCardState((s) => (s.submitted ? s : { ...s, submitted: true }))}
         onReveal={() =>
           setCardState((s) => ({
             ...s,
