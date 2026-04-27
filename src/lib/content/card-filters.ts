@@ -1,4 +1,4 @@
-import type { Card, DifficultyLevel, PriorityLevel } from "./cards";
+import type { Card, DifficultyLevel, PriorityLevel, QuestionFormat } from "./cards";
 
 /**
  * Pure helpers for filtering the card universe by priority and
@@ -90,4 +90,28 @@ function splitCsvParam(raw: string | string[] | undefined): string[] {
     .split(/[,\s]+/)
     .map((t) => t.trim().toLowerCase())
     .filter((t) => t.length > 0);
+}
+
+/**
+ * Drop retired questions from a card list. Test sessions and the daily
+ * SRS queue should always call this — retired questions live in the
+ * markdown for audit history, not for circulation. Admin/audit views
+ * skip this filter to surface the full lifecycle.
+ */
+export function filterPublished(cards: readonly Card[]): Card[] {
+  return cards.filter((c) => c.status === "published");
+}
+
+/**
+ * Restrict a card list to one or more formats. Used by the
+ * mechanism-page format-picker to assemble a session of just MCQs (or
+ * just descriptive, or just fill-in-the-blank). Pass an array to allow
+ * multiple formats; pass a single format for the common case.
+ */
+export function filterByFormat(
+  cards: readonly Card[],
+  format: QuestionFormat | readonly QuestionFormat[],
+): Card[] {
+  const allowed = new Set<QuestionFormat>(Array.isArray(format) ? format : [format]);
+  return cards.filter((c) => allowed.has(c.format));
 }

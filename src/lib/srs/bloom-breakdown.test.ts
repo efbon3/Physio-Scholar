@@ -11,6 +11,8 @@ function card(id: string, level: Card["blooms_level"]): Card {
     id,
     mechanism_id: id.split(":")[0],
     index: Number.parseInt(id.split(":")[1] ?? "1", 10),
+    format: "descriptive",
+    status: "published",
     type: "prediction",
     blooms_level: level,
     priority: "should",

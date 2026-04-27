@@ -15,6 +15,8 @@ function card(overrides: Partial<Card> & { id: string }): Card {
     id: overrides.id,
     mechanism_id: overrides.id.split(":")[0] ?? "frank-starling",
     index: Number.parseInt(overrides.id.split(":")[1] ?? "1", 10),
+    format: "descriptive",
+    status: "published",
     type: "mcq",
     blooms_level: "understand",
     priority: "should",

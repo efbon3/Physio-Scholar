@@ -94,6 +94,8 @@ describe("uniqueMechanisms", () => {
       id: `${mechanism}:${index}`,
       mechanism_id: mechanism,
       index,
+      format: "descriptive",
+      status: "published",
       type: "free-recall",
       blooms_level: "understand",
       priority: "should",

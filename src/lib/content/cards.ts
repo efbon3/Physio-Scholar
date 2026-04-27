@@ -19,6 +19,39 @@ export const bloomsLevelSchema = z.enum(["remember", "understand", "apply", "ana
 export type BloomsLevel = z.infer<typeof bloomsLevelSchema>;
 
 /**
+ * How a question is rendered and graded.
+ *
+ *   - mcq:         four-option multiple choice; deterministic grading;
+ *                  misconception-keyed feedback on wrong choices.
+ *   - descriptive: free-text answer; student self-rates Green/Yellow/Red
+ *                  against the model answer after a 5s reveal delay.
+ *   - fill_blank:  short answer (value, term, phrase); deterministic
+ *                  grading via acceptable_answers + tolerance + unit;
+ *                  partial-credit feedback for unit-error and near-miss.
+ *
+ * Default when omitted: "descriptive". Authored per question via
+ * `**Format:** mcq` (or `descriptive` / `fill_blank`).
+ */
+export const questionFormatSchema = z.enum(["mcq", "descriptive", "fill_blank"]);
+export type QuestionFormat = z.infer<typeof questionFormatSchema>;
+
+/**
+ * Question lifecycle.
+ *
+ *   - published: live in test sessions, contributing to SRS state.
+ *   - retired:   tombstoned — kept in markdown for audit and review
+ *                history, excluded from new test sessions. Retire is
+ *                the SRS-safe alternative to deletion when a question
+ *                is wrong, replaced, or otherwise out of circulation.
+ *                See content_production_sop.md §6.3 for the cosmetic-
+ *                vs-material edit rule that drives retirement.
+ *
+ * Default when omitted: "published".
+ */
+export const questionStatusSchema = z.enum(["published", "retired"]);
+export type QuestionStatus = z.infer<typeof questionStatusSchema>;
+
+/**
  * Pedagogic priority — how essential the question is to mastery of the
  * mechanism. Drives adaptive ordering (must-know surfaces first, then
  * should-know, then good-to-know) and curriculum-coverage analytics.
@@ -62,6 +95,18 @@ export const cardSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+:\d+$/),
   mechanism_id: z.string().min(1),
   index: z.number().int().min(1),
+  /**
+   * Stable per-question identifier intended to survive renumbering,
+   * mechanism file renames, and retire-and-replace flows. Optional
+   * during the transition from `{mechanism}:{index}` ids — once the
+   * SRS keys migrate to UUID this field becomes the canonical id.
+   * Authored per question via `**ID:** <uuid>`.
+   */
+  uuid: z.string().uuid().optional(),
+  /** Render and grading mode — see `questionFormatSchema`. Defaults to "descriptive". */
+  format: questionFormatSchema,
+  /** Lifecycle — see `questionStatusSchema`. Defaults to "published". */
+  status: questionStatusSchema,
   type: z.string().min(1),
   blooms_level: bloomsLevelSchema,
   /** Pedagogic priority — see `priorityLevelSchema`. Defaults to "should". */
@@ -81,6 +126,25 @@ export const cardSchema = z.object({
    * the mechanism frontmatter. Stored lowercased + trimmed here.
    */
   exam_patterns: z.array(z.string().min(1)),
+  /**
+   * Fill-blank only: alternative strings the grader accepts as
+   * Green-grade. Authored as `**Acceptable answers:** "form A" | "form B"`.
+   * Quotes around each variant disambiguate values containing pipes.
+   */
+  acceptable_answers: z.array(z.string().min(1)).optional(),
+  /**
+   * Fill-blank only: the expected unit (e.g. "L/min", "mmHg"). Used to
+   * separate Yellow (right value, wrong unit) from Red (wrong value).
+   * Authored as `**Unit:** L/min`.
+   */
+  unit: z.string().min(1).optional(),
+  /**
+   * Fill-blank only: numeric tolerance band as a fraction (0.05 = ±5%).
+   * Anything within tolerance is Green; outside but on the right
+   * order of magnitude is Yellow. Authored as `**Tolerance:** ±5%`
+   * or `**Tolerance:** 0.05`.
+   */
+  tolerance_pct: z.number().min(0).max(1).optional(),
 });
 export type Card = z.infer<typeof cardSchema>;
 
@@ -126,10 +190,14 @@ function parseCardBody(
   body: string,
   fallbackExamPatterns: readonly string[],
 ) {
+  const rawId = extractLabeledField(body, "ID");
   return {
     id: `${mechanismId}:${index}`,
     mechanism_id: mechanismId,
     index,
+    uuid: rawId && isUuid(rawId) ? rawId.toLowerCase() : undefined,
+    format: normaliseQuestionFormat(extractLabeledField(body, "Format")),
+    status: normaliseQuestionStatus(extractLabeledField(body, "Status")),
     type: extractLabeledField(body, "Type") ?? "unspecified",
     blooms_level: normaliseBloomsLevel(extractLabeledField(body, "Bloom's level") ?? ""),
     priority: normalisePriorityLevel(extractLabeledField(body, "Priority")),
@@ -140,7 +208,107 @@ function parseCardBody(
     hints: extractHintLadder(body),
     misconceptions: extractMisconceptions(body),
     exam_patterns: extractCardExamPatterns(body, fallbackExamPatterns),
+    acceptable_answers: extractAcceptableAnswers(body),
+    unit: extractLabeledField(body, "Unit") ?? undefined,
+    tolerance_pct: parseTolerance(extractLabeledField(body, "Tolerance")),
   };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value.trim());
+}
+
+/**
+ * Coerce a `**Format:**` value to one of the canonical tokens. Accepts
+ * a few near-synonyms ("multiple choice" → mcq, "free text" →
+ * descriptive, "fill in the blank" → fill_blank) so author phrasing
+ * doesn't break the parse. Falls back to "descriptive" when omitted —
+ * matches the pre-redesign default behaviour for legacy questions.
+ */
+function normaliseQuestionFormat(raw: string | null): QuestionFormat {
+  if (!raw) return "descriptive";
+  const lower = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (lower === "mcq" || lower === "multiple_choice" || lower === "multiple_choice_question") {
+    return "mcq";
+  }
+  if (
+    lower === "fill_blank" ||
+    lower === "fill_in_blank" ||
+    lower === "fill_in_the_blank" ||
+    lower === "fillin" ||
+    lower === "fillinblank" ||
+    lower === "fillintheblank"
+  ) {
+    return "fill_blank";
+  }
+  if (
+    lower === "descriptive" ||
+    lower === "free_text" ||
+    lower === "free_recall" ||
+    lower === "essay" ||
+    lower === "short_answer"
+  ) {
+    return "descriptive";
+  }
+  return "descriptive";
+}
+
+/**
+ * Coerce a `**Status:**` value to one of the canonical tokens. Anything
+ * not "retired" treats the question as live — failing safe by leaving
+ * the question in circulation if the status label is malformed.
+ */
+function normaliseQuestionStatus(raw: string | null): QuestionStatus {
+  if (!raw) return "published";
+  const lower = raw.trim().toLowerCase();
+  if (lower === "retired" || lower === "tombstoned") return "retired";
+  return "published";
+}
+
+/**
+ * Parse a `**Tolerance:**` value to a fraction. Accepts:
+ *   - `5%`, `±5%`, `+/-5%`  → 0.05
+ *   - `0.05`, `±0.05`        → 0.05
+ *   - `5` (bare number > 1)  → 0.05 (treated as percent)
+ * Returns undefined for unparseable input rather than throwing — keeps
+ * the question loadable; downstream graders can fall back to exact match.
+ */
+function parseTolerance(raw: string | null): number | undefined {
+  if (!raw) return undefined;
+  const cleaned = raw.replace(/[±\s]|\+\/-/g, "");
+  const pctMatch = cleaned.match(/^([\d.]+)%$/);
+  if (pctMatch) {
+    const v = Number.parseFloat(pctMatch[1]);
+    if (Number.isFinite(v)) return v / 100;
+  }
+  const numMatch = cleaned.match(/^([\d.]+)$/);
+  if (numMatch) {
+    const v = Number.parseFloat(numMatch[1]);
+    if (Number.isFinite(v)) return v <= 1 ? v : v / 100;
+  }
+  return undefined;
+}
+
+/**
+ * Parse a `**Acceptable answers:**` value. Recognises two shapes:
+ *   - quoted, pipe-separated: `"5.6 L/min" | "5.6 liters per minute"`
+ *   - bare pipe-separated:    `5.6 L/min | 5.6 liters per minute`
+ * Quoted form is preferred — it disambiguates values containing pipes.
+ */
+function extractAcceptableAnswers(body: string): string[] | undefined {
+  const raw = extractLabeledField(body, "Acceptable answers");
+  if (!raw) return undefined;
+  const quoted = [...raw.matchAll(/["“]([^"”]+)["”]/g)].map((m) => m[1].trim());
+  if (quoted.length > 0) return quoted;
+  const piped = raw
+    .split("|")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return piped.length > 0 ? piped : undefined;
 }
 
 /**

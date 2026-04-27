@@ -4,15 +4,24 @@ import type { Card, DifficultyLevel, PriorityLevel } from "./cards";
 import {
   applyCardFilters,
   encodeFilterParam,
+  filterByFormat,
+  filterPublished,
   parseDifficultyFilter,
   parsePriorityFilter,
 } from "./card-filters";
 
-function card(id: string, priority: PriorityLevel, difficulty: DifficultyLevel): Card {
+function card(
+  id: string,
+  priority: PriorityLevel,
+  difficulty: DifficultyLevel,
+  overrides: Partial<Card> = {},
+): Card {
   return {
     id,
     mechanism_id: id.split(":")[0] ?? "mech",
     index: Number.parseInt(id.split(":")[1] ?? "1", 10),
+    format: "descriptive",
+    status: "published",
     type: "recall",
     blooms_level: "understand",
     priority,
@@ -23,6 +32,7 @@ function card(id: string, priority: PriorityLevel, difficulty: DifficultyLevel):
     hints: [],
     misconceptions: [],
     exam_patterns: ["mbbs"],
+    ...overrides,
   };
 }
 
@@ -135,5 +145,59 @@ describe("encodeFilterParam", () => {
 
   it("joins values with commas", () => {
     expect(encodeFilterParam(["must", "should"])).toBe("must,should");
+  });
+});
+
+describe("filterPublished", () => {
+  it("keeps only status=published cards", () => {
+    const cards = [
+      card("a:1", "must", "standard", { status: "published" }),
+      card("a:2", "must", "standard", { status: "retired" }),
+      card("a:3", "should", "standard", { status: "published" }),
+    ];
+    expect(filterPublished(cards).map((c) => c.id)).toEqual(["a:1", "a:3"]);
+  });
+
+  it("returns an empty array when every card is retired", () => {
+    const cards = [
+      card("a:1", "must", "standard", { status: "retired" }),
+      card("a:2", "must", "standard", { status: "retired" }),
+    ];
+    expect(filterPublished(cards)).toEqual([]);
+  });
+
+  it("does not mutate the input array", () => {
+    const cards = [card("a:1", "must", "standard", { status: "retired" })];
+    const before = cards.map((c) => c.id);
+    filterPublished(cards);
+    expect(cards.map((c) => c.id)).toEqual(before);
+  });
+});
+
+describe("filterByFormat", () => {
+  const cards = [
+    card("a:1", "must", "standard", { format: "mcq" }),
+    card("a:2", "should", "standard", { format: "descriptive" }),
+    card("a:3", "good", "standard", { format: "fill_blank" }),
+    card("a:4", "must", "standard", { format: "mcq" }),
+  ];
+
+  it("filters to a single format", () => {
+    expect(filterByFormat(cards, "mcq").map((c) => c.id)).toEqual(["a:1", "a:4"]);
+    expect(filterByFormat(cards, "descriptive").map((c) => c.id)).toEqual(["a:2"]);
+    expect(filterByFormat(cards, "fill_blank").map((c) => c.id)).toEqual(["a:3"]);
+  });
+
+  it("filters to multiple formats (OR within the format axis)", () => {
+    expect(filterByFormat(cards, ["mcq", "fill_blank"]).map((c) => c.id)).toEqual([
+      "a:1",
+      "a:3",
+      "a:4",
+    ]);
+  });
+
+  it("returns an empty array when no card matches", () => {
+    const onlyDescriptive = [card("a:1", "must", "standard", { format: "descriptive" })];
+    expect(filterByFormat(onlyDescriptive, "mcq")).toEqual([]);
   });
 });

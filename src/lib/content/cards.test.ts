@@ -443,3 +443,351 @@ describe("extractCards — priority + difficulty classification", () => {
     expect(card.difficulty).toBe("advanced");
   });
 });
+
+describe("extractCards — format classification", () => {
+  it("defaults to descriptive when no Format label is given", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.format).toBe("descriptive");
+  });
+
+  it("reads explicit format labels", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Format:** mcq
+**Type:** prediction
+**Bloom's level:** apply
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 2
+**Format:** fill_blank
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 3
+**Format:** descriptive
+**Type:** comparison
+**Bloom's level:** analyze
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const cards = extractCards(mechanism);
+    expect(cards[0]!.format).toBe("mcq");
+    expect(cards[1]!.format).toBe("fill_blank");
+    expect(cards[2]!.format).toBe("descriptive");
+  });
+
+  it("accepts known format synonyms (multiple choice / fill in the blank / free text)", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Format:** Multiple Choice
+**Type:** prediction
+**Bloom's level:** apply
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 2
+**Format:** fill in the blank
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 3
+**Format:** free text
+**Type:** comparison
+**Bloom's level:** analyze
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const cards = extractCards(mechanism);
+    expect(cards[0]!.format).toBe("mcq");
+    expect(cards[1]!.format).toBe("fill_blank");
+    expect(cards[2]!.format).toBe("descriptive");
+  });
+
+  it("falls back to descriptive for unrecognised values rather than failing", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Format:** drag-and-drop
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.format).toBe("descriptive");
+  });
+});
+
+describe("extractCards — status lifecycle", () => {
+  it("defaults to published when no Status label is given", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.status).toBe("published");
+  });
+
+  it("reads an explicit Status: retired label", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Status:** retired
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.status).toBe("retired");
+  });
+
+  it("retired questions still parse — they're tombstones, not errors", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Status:** retired
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+
+## Question 2
+**Type:** prediction
+**Bloom's level:** apply
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const cards = extractCards(mechanism);
+    expect(cards).toHaveLength(2);
+    expect(cards[0]!.status).toBe("retired");
+    expect(cards[1]!.status).toBe("published");
+  });
+});
+
+describe("extractCards — uuid identity", () => {
+  it("is undefined when no ID label is given", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.uuid).toBeUndefined();
+  });
+
+  it("reads a valid UUID from the ID label", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**ID:** 8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.uuid).toBe("8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a");
+  });
+
+  it("normalises uppercase UUIDs to lowercase", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**ID:** 8F3C8E72-2A14-4C2C-8C8F-9E4A3B1D2C3A
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.uuid).toBe("8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a");
+  });
+
+  it("ignores malformed IDs and leaves uuid undefined", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**ID:** not-a-uuid
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.uuid).toBeUndefined();
+  });
+});
+
+describe("extractCards — fill-blank fields", () => {
+  it("reads quoted, pipe-separated acceptable_answers", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Format:** fill_blank
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** Normal cardiac output is approximately ____
+**Correct answer:** 5.6 L/min
+**Acceptable answers:** "5.6 L/min" | "5.6 liters per minute" | "5.6 l/min"
+**Unit:** L/min
+**Tolerance:** ±5%
+**Elaborative explanation:** e
+`),
+    );
+    const c = extractCards(mechanism)[0]!;
+    expect(c.acceptable_answers).toEqual(["5.6 L/min", "5.6 liters per minute", "5.6 l/min"]);
+    expect(c.unit).toBe("L/min");
+    expect(c.tolerance_pct).toBeCloseTo(0.05);
+  });
+
+  it("falls back to bare-pipe parsing when answers are unquoted", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Format:** fill_blank
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** Resting heart rate is ____ bpm
+**Correct answer:** 72
+**Acceptable answers:** 72 | 70 | 75
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.acceptable_answers).toEqual(["72", "70", "75"]);
+  });
+
+  it("parses tolerance from percent (with or without ±)", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Format:** fill_blank
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Tolerance:** 10%
+**Elaborative explanation:** e
+
+## Question 2
+**Format:** fill_blank
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Tolerance:** ±2.5%
+**Elaborative explanation:** e
+`),
+    );
+    const cards = extractCards(mechanism);
+    expect(cards[0]!.tolerance_pct).toBeCloseTo(0.1);
+    expect(cards[1]!.tolerance_pct).toBeCloseTo(0.025);
+  });
+
+  it("parses tolerance from a decimal fraction", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Format:** fill_blank
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Tolerance:** 0.05
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.tolerance_pct).toBeCloseTo(0.05);
+  });
+
+  it("acceptable_answers, unit, tolerance are all undefined when not authored", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Elaborative explanation:** e
+`),
+    );
+    const c = extractCards(mechanism)[0]!;
+    expect(c.acceptable_answers).toBeUndefined();
+    expect(c.unit).toBeUndefined();
+    expect(c.tolerance_pct).toBeUndefined();
+  });
+
+  it("ignores garbage tolerance strings rather than throwing", () => {
+    const mechanism = parseMechanism(
+      withBody(`# Questions
+
+## Question 1
+**Format:** fill_blank
+**Type:** recall
+**Bloom's level:** remember
+**Stem:** s
+**Correct answer:** a
+**Tolerance:** unknown
+**Elaborative explanation:** e
+`),
+    );
+    expect(extractCards(mechanism)[0]!.tolerance_pct).toBeUndefined();
+  });
+});

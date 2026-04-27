@@ -12,6 +12,8 @@ function card(id: string, index = Number.parseInt(id.split(":")[1] ?? "1", 10)):
     id,
     mechanism_id: id.split(":")[0],
     index,
+    format: "descriptive",
+    status: "published",
     type: "prediction",
     blooms_level: "apply",
     priority: "should",
