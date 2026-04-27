@@ -65,16 +65,7 @@ describe("extractValues", () => {
     expect(values[0].prompt).toBe("Valid");
   });
 
-  it("works on the real cardiac-cycle-phases mechanism (smoke test)", async () => {
-    const { readMechanismById } = await import("./fs");
-    const m = await readMechanismById("cardiac-cycle-phases");
-    expect(m).not.toBeNull();
-    if (!m) return;
-    const values = extractValues(m);
-    // Authored content has > 10 values.
-    expect(values.length).toBeGreaterThan(10);
-    expect(values.every((v) => v.id.startsWith("cardiac-cycle-phases:"))).toBe(true);
-    // Every value has a non-empty answer
-    expect(values.every((v) => v.answer.length > 0)).toBe(true);
-  });
+  // Smoke-test against a real shipped mechanism removed during the
+  // two-zone redesign content reset. Re-introduce against the new
+  // template mechanism once authored.
 });

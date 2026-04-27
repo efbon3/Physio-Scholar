@@ -82,20 +82,7 @@ describe("extractFacts", () => {
     expect(facts[0].prompt).toBe("Valid");
   });
 
-  it("works on the real cardiac-cycle-phases mechanism (smoke test)", async () => {
-    const { readMechanismById } = await import("./fs");
-    const m = await readMechanismById("cardiac-cycle-phases");
-    expect(m).not.toBeNull();
-    if (!m) return;
-    const facts = extractFacts(m);
-    // The authored content has > 20 facts across all six categories.
-    expect(facts.length).toBeGreaterThan(20);
-    const categories = new Set(facts.map((f) => f.category));
-    expect(categories).toContain("definition");
-    expect(categories).toContain("normal-value");
-    expect(categories).toContain("function");
-    expect(categories).toContain("relation");
-    expect(categories).toContain("association");
-    expect(categories).toContain("classification");
-  });
+  // Smoke-test against a real shipped mechanism removed during the
+  // two-zone redesign content reset. Re-introduce against the new
+  // template mechanism once authored.
 });

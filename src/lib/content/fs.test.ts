@@ -3,27 +3,19 @@ import { describe, expect, it } from "vitest";
 import { readMechanismById, readAllMechanisms } from "./fs";
 
 /**
- * These tests rely on the `content/mechanisms/` directory being populated
- * with at least the placeholder Frank-Starling mechanism (shipped in B4).
- * They double as a smoke test for the schema + loader + fs integration.
+ * Content was reset for the two-zone redesign (no mechanism .md files
+ * currently shipped). These tests cover the loader's empty-state and
+ * defensive-id-validation behaviour. Re-introduce a fixture-loading test
+ * once the new schema lands and a template mechanism is authored.
  */
 describe("readAllMechanisms", () => {
-  it("returns the placeholder mechanism parsed and validated", async () => {
+  it("returns an empty array when no mechanism files exist", async () => {
     const mechanisms = await readAllMechanisms();
-    expect(mechanisms.length).toBeGreaterThan(0);
-    const fs = mechanisms.find((m) => m.frontmatter.id === "frank-starling");
-    expect(fs).toBeDefined();
-    expect(fs?.frontmatter.organ_system).toBe("cardiovascular");
+    expect(mechanisms).toEqual([]);
   });
 });
 
 describe("readMechanismById", () => {
-  it("loads a known mechanism by id", async () => {
-    const m = await readMechanismById("frank-starling");
-    expect(m).not.toBeNull();
-    expect(m?.frontmatter.title).toMatch(/Frank-Starling/i);
-  });
-
   it("returns null for a non-existent id (no throw)", async () => {
     expect(await readMechanismById("does-not-exist-yet")).toBeNull();
   });

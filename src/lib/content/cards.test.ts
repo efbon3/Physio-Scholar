@@ -212,19 +212,6 @@ describe("extractCards — field edge cases", () => {
   });
 });
 
-describe("extractCards — parses the shipped placeholder", () => {
-  it("returns at least one valid Card from the real content/mechanisms/frank-starling.md via the file loader", async () => {
-    // Imports that touch fs are normally server-only; ok in tests.
-    const { readMechanismById } = await import("./fs");
-    const fs = await readMechanismById("frank-starling");
-    expect(fs).not.toBeNull();
-    const cards = extractCards(fs!);
-    expect(cards.length).toBeGreaterThanOrEqual(1);
-    expect(cards[0].id).toBe("frank-starling:1");
-    expect(cards[0].stem.length).toBeGreaterThan(20);
-  });
-});
-
 describe("extractCards — exam_patterns (Option Y)", () => {
   it("inherits the mechanism-level list when the card has no line", () => {
     const mechanism = parseMechanism(
