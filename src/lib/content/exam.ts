@@ -154,7 +154,11 @@ export function assembleExamSession({
   count: number;
   sessionSalt?: string;
 }): McqQuestion[] {
-  const eligible = filterByExamPattern(cards, pattern).filter(canRenderAsMcq);
+  // Retired questions stay in markdown for audit history but are never
+  // surfaced in a live test session — see content_production_sop.md
+  // §6.3.
+  const live = cards.filter((c) => c.status === "published");
+  const eligible = filterByExamPattern(live, pattern).filter(canRenderAsMcq);
   if (eligible.length === 0) return [];
 
   const deck = [...eligible];

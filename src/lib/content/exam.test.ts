@@ -205,4 +205,24 @@ describe("assembleExamSession", () => {
     const session = assembleExamSession({ cards: [], pattern: "mbbs", count: 10 });
     expect(session).toEqual([]);
   });
+
+  it("excludes retired cards even if they match the pattern and have misconceptions", () => {
+    const m = { wrong_answer: "wrong", description: "why" };
+    const cards = [
+      card({
+        id: "retired:1",
+        status: "retired",
+        misconceptions: [m, m, m],
+        exam_patterns: ["mbbs"],
+      }),
+      card({
+        id: "ok:1",
+        status: "published",
+        misconceptions: [m, m, m],
+        exam_patterns: ["mbbs"],
+      }),
+    ];
+    const session = assembleExamSession({ cards, pattern: "mbbs", count: 5 });
+    expect(session.map((q) => q.cardId)).toEqual(["ok:1"]);
+  });
 });
