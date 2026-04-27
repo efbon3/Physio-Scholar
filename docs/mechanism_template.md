@@ -85,23 +85,59 @@ needs them; the parser doesn't require them. Layers above 2 are extra.
 # Questions
 
 Each question must use the exact heading shape `## Question N` with N
-starting at 1 and incrementing by 1. The four bold labels (Type,
-Bloom's level, Stem, Correct answer) and the **Elaborative
-explanation:** label are required. **Priority** and **Difficulty** are
-optional (defaults: `should` / `standard`) but should be set
-explicitly on every question — they drive adaptive ordering and
-curriculum-coverage analytics. The two `###` subheadings (Hint
-Ladder, Misconception Mappings) are optional but recommended.
+starting at 1 and incrementing by 1. The required labels are **Type**,
+**Bloom's level**, **Stem**, **Correct answer**, and **Elaborative
+explanation**. Every other label is optional and has a documented
+default (see below).
 
-Priority and difficulty are independent axes:
+The two-zone redesign introduces three new per-question fields:
+
+- **Format** — how the question is rendered and graded.
+  - `mcq` — four-option multiple choice; the system grades against the
+    correct answer; misconception mappings drive distractor feedback.
+  - `descriptive` — free-text answer; student self-rates Green / Yellow /
+    Red against the model answer after a 5-second reveal delay.
+  - `fill_blank` — short answer (value, term, or phrase); the system
+    grades against `Acceptable answers` plus `Tolerance` and `Unit` for
+    Green / Yellow / Red.
+  Default when omitted: `descriptive`. Authors should declare format
+  explicitly on every published question — implicit defaults are a
+  legacy concession to pre-redesign content.
+
+- **Status** — published or retired.
+  - `published` — live in test sessions and contributing to SRS state.
+  - `retired` — tombstoned. Stays in the file (with the heading and
+    body intact) for audit and review history; excluded from new test
+    sessions. See `content_production_sop.md` §6.3 for the cosmetic-vs-
+    material edit ruleset that drives retirement.
+  Default when omitted: `published`.
+
+- **ID** — a stable per-question UUID intended to survive renumbering,
+  mechanism file renames, and retire-and-replace flows. Optional during
+  the transition from `{mechanism}:{index}` ids; once the SRS keys
+  migrate to UUID this becomes the canonical id. When present, must be
+  a valid UUID v4 (e.g. generated via `crypto.randomUUID()` or any
+  UUID generator).
+
+The six axes that always apply:
 
 - **Priority** = how essential to mastery (`must` / `should` / `good`).
-- **Difficulty** = how hard to answer correctly (`foundational` / `standard` / `advanced`).
+  Default: `should`.
+- **Difficulty** = how hard to answer correctly (`foundational` /
+  `standard` / `advanced`). Default: `standard`.
+- Priority and difficulty are independent. A "must / advanced"
+  question is legitimate — a foundational concept tested at high
+  cognitive depth.
 
-A "must / advanced" question is rare but legitimate — a foundational
-concept tested at high cognitive depth.
+The two `###` subheadings (Hint Ladder, Misconception Mappings) are
+optional but recommended. Misconception Mappings is the join key for
+MCQ distractor coaching — every plausible wrong answer a student
+might select should have a corresponding entry.
 
 ## Question 1
+**ID:** 8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a
+**Format:** descriptive
+**Status:** published
 **Type:** comparison
 **Bloom's level:** understand
 **Priority:** must
@@ -136,19 +172,78 @@ on the post-drill review screen during exam mode.
 -->
 
 ## Question 2
+**ID:** 2c91f4d6-4f8e-4a2b-9d3a-1e8b6c5f2d4a
+**Format:** mcq
+**Status:** published
 **Type:** prediction
 **Bloom's level:** apply
 **Priority:** should
 **Difficulty:** standard
-**Stem:** ...
-**Correct answer:** ...
+**Stem:** Stem of an MCQ. Three of the misconception entries below
+become the wrong-option distractors at render time, paired with the
+correct answer; selecting a misconception-keyed wrong option fires the
+matching feedback.
+**Correct answer:** The single right option, written exactly as it
+should appear.
 **Elaborative explanation:** ...
 
-### Hint Ladder
-1. ...
-2. ...
-3. ...
-
 ### Misconception Mappings
-- Wrong answer: "..." -> Misconception: ...
-- Wrong answer: "..." -> Misconception: ...
+- Wrong answer: "Distractor A" -> Misconception: ...
+- Wrong answer: "Distractor B" -> Misconception: ...
+- Wrong answer: "Distractor C" -> Misconception: ...
+
+## Question 3
+**ID:** a1b2c3d4-e5f6-4789-9abc-def012345678
+**Format:** fill_blank
+**Status:** published
+**Type:** recall
+**Bloom's level:** remember
+**Priority:** must
+**Difficulty:** foundational
+**Stem:** Stem with a blank to fill — typically a single value, term,
+or short phrase. Phrasing examples: "Normal resting cardiac output is
+approximately ____ L/min." or "The neurotransmitter at the
+neuromuscular junction is ______."
+**Correct answer:** The canonical answer — preferably the exact form a
+graded student answer would match against first.
+**Acceptable answers:** "primary form" | "alternative form 1" | "alternative form 2"
+**Unit:** L/min
+**Tolerance:** ±5%
+**Elaborative explanation:** ...
+
+<!--
+  Acceptable answers, Unit, and Tolerance only apply when Format is
+  fill_blank. The grader treats them like this:
+
+    Green: student answer matches an Acceptable answer exactly (case-
+           insensitive, whitespace-trimmed) OR — if numeric — falls
+           within ±Tolerance of the Correct answer.
+    Yellow: numerically close but on the wrong side of Tolerance, OR
+            right value but wrong Unit.
+    Red:    everything else.
+
+  Quote each Acceptable answer separately with `"..."` and pipe-
+  separate them. Quotes disambiguate values that themselves contain
+  pipes ("|"). Bare `a | b | c` parses too, but quoting is the
+  recommended form.
+-->
+
+## Question 4 [retired]
+**ID:** retired-uuid-stays-the-same-here-90a
+**Format:** mcq
+**Status:** retired
+**Type:** prediction
+**Bloom's level:** apply
+**Stem:** [Original stem stays in the file for audit history. The
+question is no longer surfaced in test sessions because Status is
+retired.]
+**Correct answer:** [Original answer stays.]
+**Elaborative explanation:** [Original explanation stays.]
+
+<!--
+  Retirement preserves all student review history against this UUID.
+  See content_production_sop.md §6.3 — material edits (anything that
+  changes what the question means) retire the existing question and
+  add a new one with a fresh UUID, rather than editing in place. Never
+  renumber surrounding questions to fill the gap.
+-->

@@ -30,6 +30,49 @@ requires (`- Wrong answer: "..." -> Misconception: ...`). Either ASCII
 
 ---
 
+## Choosing a Format
+
+The two-zone redesign exposes three rendering and grading formats. Pick
+one per question; banks are scoped by format on the mechanism page (a
+student picking "MCQ" sees only `format: mcq` questions for that
+mechanism, etc.).
+
+- **`mcq`** — four-option multiple choice. The system renders the
+  `Correct answer` plus three distractors drawn from
+  `Misconception Mappings`, scrambles them, and grades the student
+  selection. Selecting a misconception-keyed wrong option fires the
+  matching coaching string. Use for: anything where the wrong answers
+  are more interesting than the right one (misconception-targeted,
+  comparison, prediction). Best when at least three plausible
+  distractors exist; otherwise pick descriptive instead.
+
+- **`descriptive`** — free-text answer. The student types their
+  answer, then sees the model `Correct answer` and `Elaborative
+  explanation`. After a 5-second minimum reveal delay, the student
+  self-rates Green / Yellow / Red. The system does not grade the text.
+  Use for: explanation, comparison, mechanism chain ordering, and any
+  question where the value is in the student articulating something —
+  not in checking a single canonical string.
+
+- **`fill_blank`** — short answer (a number, term, or phrase). The
+  system grades against `Acceptable answers` plus `Tolerance` and
+  `Unit`. Use for: numeric recall (normal values), single-term recall
+  (neurotransmitter at the NMJ), or anything where the right answer
+  is short and substitution-worthy. Provide a generous
+  `Acceptable answers` list so a student writing the right thing
+  in a different shape is graded Green, not Red.
+
+Format goes on every question as `**Format:** mcq` (or `descriptive`
+or `fill_blank`). When the field is omitted, the parser defaults to
+`descriptive` — but author-discipline is to declare it explicitly.
+
+The eight question-type templates below all default to descriptive.
+The fill-blank-specific template (§9) shows the additional fields. To
+adapt one of the descriptive templates into an MCQ, add
+`**Format:** mcq` and ensure at least three Misconception Mappings.
+
+---
+
 ## 1. `recall` — direct retrieval
 
 Use for foundational facts that the learner needs at fingertip speed.
@@ -254,3 +297,66 @@ contributing mechanisms, and explain how they interact. Bloom's level:
 - Wrong answer: "Both drugs damage the kidney directly" -> Misconception: Neither drug is directly nephrotoxic in usual doses. The injury is haemodynamic — collapse of the dual regulatory system that maintains glomerular pressure.
 - Wrong answer: "ACE inhibitors and NSAIDs act on the same arteriole" -> Misconception: They act on opposite arterioles (ACE inhibitor on efferent, NSAID on afferent). That's why the combination is uniquely dangerous — it removes both safety margins.
 ```
+
+---
+
+## 9. `fill_blank` — short answer with deterministic grading
+
+Use for numeric recall (normal values, ranges), single-term recall
+(named structures, neurotransmitters), or any question where the right
+answer is short enough that the system can compare strings directly.
+Bloom's level: usually **remember** or **understand**.
+
+Three new fields turn this from a guess into a grade:
+
+- **Acceptable answers**: a pipe-separated, quoted list of every
+  surface form the grader treats as correct (Green). Include casing,
+  abbreviations, and unit variations students might reasonably write.
+- **Unit**: the canonical unit. Only matters when the answer is
+  numeric. The grader uses this to separate "right value, wrong unit"
+  (Yellow) from "wrong value" (Red).
+- **Tolerance**: numeric grading window as a fraction (`0.05` = ±5%)
+  or a percent (`5%`, `±5%`). Anything inside is Green; outside but
+  within an order of magnitude is Yellow; further out is Red. Omit
+  Tolerance for non-numeric answers — string-match-only grading.
+
+```markdown
+## Question N
+**Format:** fill_blank
+**Type:** recall
+**Bloom's level:** remember
+**Priority:** must
+**Difficulty:** foundational
+**Stem:** Normal resting cardiac output of a healthy adult is approximately ____ L/min.
+**Correct answer:** 5 L/min
+**Acceptable answers:** "5 L/min" | "5 l/min" | "5 liters per minute" | "5 litres per minute" | "5"
+**Unit:** L/min
+**Tolerance:** ±10%
+**Elaborative explanation:** Cardiac output = stroke volume × heart rate. At rest, a typical adult has SV ≈ 70 mL and HR ≈ 70 bpm, giving CO ≈ 4.9 L/min. The 4.5–6 L/min range reflects normal between-individual variation; this is the anchor every CO-related comparison rests on.
+
+### Hint Ladder
+1. CO = SV × HR. Both values are familiar.
+2. Stroke volume at rest is roughly 70 mL; heart rate is roughly 70 bpm.
+3. The product is in mL/min — convert to L/min.
+
+### Misconception Mappings
+- Wrong answer: "5000 mL/min" -> Misconception: Numerically equivalent but written in mL — the system grades this Yellow (right value, wrong unit). The convention for cardiac output is L/min, not mL/min.
+- Wrong answer: "1 L/min" -> Misconception: This is closer to renal blood flow alone (~20% of CO). Whole-body CO is much higher.
+```
+
+<!--
+  Tolerance interpretation (parser):
+    "5%"   → 0.05
+    "±5%"  → 0.05
+    "0.05" → 0.05
+    "5"    → 0.05  (bare numbers > 1 are treated as percent)
+
+  Acceptable answers parsing:
+    "5 L/min" | "5 l/min" | "5"          ← preferred; quotes disambiguate
+    5 L/min | 5 l/min | 5                ← fallback parser; works but noisy
+
+  String matching is case-insensitive and trims whitespace. The first
+  Acceptable answer is the one the elaborative-explanation screen
+  shows back to the student as the canonical form, so put the most
+  pedagogically clean version first.
+-->

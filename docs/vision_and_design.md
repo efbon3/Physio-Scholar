@@ -190,6 +190,8 @@ Every rating logged with context: timestamp, time-to-rate, hints used, confidenc
 
 ### 2.7 Self-Explanation Grading Rubric
 
+> **v1 scope note.** AI-graded self-explanations are deferred to v2. v1 ships with format-determined grading: deterministic for MCQ and fill-in-the-blank, student-self-rated for descriptive against the model answer with a 5-second forced-reveal delay. The Green/Yellow/Red rubric below is the long-term target the AI grader will be calibrated against; it also describes how a student should self-rate descriptive answers in v1. See `build_spec.md` §2.6 for the v1 implementation.
+
 The AI grading of self-explanations operates on a three-tier rubric:
 
 **Green — Well explained.**
@@ -207,11 +209,11 @@ The AI grading of self-explanations operates on a three-tier rubric:
 - Flagged misconception present.
 - Mechanism fundamentally misidentified.
 
-**False-positive budget.** False positives (wrong explanations marked Green) are pedagogically worse than false negatives (correct explanations marked Yellow). The grading must keep false-positive rate below 5% in testing. This is verified before launch against a test set of at least 200 sample responses, with faculty-adjudicated gold labels.
+**False-positive budget.** False positives (wrong explanations marked Green) are pedagogically worse than false negatives (correct explanations marked Yellow). The grading must keep false-positive rate below 5% in testing. This is verified before launch against a test set of at least 200 sample responses, with faculty-adjudicated gold labels. *(v2.)*
 
-**Language robustness.** Grading prompts tested against Hinglish, Indian medical abbreviations, and varied English proficiency levels. The grader accepts natural code-switching and common abbreviations. Test set includes deliberately varied linguistic samples.
+**Language robustness.** Grading prompts tested against Hinglish, Indian medical abbreviations, and varied English proficiency levels. The grader accepts natural code-switching and common abbreviations. Test set includes deliberately varied linguistic samples. *(v2.)*
 
-**Student dispute mechanism.** When a student disagrees with a grade, they can flag it for review. In the initial pilot, the author reviews flagged grades directly. In future versions with multiple faculty, flagged grades route to the appropriate reviewer. Dispute rate is tracked as a quality signal.
+**Student dispute mechanism.** When a student disagrees with an AI grade, they can flag it for review. In the initial AI-grading pilot, the author reviews flagged grades directly. In future versions with multiple faculty, flagged grades route to the appropriate reviewer. Dispute rate is tracked as a quality signal. *(v2 — there are no AI grades to dispute in v1.)*
 
 ### 2.8 Question Design Philosophy
 
