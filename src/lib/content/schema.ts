@@ -19,6 +19,7 @@ import { z } from "zod";
  * canonical list changes.
  */
 export const organSystemSchema = z.enum([
+  "general",
   "cardiovascular",
   "respiratory",
   "renal",
@@ -30,6 +31,8 @@ export const organSystemSchema = z.enum([
   "blood",
   "immune",
   "integumentary",
+  "special-senses",
+  "integrated",
 ]);
 export type OrganSystem = z.infer<typeof organSystemSchema>;
 
@@ -80,7 +83,10 @@ export const mechanismFrontmatterSchema = z.object({
   id: mechanismIdSchema,
   title: z.string().min(1),
   organ_system: organSystemSchema,
-  nmc_competencies: z.array(nmcCompetencyCodeSchema).min(1),
+  // Optional with empty default — Phase 0 author-generated drafts ship
+  // without competency codes (the official NMC list isn't bundled with
+  // the repo). Reviewers add codes during the gold-standard pass.
+  nmc_competencies: z.array(nmcCompetencyCodeSchema).default([]),
   exam_patterns: z.array(z.string().min(1)).min(1),
   prerequisites: z.array(mechanismIdSchema),
   related_mechanisms: z.array(mechanismIdSchema),

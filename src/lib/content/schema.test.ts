@@ -94,10 +94,17 @@ describe("mechanismFrontmatterSchema", () => {
     ).toThrow();
   });
 
-  it("requires at least one NMC competency", () => {
+  it("accepts an empty NMC competencies array (drafts ship without codes)", () => {
     expect(() =>
       mechanismFrontmatterSchema.parse({ ...validFrontmatter, nmc_competencies: [] }),
-    ).toThrow();
+    ).not.toThrow();
+  });
+
+  it("defaults to empty NMC competencies when the field is omitted", () => {
+    const { nmc_competencies: _omit, ...rest } = validFrontmatter;
+    void _omit;
+    const parsed = mechanismFrontmatterSchema.parse(rest);
+    expect(parsed.nmc_competencies).toEqual([]);
   });
 
   it("requires at least one exam pattern", () => {
