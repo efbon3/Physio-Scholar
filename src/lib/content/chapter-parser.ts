@@ -259,18 +259,30 @@ function stripFinalSummary(raw: string): string {
 
 /**
  * Transform a single `QUESTION N` block into a `## Question N`
- * block with bold-labeled fields, a `### Hint Ladder`, and a
- * `### Misconception Mappings` section. Returns null if the block
- * doesn't begin with a recognisable QUESTION heading (e.g. the
- * `## Pass N` block on its own without a question).
+ * block with bold-labeled fields. Detects the shape and dispatches:
+ *   - `Canonical answer:` present → fill-blank
+ *   - otherwise (`Correct answer:` + `Distractors:`) → MCQ
+ *
+ * Returns null if the block doesn't begin with a recognisable
+ * QUESTION heading (e.g. a `## Pass N` block on its own).
  */
 function transformQuestionBlock(block: string): string | null {
   const headingMatch = block.match(/^QUESTION\s+(\d+)\s*$/im);
   if (!headingMatch) return null;
   const number = headingMatch[1];
+  if (/^Canonical answer:/im.test(block)) {
+    return transformFillBlankBlock(block, number);
+  }
+  return transformMcqBlock(block, number);
+}
 
+/**
+ * Common shared bits: Type, Bloom's, Priority, Difficulty, Stem,
+ * Hints. Returned as a partial line list ready to be appended to in
+ * each format-specific transformer.
+ */
+function buildCommonHeader(block: string, number: string): string[] {
   const get = (label: string): string | null => extractLineField(block, label);
-
   const type = get("Type");
   const blooms = get("Bloom's level") ?? get("Bloom's Level");
   // Priority and Difficulty live on the question block in two
@@ -286,21 +298,29 @@ function transformQuestionBlock(block: string): string | null {
   const difficulty = mapDifficultyShorthand(
     get("Difficulty (F / I / A)") ?? get("Difficulty (F/I/A)") ?? get("Difficulty"),
   );
+  const lines: string[] = [];
+  lines.push(`## Question ${number}`);
+  lines.push(`**Status:** published`);
+  if (type) lines.push(`**Type:** ${type}`);
+  if (blooms) lines.push(`**Bloom's level:** ${blooms}`);
+  if (priority) lines.push(`**Priority:** ${priority}`);
+  if (difficulty) lines.push(`**Difficulty:** ${difficulty}`);
+  return lines;
+}
+
+function transformMcqBlock(block: string, number: string): string {
+  const lines = buildCommonHeader(block, number);
+  // Insert `**Format:**` after the shared header but before the
+  // status-prefixed lines for readability — the platform tolerates
+  // any order, but author-shaped output is easier to skim.
+  lines.splice(1, 0, `**Format:** mcq`);
+
   const stem = extractMultilineField(block, "Stem");
   const correct = extractMultilineField(block, "Correct answer");
   const explanation = extractMultilineField(block, "Explanation");
   const distractors = extractListField(block, "Distractors");
   const hints = extractListField(block, "Hints");
 
-  // Build the platform-shaped block.
-  const lines: string[] = [];
-  lines.push(`## Question ${number}`);
-  lines.push(`**Format:** mcq`);
-  lines.push(`**Status:** published`);
-  if (type) lines.push(`**Type:** ${type}`);
-  if (blooms) lines.push(`**Bloom's level:** ${blooms}`);
-  if (priority) lines.push(`**Priority:** ${priority}`);
-  if (difficulty) lines.push(`**Difficulty:** ${difficulty}`);
   if (stem) lines.push(`**Stem:** ${stem}`);
   if (correct) lines.push(`**Correct answer:** ${correct}`);
   if (explanation) lines.push(`**Elaborative explanation:** ${explanation}`);
@@ -323,6 +343,115 @@ function transformQuestionBlock(block: string): string | null {
   return lines.join("\n");
 }
 
+function transformFillBlankBlock(block: string, number: string): string {
+  const lines = buildCommonHeader(block, number);
+  lines.splice(1, 0, `**Format:** fill_blank`);
+
+  const stem = extractMultilineField(block, "Stem");
+  const canonical = extractMultilineField(block, "Canonical answer");
+  const explanation = extractMultilineField(block, "Explanation");
+  const variants = extractListField(block, "Accepted variants");
+  const hints = extractListField(block, "Hints");
+  const toleranceRaw = extractLineField(block, "Tolerance");
+  const tolerance = formatToleranceForChapter(canonical, toleranceRaw);
+  const unit = inferUnit(canonical);
+
+  if (stem) lines.push(`**Stem:** ${stem}`);
+  if (canonical) lines.push(`**Correct answer:** ${canonical}`);
+  // Acceptable answers: pipe-separated, each variant quoted to allow
+  // pipes inside values. Filter out the canonical form duplicated as
+  // a variant — cards.ts's grader already accepts the canonical, and
+  // duplicating it just adds noise.
+  if (variants.length > 0) {
+    const filtered = variants.filter((v) => v !== canonical);
+    if (filtered.length > 0) {
+      lines.push(`**Acceptable answers:** ${filtered.map((v) => `"${v}"`).join(" | ")}`);
+    }
+  }
+  if (unit) lines.push(`**Unit:** ${unit}`);
+  if (tolerance) lines.push(`**Tolerance:** ${tolerance}`);
+  if (explanation) lines.push(`**Elaborative explanation:** ${explanation}`);
+
+  if (hints.length > 0) {
+    lines.push("");
+    lines.push("### Hint Ladder");
+    hints.forEach((h, i) => lines.push(`${i + 1}. ${h}`));
+  }
+
+  // Yellow conditions are intentionally dropped — the platform's
+  // grader (`gradeFillBlank`) computes Yellow algorithmically (right
+  // value/wrong unit, near-tolerance miss). Per-question authored
+  // Yellow feedback messages can be re-introduced when there's
+  // evidence the algorithmic version is too generic.
+  return lines.join("\n");
+}
+
+/**
+ * Convert a chapter-format Tolerance string into the percent form the
+ * platform's grader expects. Three cases:
+ *   - "not applicable" / "n/a" → null (no tolerance, exact match)
+ *   - "±5%" / "5%" → emitted as "±5%"
+ *   - absolute (e.g., "±10 percentage points", "±0.5 °C", "±5 mmol/L")
+ *     → converted to percent of the canonical answer's numeric value
+ *
+ * The grader interprets `tolerance_pct` as a fraction of the
+ * canonical's numeric value, so absolute → percent conversion
+ * preserves the author's intended grading window. Returns null if
+ * either value lacks a numeric component to anchor the conversion.
+ */
+export function formatToleranceForChapter(
+  canonicalRaw: string | null,
+  toleranceRaw: string | null,
+): string | null {
+  if (!toleranceRaw) return null;
+  const lower = toleranceRaw.trim().toLowerCase();
+  if (lower.length === 0) return null;
+  if (lower.startsWith("not applicable") || lower === "n/a" || lower === "na") {
+    return null;
+  }
+  // Match the first numeric token plus an optional trailing % so we
+  // can tell "±5%" (already a percent) from "±10 percentage points
+  // (range 50–70%)" (absolute, where the trailing % is just prose).
+  const tolMatch = toleranceRaw.match(/([\d.]+)(%?)/);
+  if (!tolMatch) return null;
+  const tolNum = Number.parseFloat(tolMatch[1]);
+  if (!Number.isFinite(tolNum)) return null;
+  // Already a percent — pass through.
+  if (tolMatch[2] === "%") return `±${tolNum}%`;
+  // Absolute → convert to percent using the canonical's numeric value.
+  if (!canonicalRaw) return null;
+  const canMatch = canonicalRaw.match(/[\d.]+/);
+  if (!canMatch) return null;
+  const canNum = Number.parseFloat(canMatch[0]);
+  if (!Number.isFinite(canNum) || canNum === 0) return null;
+  const pct = (tolNum / Math.abs(canNum)) * 100;
+  // Two decimal places keeps the emitted value readable while
+  // preserving enough resolution for clinically narrow windows
+  // (pH 7.4 ± 0.05 → 0.68%, not 1%).
+  return `±${pct.toFixed(2)}%`;
+}
+
+/**
+ * Pull the unit string out of a canonical answer like "5.6 L/min" or
+ * "37.0 °C". Returns null when the answer is purely numeric or
+ * categorical ("two-thirds", "homeostasis"). Only the trailing unit
+ * tokens are extracted — the leading numeric portion is dropped.
+ */
+function inferUnit(canonicalRaw: string | null): string | null {
+  if (!canonicalRaw) return null;
+  // Match: optional sign, digits with optional decimal, a separator,
+  // then the unit token (letters, slashes, °, µ, % allowed inside).
+  const m = canonicalRaw.match(/^\s*[−\-+]?[\d.]+\s+([^\s].*?)\s*$/);
+  if (!m) return null;
+  const unit = m[1].trim();
+  // Skip purely-parenthetical "(textbook range)" type tails.
+  if (unit.startsWith("(")) return null;
+  // Skip prose that snuck through (e.g. "to physiology"); a unit is
+  // typically a short token.
+  if (unit.length > 16 || /\s/.test(unit)) return null;
+  return unit;
+}
+
 /**
  * Pull a single-line `Label: value` from a question block.
  * Single-line fields are: Type, Bloom's level.
@@ -336,14 +465,18 @@ function extractLineField(block: string, label: string): string | null {
 
 /**
  * Pull a possibly-multiline `Label: value` from a question block.
- * Multiline fields are: Stem, Correct answer, Explanation. The value
- * runs until the next `Label:` line, blank line, or end of block.
+ * Multiline fields are: Stem, Correct answer, Canonical answer,
+ * Explanation. The value runs until the next known `Label:` line or
+ * end of block. The stop list includes both MCQ-shape labels
+ * (Correct answer, Distractors) and fill-blank-shape labels (Canonical
+ * answer, Accepted variants, Tolerance, Yellow conditions) so that
+ * `Stem:` extracted from a fill-blank block doesn't run into the
+ * `Canonical answer:` line that follows.
  */
 function extractMultilineField(block: string, label: string): string | null {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // Match: ^Label: ... up to next Label: line OR Distractors:/Hints:/Explanation: section OR end.
   const re = new RegExp(
-    `^${escaped}:\\s*([\\s\\S]+?)(?=\\n\\s*(?:Type|Bloom's level|Bloom's Level|Stem|Correct answer|Distractors|Explanation|Hints):|$)`,
+    `^${escaped}:\\s*([\\s\\S]+?)(?=\\n\\s*(?:Type|Bloom's level|Bloom's Level|Stem|Correct answer|Canonical answer|Accepted variants|Tolerance|Yellow conditions|Distractors|Explanation|Hints):|$)`,
     "im",
   );
   const m = block.match(re);

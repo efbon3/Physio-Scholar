@@ -4,6 +4,7 @@ import { extractCards } from "./cards";
 import {
   chapterToMechanism,
   deriveChapterId,
+  formatToleranceForChapter,
   isChapterFrontmatter,
   mapPartToOrganSystem,
   parseDistractorLine,
@@ -344,6 +345,177 @@ describe("chapterToMechanism — shipped chapter file", () => {
     // Q1 specifically authored as F (foundational) / S (should).
     expect(cards[0].priority).toBe("should");
     expect(cards[0].difficulty).toBe("foundational");
+  });
+});
+
+describe("formatToleranceForChapter", () => {
+  it("returns null for not-applicable / categorical answers", () => {
+    expect(formatToleranceForChapter("homeostasis", "not applicable")).toBeNull();
+    expect(formatToleranceForChapter("two-thirds", "not applicable (categorical)")).toBeNull();
+    expect(formatToleranceForChapter("60%", null)).toBeNull();
+    expect(formatToleranceForChapter("60%", "")).toBeNull();
+  });
+
+  it("passes percent tolerances through unchanged", () => {
+    expect(formatToleranceForChapter("5.6 L/min", "±5%")).toBe("±5%");
+    expect(formatToleranceForChapter("60%", "5%")).toBe("±5%");
+  });
+
+  it("converts absolute tolerance to a percent of the canonical value", () => {
+    // Q1: 60% ± 10pp → 16.67% of 60
+    expect(formatToleranceForChapter("60%", "±10 percentage points")).toBe("±16.67%");
+    // Q7: 7.4 ± 0.05 → 0.68% of 7.4
+    expect(formatToleranceForChapter("7.4", "±0.05")).toBe("±0.68%");
+    // Q9: 142 mmol/L ± 5 mmol/L → 3.52% of 142
+    expect(formatToleranceForChapter("142 mmol/L", "±5 mmol/L")).toBe("±3.52%");
+    // Q12: 37.0 °C ± 0.5 °C → 1.35% of 37
+    expect(formatToleranceForChapter("37.0 °C", "±0.5 °C")).toBe("±1.35%");
+    // Q18: −2 ± 0.5 → 25% of |−2|
+    expect(formatToleranceForChapter("−2", "±0.5")).toBe("±25.00%");
+  });
+
+  it("returns null when neither value carries a usable number", () => {
+    expect(formatToleranceForChapter("homeostasis", "±0.5")).toBeNull();
+    expect(formatToleranceForChapter("60%", "loose")).toBeNull();
+  });
+});
+
+describe("chapterToMechanism — fill-blank conversion", () => {
+  // Two-question fill-blank fixture, exercising:
+  //   - canonical → **Correct answer:**
+  //   - accepted variants (filter out exact canonical duplicate) → **Acceptable answers:**
+  //   - absolute tolerance → percent
+  //   - "not applicable" → no tolerance
+  //   - Yellow conditions silently dropped
+  //   - hints → ### Hint Ladder
+  const RAW = `---
+chapter: Chapter 1 — Test
+part: Part I — Foundations of Physiology
+status: draft
+---
+
+# Chapter 1 — Fill-in-the-Blank Questions
+
+QUESTION 1
+Type: recall
+Bloom's level: remember
+Difficulty (F / I / A): f
+Priority (M / S / G): m
+
+Stem: Total body water is approximately ___ % of body weight.
+
+Canonical answer: 60%
+
+Accepted variants:
+- 60%
+- 60
+- 0.6
+
+Tolerance: ±10 percentage points (range 50–70%)
+
+Yellow conditions:
+- "value missing %" → "Right value, include the percent sign."
+
+Explanation: About 60% of body weight is water [Guyton ch.1].
+
+Hints:
+1. The body is mostly water.
+2. Above half but below three-quarters.
+
+---
+
+QUESTION 2
+Type: recall
+Bloom's level: remember
+Difficulty (F / I / A): f
+Priority (M / S / G): m
+
+Stem: The dominant cation in the ECF is ___ .
+
+Canonical answer: sodium (Na⁺)
+
+Accepted variants:
+- sodium
+- Na+
+- Na⁺
+
+Tolerance: not applicable
+
+Yellow conditions:
+- "potassium" → "That is the ICF cation."
+
+Explanation: ECF is sodium-rich [Guyton ch.1].
+
+Hints:
+1. The Na⁺/K⁺-ATPase pumps it out of cells.
+`;
+
+  it("emits Format: fill_blank and a Correct answer line from Canonical answer", () => {
+    const m = parseMechanism(RAW);
+    expect(m.body).toContain("**Format:** fill_blank");
+    expect(m.body).toContain("**Correct answer:** 60%");
+    expect(m.body).toContain("**Correct answer:** sodium (Na⁺)");
+  });
+
+  it("emits Acceptable answers as quoted pipe-separated, deduping the canonical", () => {
+    const m = parseMechanism(RAW);
+    // The canonical "60%" is duplicated in the variants list — it should
+    // not reappear under Acceptable answers; only "60" and "0.6" remain.
+    expect(m.body).toContain('**Acceptable answers:** "60" | "0.6"');
+    // Q2: canonical "sodium (Na⁺)" is not literally in the variant list,
+    // so all three variants survive.
+    expect(m.body).toContain('**Acceptable answers:** "sodium" | "Na+" | "Na⁺"');
+  });
+
+  it("converts absolute tolerance to percent and omits Tolerance for not-applicable", () => {
+    const m = parseMechanism(RAW);
+    expect(m.body).toContain("**Tolerance:** ±16.67%"); // Q1: 10pp on 60
+    expect(m.body).not.toMatch(/Question 2[\s\S]*?\*\*Tolerance:\*\*/); // Q2 has none
+  });
+
+  it("strips Yellow conditions silently — algorithmic grader handles that band", () => {
+    const m = parseMechanism(RAW);
+    expect(m.body).not.toContain("Yellow conditions");
+    expect(m.body).not.toContain("missing %");
+    expect(m.body).not.toContain("ICF cation");
+  });
+
+  it("end-to-end: extractCards produces fill-blank cards", () => {
+    const m = parseMechanism(RAW);
+    const cards = extractCards(m);
+    expect(cards).toHaveLength(2);
+    expect(cards[0].format).toBe("fill_blank");
+    expect(cards[0].correct_answer).toBe("60%");
+    expect(cards[0].acceptable_answers).toEqual(["60", "0.6"]);
+    expect(cards[0].tolerance_pct).toBeCloseTo(0.1667, 3);
+    expect(cards[1].format).toBe("fill_blank");
+    expect(cards[1].correct_answer).toBe("sodium (Na⁺)");
+    expect(cards[1].tolerance_pct).toBeUndefined();
+  });
+});
+
+describe("chapterToMechanism — shipped fill-blank chapter file", () => {
+  // Smoke test against the real ch01-introduction-and-homeostasis-fillblank.md
+  // we ship under content/mechanisms/. If the chapter format drifts
+  // and breaks the parser, this test catches it on every CI run.
+  it("loads the fill-blank chapter and produces 18 fill-blank cards", async () => {
+    const { readMechanismById } = await import("./fs");
+    const m = await readMechanismById("ch01-introduction-and-homeostasis-fillblank");
+    expect(m).not.toBeNull();
+    if (!m) return;
+    expect(m.frontmatter.id).toBe("ch01-introduction-and-homeostasis-fillblank");
+    expect(m.frontmatter.organ_system).toBe("foundations");
+    const cards = extractCards(m);
+    expect(cards).toHaveLength(18);
+    for (const card of cards) {
+      expect(card.format).toBe("fill_blank");
+      expect(card.correct_answer.length).toBeGreaterThan(0);
+    }
+    // Q13 is the "homeostasis" recall — the year correction (1929 → 1926)
+    // landed in the stem. Catch a regression that would un-fix the date.
+    const q13 = cards.find((c) => c.index === 13);
+    expect(q13?.stem).toMatch(/1926/);
+    expect(q13?.stem).not.toMatch(/1929/);
   });
 });
 
