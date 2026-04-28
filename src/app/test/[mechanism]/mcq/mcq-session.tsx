@@ -62,6 +62,15 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [startTime, setStartTime] = useState<number>(() => Date.now());
   const [practiceMode, setPracticeMode] = useState(false);
+  // Practice-missed sub-session: after a Session-complete summary, the
+  // student can grind just the cards they got wrong without disturbing
+  // their SM-2 schedule. We force practice mode for this sub-session
+  // regardless of the toggle, so a learner re-attempting their misses
+  // can never accidentally tank their card states by choosing badly
+  // on a tired second pass.
+  const [practiceMissedActive, setPracticeMissedActive] = useState(false);
+  const [activeQuestions, setActiveQuestions] = useState<readonly McqQuestion[]>(questions);
+  const effectivePracticeMode = practiceMode || practiceMissedActive;
   const practiceLocked = outcomes.length > 0;
 
   const sessionId = useMemo(() => crypto.randomUUID(), []);
@@ -74,9 +83,29 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
     return m;
   }, [cards]);
 
-  const question = questions[index];
+  const question = activeQuestions[index];
   const card = question ? cardsById.get(question.cardId) : undefined;
-  const isLastQuestion = index === questions.length - 1;
+  const isLastQuestion = index === activeQuestions.length - 1;
+
+  function handlePracticeMissed() {
+    const missedIds = new Set(
+      outcomes
+        .filter((o) => o.band === "red" || o.band === "yellow" || o.band === "dont_know")
+        .map((o) => o.cardId),
+    );
+    if (missedIds.size === 0) return;
+    const missed = activeQuestions.filter((q) => missedIds.has(q.cardId));
+    // Re-shuffle so the order isn't memorised — same defence as the
+    // server-side shuffle on session start.
+    const shuffled = [...missed].sort(() => Math.random() - 0.5);
+    setActiveQuestions(shuffled);
+    setPracticeMissedActive(true);
+    setIndex(0);
+    setSelectedIndex(null);
+    setOutcomes([]);
+    setStartTime(Date.now());
+    setStatus("answering");
+  }
 
   if (status === "complete") {
     return (
@@ -84,7 +113,9 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
         outcomes={outcomes}
         mechanismId={mechanismId}
         mechanismSystem={mechanismSystem}
-        practiceMode={practiceMode}
+        practiceMode={effectivePracticeMode}
+        practiceMissedActive={practiceMissedActive}
+        onPracticeMissed={handlePracticeMissed}
       />
     );
   }
@@ -131,7 +162,7 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
         hintsUsed: 0,
         timeSpentSeconds: elapsedSeconds,
         sessionId,
-        practiceMode,
+        practiceMode: effectivePracticeMode,
       });
     } catch (err) {
       console.error("Failed to record MCQ review locally", err);
@@ -166,25 +197,33 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
       <header className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between text-xs">
           <p className="text-muted-foreground tracking-widest uppercase">
-            Question {index + 1} of {questions.length}
+            Question {index + 1} of {activeQuestions.length}
           </p>
           {status === "feedback" ? (
             <BandPill band={isDontKnow ? "dont_know" : isCorrect ? "green" : "red"} />
           ) : null}
         </div>
-        <label className="text-muted-foreground flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={practiceMode}
-            onChange={(e) => setPracticeMode(e.target.checked)}
-            disabled={practiceLocked}
-            className="h-3.5 w-3.5"
-          />
-          <span>
-            Practice only — log this session but don&apos;t change my schedule.
-            {practiceLocked ? <em className="ml-1">(Locked after first answer.)</em> : null}
-          </span>
-        </label>
+        {practiceMissedActive ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <strong className="font-medium">Practice round</strong> — reviewing{" "}
+            {activeQuestions.length} missed card{activeQuestions.length === 1 ? "" : "s"}. Your SRS
+            schedule won&apos;t be touched.
+          </p>
+        ) : (
+          <label className="text-muted-foreground flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={practiceMode}
+              onChange={(e) => setPracticeMode(e.target.checked)}
+              disabled={practiceLocked}
+              className="h-3.5 w-3.5"
+            />
+            <span>
+              Practice only — log this session but don&apos;t change my schedule.
+              {practiceLocked ? <em className="ml-1">(Locked after first answer.)</em> : null}
+            </span>
+          </label>
+        )}
       </header>
 
       <p className="text-base leading-relaxed">{question.stem}</p>
@@ -309,11 +348,15 @@ function SummaryScreen({
   mechanismId,
   mechanismSystem,
   practiceMode,
+  practiceMissedActive,
+  onPracticeMissed,
 }: {
   outcomes: readonly Outcome[];
   mechanismId: string;
   mechanismSystem: string;
   practiceMode: boolean;
+  practiceMissedActive: boolean;
+  onPracticeMissed: () => void;
 }) {
   const counts = outcomes.reduce<Record<GradingBand, number>>(
     (acc, o) => {
@@ -322,10 +365,13 @@ function SummaryScreen({
     },
     { green: 0, yellow: 0, red: 0, dont_know: 0 },
   );
+  const missedCount = counts.yellow + counts.red + counts.dont_know;
   return (
     <article className="border-border flex flex-col gap-5 rounded-md border p-5">
       <header className="flex flex-col gap-1">
-        <h2 className="font-heading text-xl font-semibold">Session complete</h2>
+        <h2 className="font-heading text-xl font-semibold">
+          {practiceMissedActive ? "Practice round complete" : "Session complete"}
+        </h2>
         <p className="text-muted-foreground text-sm">
           You answered {outcomes.length} multiple-choice question
           {outcomes.length === 1 ? "" : "s"}.
@@ -338,18 +384,34 @@ function SummaryScreen({
         <SummaryStat label="Don't know" count={counts.dont_know} band="dont_know" />
       </dl>
       <p className="text-muted-foreground text-xs leading-relaxed">
-        {practiceMode
-          ? "Practice mode — your answers were logged but the SRS schedule wasn't touched."
-          : "These ratings have been logged to your daily review queue."}
+        {practiceMissedActive
+          ? "Practice round — analytics logged, SRS schedule untouched."
+          : practiceMode
+            ? "Practice mode — your answers were logged but the SRS schedule wasn't touched."
+            : "These ratings have been logged to your daily review queue."}
       </p>
       <div className="flex flex-wrap gap-3">
+        {missedCount > 0 ? (
+          <button
+            type="button"
+            onClick={onPracticeMissed}
+            className={cn(buttonVariants({ size: "default" }))}
+          >
+            Practice missed ({missedCount})
+          </button>
+        ) : null}
         <Link
           href={`/systems/${mechanismSystem}/${mechanismId}`}
           className={cn(buttonVariants({ size: "default", variant: "outline" }))}
         >
           Back to mechanism
         </Link>
-        <Link href="/today" className={cn(buttonVariants({ size: "default" }))}>
+        <Link
+          href="/today"
+          className={cn(
+            buttonVariants({ size: "default", variant: missedCount > 0 ? "outline" : "default" }),
+          )}
+        >
           Open today&apos;s review
         </Link>
       </div>
