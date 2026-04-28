@@ -1,32 +1,32 @@
--- Phase 5+ G1 — content_mechanisms table for CMS-authored mechanisms.
+-- Phase 5+ G1 — content_chapters table for CMS-authored chapters.
 --
 -- The pilot has moved from solo-author-in-repo to team-authoring via an
--- admin UI. Files under content/mechanisms/*.md stay as a canonical
+-- admin UI. Files under content/chapters/*.md stay as a canonical
 -- fallback (so existing tests + CI continue to work without needing a
 -- live DB), but the app now reads DB rows first.
 --
--- Storage model: one row per mechanism, holding the full markdown
+-- Storage model: one row per chapter, holding the full markdown
 -- *including* frontmatter. Keeping it as a single text column makes
 -- export-to-markdown trivial (SELECT the column, write to disk) and
 -- avoids re-inventing the parser on the DB side. The parser in
 -- src/lib/content/loader.ts is reused unchanged for DB-sourced content.
 --
--- Status mirrors the `mechanismStatusSchema` in src/lib/content/schema.ts
+-- Status mirrors the `chapterStatusSchema` in src/lib/content/schema.ts
 -- so frontmatter's `status: draft|review|published|retired` and the DB's
 -- row-level status can line up during authoring.
 
-create type public.content_mechanism_status as enum (
+create type public.content_chapter_status as enum (
   'draft',
   'review',
   'published',
   'retired'
 );
 
-create table public.content_mechanisms (
+create table public.content_chapters (
   -- kebab-case id, matches the frontmatter `id:` and the URL slug.
   id text primary key check (id ~ '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'),
   markdown text not null check (char_length(markdown) between 1 and 500000),
-  status public.content_mechanism_status not null default 'draft',
+  status public.content_chapter_status not null default 'draft',
 
   -- Audit: who last saved this revision. Trigger fills updated_at.
   updated_at timestamptz not null default now(),
@@ -34,29 +34,29 @@ create table public.content_mechanisms (
   created_at timestamptz not null default now()
 );
 
-comment on table public.content_mechanisms is
-  'CMS-authored mechanism markdown. Dual-source with content/mechanisms/*.md; DB wins when a row exists. Full file content (frontmatter + body) stored as a single text column for simple export.';
+comment on table public.content_chapters is
+  'CMS-authored chapter markdown. Dual-source with content/chapters/*.md; DB wins when a row exists. Full file content (frontmatter + body) stored as a single text column for simple export.';
 
-create index content_mechanisms_status_idx
-  on public.content_mechanisms (status, updated_at desc);
+create index content_chapters_status_idx
+  on public.content_chapters (status, updated_at desc);
 
-create trigger content_mechanisms_set_updated_at
-  before update on public.content_mechanisms
+create trigger content_chapters_set_updated_at
+  before update on public.content_chapters
   for each row execute function public.set_updated_at();
 
-alter table public.content_mechanisms enable row level security;
+alter table public.content_chapters enable row level security;
 
 -- Every authenticated user can READ published rows — the app loads
--- them server-side on every mechanism-page render.
-create policy content_mechanisms_select_published
-  on public.content_mechanisms
+-- them server-side on every chapter-page render.
+create policy content_chapters_select_published
+  on public.content_chapters
   for select
   to authenticated
   using (status = 'published');
 
 -- Admins can READ every row, including drafts under review.
-create policy content_mechanisms_select_admin
-  on public.content_mechanisms
+create policy content_chapters_select_admin
+  on public.content_chapters
   for select
   to authenticated
   using (
@@ -64,16 +64,16 @@ create policy content_mechanisms_select_admin
   );
 
 -- Admins can INSERT and UPDATE. No separate write policy for learners.
-create policy content_mechanisms_insert_admin
-  on public.content_mechanisms
+create policy content_chapters_insert_admin
+  on public.content_chapters
   for insert
   to authenticated
   with check (
     (select is_admin from public.profiles where id = (select auth.uid())) = true
   );
 
-create policy content_mechanisms_update_admin
-  on public.content_mechanisms
+create policy content_chapters_update_admin
+  on public.content_chapters
   for update
   to authenticated
   using (
