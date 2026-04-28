@@ -166,12 +166,12 @@ The test session runs as a sequence of question → submit → reveal → next c
 The stem is displayed prominently; format-appropriate input affordances appear below:
 
 - **MCQ** — answer options as selectable cards. Tapping an option highlights it; the student can change their selection any number of times before submitting. A fifth option, **"I don't know,"** appears below the answer options as a visually subordinate but clearly available choice. Selecting "I don't know" highlights it the same way as picking an answer option; switching between an option and "I don't know" is allowed any number of times.
-- **Descriptive** — a text area for typing the answer. The student may type, edit freely, or leave the area blank if they're answering mentally. There is no character limit and no "I don't know" affordance — the student already controls whether to attempt.
+- **Descriptive** — a text area for typing the answer. The student may type or edit freely. A subordinate **"I don't know"** button appears below the textarea — tapping it skips the writing step and jumps to the model-answer reveal (auto-rated Don't know after the 5-second reading delay). There is no character limit.
 - **Fill-in-the-blank** — an inline input field (or several, depending on the question). The student types their answer; they can edit freely. A subordinate **"I don't know"** button appears below the input.
 
 Optional hint ladder is available on every format — the student can request hint 1, hint 2, or hint 3 before submitting. Each hint tap is logged as a metacognitive signal.
 
-A primary **"Submit answer"** button is the action that commits the student's input and advances to the reveal screen. The student's input (or "I don't know" selection, where applicable) is locked at the moment of submit; the reveal screen is purely read-only from there. For descriptive, tapping submit with an empty text area is permitted and indicates the student answered mentally only — the system records the empty submission and proceeds to reveal.
+A primary **"Submit answer"** button is the action that commits the student's input and advances to the reveal screen. The student's input (or "I don't know" selection, where applicable) is locked at the moment of submit; the reveal screen is purely read-only from there. For descriptive, the explicit "I don't know" button is the opt-out path — submitting with an empty text area is blocked. Tapping "I don't know" jumps straight to the model-answer reveal; the card auto-rates as Don't know after the 5-second reading delay.
 
 **Reveal screen.**
 
@@ -179,7 +179,7 @@ The reveal screen's structure differs slightly per format because the cognitive 
 
 - *MCQ reveal.* The student's selection is shown alongside the correct option. Right pick → brief acknowledgment plus the elaborative explanation. Wrong pick that matches a misconception entry → the matching misconception correction appears alongside the explanation. Wrong pick without a matching entry → only the explanation. "I don't know" → correct answer is shown with the explanation; no misconception correction fires (there's no wrong answer to map). MCQ has no separate self-rating step — the system's grade drives the SRS rating per §2.7. The student taps "Next question" to advance.
 - *Fill-in-the-blank reveal.* The student's typed answer is shown alongside the correct answer plus the system-determined grade — Green (exact match or accepted variant within tolerance), Yellow (partial — typically right value with wrong unit, or numerically close but outside tolerance), Red (wrong), or "Don't know" if the student selected that option. Brief explanatory feedback accompanies the grade ("right value, check the units" for unit-error Yellows, etc.). No separate self-rating step.
-- *Descriptive reveal.* The student's typed answer (or "answered mentally" if empty) is shown at the top. The model answer and elaborative explanation appear below. The Green / Yellow / Red rating buttons are disabled for a 5-second minimum delay so the student actually reads the model answer before rating; after the delay, the buttons activate. The rating drives SRS scheduling per §2.7.
+- *Descriptive reveal.* The student's typed answer is shown at the top (skipped if they tapped "I don't know"). The model answer and elaborative explanation appear below, followed by the authored **self-grading checklist** (the Green/Yellow/Red rubric the student grades themselves against) and, where present, **common misconceptions** (a list of "wrong-mental-model → correction" pairs the author identified, surfaced so the learner can spot a misalignment in their own answer even when self-rating it correct). The rating buttons are disabled for a 5-second minimum delay so the student actually reads the model answer before rating; after the delay, Green / Yellow / Red activate. On the "I don't know" path, a single Continue button replaces the rating row and auto-rates the card as Don't know. The rating drives SRS scheduling per §2.7.
 
 **Engagement-method prompt (descriptive only).**
 
@@ -195,11 +195,16 @@ The student picks one. Their pick becomes the default for the next descriptive q
 
 - *MCQ.* Correct → Good. Wrong → Again. "I don't know" → Don't know. (Hint usage on a correct answer downgrades to Hard once hint-ladder integration on this surface lands; v1 ships without it.)
 - *Fill-blank.* Green → Good. Yellow → Hard. Red → Again. "I don't know" → Don't know.
-- *Descriptive.* Green → Good. Yellow → Hard. Red → Again. (No Don't know — the empty-submission + Red rating already covers it.)
+- *Descriptive.* Green → Good. Yellow → Hard. Red → Again. "I don't know" → Don't know (same SM-2 treatment as MCQ/fill-blank: interval = 1 day, ease unchanged, no lapse increment).
 
 Sessions can be paused at any point. Unrated cards from a paused session do not have their states updated until the session is resumed and the rating completed.
 
-**End-of-session summary.** When the test session ends (all questions completed or session paused with all completed questions rated), the student sees a summary screen: number of questions completed, performance breakdown (Green/Yellow/Red counts), brief acknowledgment that the cards encountered will reappear in the daily review queue based on the ratings, and two action buttons — "Review another mechanism" (returns to Systems tab) and "Open today's review" (jumps to the Today dashboard's daily SRS queue). The summary is informational only; no celebration on high performance, no failure messaging on low performance — performance is data, not a judgment, consistent with the flat-emotional-tone principle.
+**End-of-session summary.** When the test session ends (all questions completed or session paused with all completed questions rated), the student sees a summary screen: number of questions completed, performance breakdown (Green/Yellow/Red counts plus Don't-know where applicable), brief acknowledgment that the cards encountered will reappear in the daily review queue based on the ratings, and up to three action buttons:
+- **"Practice missed (N)"** — visible only when N > 0 yellow/red/dont-know cards exist. Restarts the session in-place with just those N cards, re-shuffled. The sub-session forces practice mode (no SRS schedule update) so a tired second pass can't disturb the schedule a learner just built. After a practice round the summary appears again; the button reappears recursively if any are still missed.
+- **"Review another mechanism"** — returns to Systems tab.
+- **"Open today's review"** — jumps to the Today dashboard's daily SRS queue.
+
+The summary is informational only; no celebration on high performance, no failure messaging on low performance — performance is data, not a judgment, consistent with the flat-emotional-tone principle.
 
 **Practice-only sessions (optional).** Before starting a test session, the student may toggle "Practice only — don't update my schedule." When enabled, the session runs identically and the per-question results are still logged so the activity counts toward analytics — time studied, questions attempted, accuracy aggregates, and retention curves. What practice-only suppresses is the SRS *schedule update*: no card_state row is created or modified, so the card's ease, interval, and due_at remain whatever they were before the session. The student gets the cognitive workout and a record of having done it, but their daily review queue is not perturbed by this practice run. This is opt-in per session, not a global setting. Default is off — regular sessions update SRS state in addition to logging.
 
@@ -458,7 +463,7 @@ V1 is done when all of the following are demonstrable:
 - [ ] A student can tap "Test yourself" and see three format options (MCQ / Descriptive / Fill-in-the-blank) with brief descriptions.
 - [ ] A student can pick a format and see optional filter controls (type, priority, difficulty) with sensible defaults.
 - [ ] A student can start a test session and answer questions in the chosen format, with a primary "Submit answer" button as the commit action across all formats.
-- [ ] For MCQ and fill-in-the-blank, a visually subordinate "I don't know" affordance is available alongside the answer input.
+- [ ] For MCQ, fill-in-the-blank, and descriptive, a visually subordinate "I don't know" affordance is available alongside the answer input. On descriptive, tapping it skips the writing step and jumps to the model-answer reveal; the card auto-rates as Don't know after the 5-second reading delay.
 - [ ] Students can change their answer (including switching between selected options, typed text, and "I don't know") freely until they tap Submit; after Submit the input is locked.
 - [ ] After Submit, the reveal screen displays format-appropriate feedback:
   - MCQ: deterministic grading against the correct option; misconception correction fires on wrong choices that match misconception map entries; no correction fires on "I don't know."
@@ -468,7 +473,8 @@ V1 is done when all of the following are demonstrable:
 - [ ] A test session correctly updates SRS state per question via the five-rating mapping (Easy / Good / Hard / Again / Don't know) per the SM-2 rules in §2.7. Cards appear in the student's daily review queue at the appropriate next-due times.
 - [ ] "Don't know" submissions are recorded distinctly from wrong attempts in the reviews log so analytics can distinguish the two; the consecutive-again counter does not advance on Don't know, so a string of Don't knows does not promote the card to leech.
 - [ ] The "practice only" toggle on a test session correctly suppresses SRS state updates while still rendering questions and feedback identically.
-- [ ] The end-of-session summary correctly displays performance breakdown and routes to either Systems or daily review.
+- [ ] The end-of-session summary correctly displays performance breakdown (including Don't-know counts) and routes to either Systems, daily review, or — when N > 0 yellow/red/dont-know cards exist — a "Practice missed (N)" sub-session that re-runs only those cards in forced practice mode (no SRS schedule update).
+- [ ] Descriptive reveal surfaces the authored self-grading checklist and any common misconceptions alongside the model answer.
 - [ ] Filter selections persist as the default for the next test session on the same mechanism.
 - [ ] New students see priority="must" and difficulty="foundational" pre-applied as defaults on first encounter with a mechanism, with the defaults visibly indicated and easily cleared.
 - [ ] The SRS scheduler correctly calculates intervals for at least 50 distinct rating sequences verified against reference outputs.
