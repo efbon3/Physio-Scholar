@@ -34,7 +34,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   const { data, error } = await supabase
-    .from("content_mechanisms")
+    .from("content_chapters")
     .select("markdown")
     .eq("id", id)
     .maybeSingle();

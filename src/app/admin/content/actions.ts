@@ -78,7 +78,7 @@ async function saveMechanism({
     // Prevent accidental overwrite — INSERT fails on duplicate primary
     // key, which is what we want. If the admin really meant to edit an
     // existing row, the UI routes them through /admin/content/[id]/edit.
-    const { error } = await supabase.from("content_mechanisms").insert({
+    const { error } = await supabase.from("content_chapters").insert({
       id: parsed.frontmatter.id,
       markdown,
       status: status as "draft" | "review" | "published" | "retired",
@@ -95,7 +95,7 @@ async function saveMechanism({
     }
   } else {
     const { data: updated, error } = await supabase
-      .from("content_mechanisms")
+      .from("content_chapters")
       .update({
         markdown,
         status: status as "draft" | "review" | "published" | "retired",

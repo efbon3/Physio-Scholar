@@ -5,7 +5,7 @@ import { parseChapter, type Chapter } from "./loader";
 /**
  * Supabase-backed chapter source.
  *
- * CMS-authored chapters land in `public.content_mechanisms` as full
+ * CMS-authored chapters land in `public.content_chapters` as full
  * markdown text (frontmatter + body). At render time, the
  * dual-source loader in `./source.ts` asks this module for published
  * rows first, then layers the filesystem markdown underneath for any
@@ -36,7 +36,7 @@ export async function readPublishedChaptersFromDb(): Promise<Chapter[]> {
   }
 
   const { data, error } = await supabase
-    .from("content_mechanisms")
+    .from("content_chapters")
     .select("id, markdown")
     .eq("status", "published");
 
@@ -76,7 +76,7 @@ export async function readPublishedChapterByIdFromDb(id: string): Promise<Chapte
   }
 
   const { data, error } = await supabase
-    .from("content_mechanisms")
+    .from("content_chapters")
     .select("id, markdown")
     .eq("id", id)
     .eq("status", "published")

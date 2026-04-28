@@ -24,7 +24,7 @@ describe("Database type", () => {
       | "admin_audit_log"
       | "card_states"
       | "content_flags"
-      | "content_mechanisms"
+      | "content_chapters"
       | "exam_events"
       | "faculty_assignments"
       | "institutions"

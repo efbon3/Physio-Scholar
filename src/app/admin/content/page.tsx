@@ -32,7 +32,7 @@ export default async function AdminContentPage() {
 
   const [dbResult, fsMechanisms] = await Promise.all([
     supabase
-      .from("content_mechanisms")
+      .from("content_chapters")
       .select("id, markdown, status, updated_at")
       .order("updated_at", { ascending: false }),
     readFromFs(),

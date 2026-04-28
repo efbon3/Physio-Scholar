@@ -24,7 +24,7 @@ export default async function EditMechanismPage({ params }: Params) {
 
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("content_mechanisms")
+    .from("content_chapters")
     .select("id, markdown, status")
     .eq("id", id)
     .maybeSingle();
