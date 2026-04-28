@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
-import { gradeFillBlank, type FillBlankGrade } from "@/lib/grading/fill-blank";
-import { bandToRating } from "@/lib/grading/rating-mapping";
+import { gradeFillBlank } from "@/lib/grading/fill-blank";
+import { bandToRating, type GradingBand } from "@/lib/grading/rating-mapping";
 import { recordReviewLocally } from "@/lib/srs/local";
 import { cn } from "@/lib/utils";
 
@@ -21,39 +21,42 @@ type SessionStatus = "answering" | "feedback" | "complete";
 
 type CardOutcome = {
   cardId: string;
-  band: FillBlankGrade;
+  band: GradingBand;
   studentAnswer: string;
 };
 
 /**
- * Minimal per-question fill-blank session.
+ * Per-question fill-blank session.
  *
  * Walks through the supplied cards one at a time:
- *   1. Show stem + textbox.
- *   2. On Submit, grade with `gradeFillBlank` and reveal the model
- *      answer + elaborative explanation alongside Green/Yellow/Red
- *      feedback.
+ *   1. Show stem + input + a subordinate "I don't know" button. The
+ *      student types an answer, or taps "I don't know" to opt out;
+ *      either choice is freely changeable until they tap Submit.
+ *   2. Submit — if the student typed an answer, grade with
+ *      `gradeFillBlank` and reveal the model answer + elaborative
+ *      explanation alongside Green/Yellow/Red feedback. If the
+ *      student tapped "I don't know," skip grading and reveal the
+ *      model answer with the don't-know acknowledgment.
  *   3. Continue → next card.
- *   4. After the last card → summary screen with Green/Yellow/Red
- *      counts and two CTAs.
+ *   4. After the last card → summary screen with band counts and CTAs.
  *
- * No hint ladder yet (build spec §2.5 leaves it optional and the
- * format-picker + grader are the priorities for this commit). No
- * practice-only toggle wired into this UI yet either — the SRS API
- * already supports it via `recordReviewLocally`'s `practiceMode` flag.
+ * SRS rating mapping (build spec §2.6):
+ *   - Green / Yellow / Red → good / hard / again per `bandToRating`.
+ *   - "I don't know"        → dont_know (build spec §2.7 modification 3
+ *                              — same next-interval as Again but no
+ *                              ease drop, no lapse increment).
+ *
+ * Practice-only toggle suppresses SRS schedule writes per build spec
+ * §2.3 — review row still records (analytics), card_state stays
+ * untouched. Locked once the first answer is submitted.
  */
 export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileId }: Props) {
   const [index, setIndex] = useState(0);
   const [studentAnswer, setStudentAnswer] = useState("");
+  const [dontKnow, setDontKnow] = useState(false);
   const [status, setStatus] = useState<SessionStatus>("answering");
   const [outcomes, setOutcomes] = useState<CardOutcome[]>([]);
   const [startTime, setStartTime] = useState<number>(() => Date.now());
-  // Practice-only mode: per-session toggle that suppresses SRS schedule
-  // updates. The review row is still logged so the activity counts
-  // toward analytics (build spec §2.3 — "practice should also
-  // contribute"). Lockable only before the first answer is submitted —
-  // toggling mid-session would mix scheduled and unscheduled cards in
-  // a way the summary screen can't usefully describe.
   const [practiceMode, setPracticeMode] = useState(false);
   const practiceLocked = outcomes.length > 0;
 
@@ -77,14 +80,29 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
     return null;
   }
 
-  const result = status === "feedback" ? gradeFillBlank(studentAnswer, card) : null;
+  // Compute the result lazily so we can show it on the reveal screen
+  // without storing it in state. For dont-know submissions the grader
+  // is skipped — there's no student input to grade.
+  const result = status === "feedback" && !dontKnow ? gradeFillBlank(studentAnswer, card) : null;
+  // The outcome's band: dont_know if that path was taken, else the
+  // grader's verdict.
+  const feedbackBand: GradingBand | null = !card
+    ? null
+    : status !== "feedback"
+      ? null
+      : dontKnow
+        ? "dont_know"
+        : (result?.grade ?? null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!card || studentAnswer.trim().length === 0) return;
+  async function handleSubmit() {
+    if (!card) return;
+    if (status !== "answering") return;
+    // Submit is only allowed when the student has either typed something
+    // or tapped "I don't know."
+    if (!dontKnow && studentAnswer.trim().length === 0) return;
 
-    const grade = gradeFillBlank(studentAnswer, card);
-    const rating = bandToRating(grade.grade);
+    const band: GradingBand = dontKnow ? "dont_know" : gradeFillBlank(studentAnswer, card).grade;
+    const rating = bandToRating(band);
     const elapsedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
 
     try {
@@ -105,7 +123,7 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
       console.error("Failed to record fill-blank review locally", err);
     }
 
-    setOutcomes((prior) => [...prior, { cardId: card.id, band: grade.grade, studentAnswer }]);
+    setOutcomes((prior) => [...prior, { cardId: card.id, band, studentAnswer }]);
     setStatus("feedback");
   }
 
@@ -116,9 +134,25 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
     }
     setIndex((i) => i + 1);
     setStudentAnswer("");
+    setDontKnow(false);
     setStatus("answering");
     setStartTime(Date.now());
   }
+
+  function handleAnswerChange(next: string) {
+    if (status !== "answering") return;
+    setStudentAnswer(next);
+    // Typing implicitly clears the don't-know flag — the student
+    // changed their mind and is attempting after all.
+    if (next.length > 0 && dontKnow) setDontKnow(false);
+  }
+
+  function handleDontKnowToggle() {
+    if (status !== "answering") return;
+    setDontKnow((v) => !v);
+  }
+
+  const submitDisabled = status !== "answering" || (!dontKnow && studentAnswer.trim().length === 0);
 
   return (
     <article className="border-border flex flex-col gap-5 rounded-md border p-5">
@@ -127,7 +161,7 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
           <p className="text-muted-foreground tracking-widest uppercase">
             Question {index + 1} of {cards.length}
           </p>
-          {result ? <BandPill band={result.grade} /> : null}
+          {feedbackBand ? <BandPill band={feedbackBand} /> : null}
         </div>
         <label className="text-muted-foreground flex items-center gap-2 text-xs">
           <input
@@ -148,37 +182,64 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
         <p className="text-base leading-relaxed">{card.stem}</p>
       </div>
 
-      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+      <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-muted-foreground">Your answer</span>
           <input
             type="text"
             value={studentAnswer}
-            onChange={(e) => setStudentAnswer(e.target.value)}
-            disabled={status === "feedback"}
+            onChange={(e) => handleAnswerChange(e.target.value)}
+            disabled={status !== "answering" || dontKnow}
             autoFocus
             placeholder={card.unit ? `e.g. 5.6 ${card.unit}` : "Type your answer"}
-            className="border-input bg-background rounded-md border px-3 py-2 text-base disabled:opacity-70"
+            className={cn(
+              "border-input bg-background rounded-md border px-3 py-2 text-base disabled:opacity-70",
+              dontKnow && "bg-muted",
+            )}
           />
         </label>
+
+        <button
+          type="button"
+          onClick={handleDontKnowToggle}
+          disabled={status !== "answering"}
+          aria-pressed={dontKnow}
+          className={cn(
+            "border-input text-muted-foreground self-start rounded-md border border-dashed px-3 py-1.5 text-xs transition-colors",
+            status === "answering" && "hover:bg-muted",
+            status === "answering" && dontKnow && "border-primary text-primary bg-primary/5",
+            status !== "answering" && dontKnow && "border-amber-500 bg-amber-50 text-amber-900",
+            status !== "answering" && !dontKnow && "opacity-50",
+          )}
+        >
+          I don&apos;t know
+        </button>
+
         {status === "answering" ? (
           <div className="flex justify-end">
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               className={cn(buttonVariants({ size: "default" }))}
-              disabled={studentAnswer.trim().length === 0}
+              disabled={submitDisabled}
             >
-              Submit
+              Submit answer
             </button>
           </div>
         ) : null}
-      </form>
+      </div>
 
-      {status === "feedback" && result ? (
+      {status === "feedback" ? (
         <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-md border p-4 text-sm leading-relaxed">
-          <p>
-            <span className="font-medium">Feedback:</span> {result.feedback}
-          </p>
+          {dontKnow ? (
+            <p className="text-muted-foreground text-xs">
+              You opted out — the card returns tomorrow without an ease change.
+            </p>
+          ) : result ? (
+            <p>
+              <span className="font-medium">Feedback:</span> {result.feedback}
+            </p>
+          ) : null}
           <div>
             <p className="text-muted-foreground text-xs tracking-widest uppercase">
               Correct answer
@@ -202,14 +263,23 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
   );
 }
 
-function BandPill({ band }: { band: FillBlankGrade }) {
-  const label = band === "green" ? "Green" : band === "yellow" ? "Yellow" : "Red";
+function BandPill({ band }: { band: GradingBand }) {
+  const label =
+    band === "green"
+      ? "Green"
+      : band === "yellow"
+        ? "Yellow"
+        : band === "red"
+          ? "Red"
+          : "Don't know";
   const cls =
     band === "green"
       ? "bg-emerald-100 text-emerald-900"
       : band === "yellow"
         ? "bg-amber-100 text-amber-900"
-        : "bg-red-100 text-red-900";
+        : band === "red"
+          ? "bg-red-100 text-red-900"
+          : "bg-slate-100 text-slate-700";
   return (
     <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium", cls)}>{label}</span>
   );
@@ -226,12 +296,12 @@ function SummaryScreen({
   mechanismSystem: string;
   practiceMode: boolean;
 }) {
-  const counts = outcomes.reduce<Record<FillBlankGrade, number>>(
+  const counts = outcomes.reduce<Record<GradingBand, number>>(
     (acc, o) => {
       acc[o.band] += 1;
       return acc;
     },
-    { green: 0, yellow: 0, red: 0 },
+    { green: 0, yellow: 0, red: 0, dont_know: 0 },
   );
   return (
     <article className="border-border flex flex-col gap-5 rounded-md border p-5">
@@ -242,10 +312,11 @@ function SummaryScreen({
           {outcomes.length === 1 ? "" : "s"}.
         </p>
       </header>
-      <dl className="grid grid-cols-3 gap-2 text-center text-sm">
+      <dl className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
         <SummaryStat label="Green" count={counts.green} band="green" />
         <SummaryStat label="Yellow" count={counts.yellow} band="yellow" />
         <SummaryStat label="Red" count={counts.red} band="red" />
+        <SummaryStat label="Don't know" count={counts.dont_know} band="dont_know" />
       </dl>
       <p className="text-muted-foreground text-xs leading-relaxed">
         {practiceMode
@@ -267,21 +338,15 @@ function SummaryScreen({
   );
 }
 
-function SummaryStat({
-  label,
-  count,
-  band,
-}: {
-  label: string;
-  count: number;
-  band: FillBlankGrade;
-}) {
+function SummaryStat({ label, count, band }: { label: string; count: number; band: GradingBand }) {
   const cls =
     band === "green"
       ? "bg-emerald-50 text-emerald-900"
       : band === "yellow"
         ? "bg-amber-50 text-amber-900"
-        : "bg-red-50 text-red-900";
+        : band === "red"
+          ? "bg-red-50 text-red-900"
+          : "bg-slate-50 text-slate-700";
   return (
     <div className={cn("flex flex-col rounded-md py-3", cls)}>
       <dt className="text-[11px] tracking-widest uppercase">{label}</dt>

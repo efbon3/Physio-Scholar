@@ -1,5 +1,7 @@
 # Physiology PWA — V1 Build Specification
 
+**Version 1.3** — Unified submit-then-reveal flow across all three formats; explicit "Submit answer" button as the commit action; pre-submit edits free, post-submit input locked. Added "I don't know" as a fifth SM-2 rating (third scheduler modification, joining ease floor at 1.5 and leech detection at 5): same next-interval as Again (1 day) but does not decrement ease and does not increment lapse count. MCQ and fill-blank surface a visually subordinate "I don't know" affordance; descriptive omits it (the empty-submission + Red rating already covers that case). Added an optional engagement-method prompt on descriptive — written-peer / written-self / mental — logged as analytics metadata only.
+
 **Version 1.2** — Two-zone redesign. AI self-explanation grading deferred to v2; replaced in v1 with a format-aware test session model (MCQ, descriptive, fill-blank) with deterministic grading for the first two formats and student self-rating for descriptive.
 
 **Version 1.1** (superseded)
@@ -155,17 +157,43 @@ A "Start test" button initiates the session.
 
 **Test session flow.**
 
-The test session runs per-question retrieval-feedback-rate cycles. For each question:
+The test session runs as a sequence of question → submit → reveal → next cycles. The structure is unified across all three formats: the student commits an answer (or declines to attempt) via an explicit submit action, after which the reveal screen appears. Until submitted, the student can change their answer freely — selection / typed text / "I don't know" can all be edited or swapped without consequence.
 
-1. **Present the question.** Stem displayed, format-appropriate input affordance shown (MCQ options as cards, descriptive as text area, fill-in-the-blank as inline input field). Optional hint ladder available — student can request hint 1, hint 2, or hint 3 before submitting.
-2. **Student commits an answer.** "Submit" button or equivalent.
-3. **System reveals feedback.**
-   - For MCQ: correct or incorrect indicator, with the elaborative explanation. If incorrect and the chosen option matches a misconception map entry, the misconception correction is shown alongside the explanation.
-   - For descriptive: the model answer and elaborative explanation are revealed. The student reads them to compare against what they wrote.
-   - For fill-in-the-blank: graded automatically as Green (exact match or accepted variant within tolerance), Yellow (partial — typically right value with wrong unit, or numerically close but outside tolerance), or Red (wrong). Brief explanatory feedback accompanies the grade.
-4. **Student self-rates (descriptive only).** Green / Yellow / Red buttons. The 5-second minimum delay between answer reveal and rating activation applies; the student must read the model answer before rating. For MCQ and fill-in-the-blank, the system's grade serves as the rating directly; no separate self-rate step.
-5. **SRS rating.** The rating (whether system-determined or self-assigned) maps to SM-2 input and updates the card's state per the scheduler rules in section 2.7. The student sees a brief next-review-date indicator before advancing.
-6. **Advance.** Next card or session end.
+**Question screen.**
+
+The stem is displayed prominently; format-appropriate input affordances appear below:
+
+- **MCQ** — answer options as selectable cards. Tapping an option highlights it; the student can change their selection any number of times before submitting. A fifth option, **"I don't know,"** appears below the answer options as a visually subordinate but clearly available choice. Selecting "I don't know" highlights it the same way as picking an answer option; switching between an option and "I don't know" is allowed any number of times.
+- **Descriptive** — a text area for typing the answer. The student may type, edit freely, or leave the area blank if they're answering mentally. There is no character limit and no "I don't know" affordance — the student already controls whether to attempt.
+- **Fill-in-the-blank** — an inline input field (or several, depending on the question). The student types their answer; they can edit freely. A subordinate **"I don't know"** button appears below the input.
+
+Optional hint ladder is available on every format — the student can request hint 1, hint 2, or hint 3 before submitting. Each hint tap is logged as a metacognitive signal.
+
+A primary **"Submit answer"** button is the action that commits the student's input and advances to the reveal screen. The student's input (or "I don't know" selection, where applicable) is locked at the moment of submit; the reveal screen is purely read-only from there. For descriptive, tapping submit with an empty text area is permitted and indicates the student answered mentally only — the system records the empty submission and proceeds to reveal.
+
+**Reveal screen.**
+
+The reveal screen's structure differs slightly per format because the cognitive work the student needs to do at this stage differs.
+
+- *MCQ reveal.* The student's selection is shown alongside the correct option. Right pick → brief acknowledgment plus the elaborative explanation. Wrong pick that matches a misconception entry → the matching misconception correction appears alongside the explanation. Wrong pick without a matching entry → only the explanation. "I don't know" → correct answer is shown with the explanation; no misconception correction fires (there's no wrong answer to map). MCQ has no separate self-rating step — the system's grade drives the SRS rating per §2.7. The student taps "Next question" to advance.
+- *Fill-in-the-blank reveal.* The student's typed answer is shown alongside the correct answer plus the system-determined grade — Green (exact match or accepted variant within tolerance), Yellow (partial — typically right value with wrong unit, or numerically close but outside tolerance), Red (wrong), or "Don't know" if the student selected that option. Brief explanatory feedback accompanies the grade ("right value, check the units" for unit-error Yellows, etc.). No separate self-rating step.
+- *Descriptive reveal.* The student's typed answer (or "answered mentally" if empty) is shown at the top. The model answer and elaborative explanation appear below. The Green / Yellow / Red rating buttons are disabled for a 5-second minimum delay so the student actually reads the model answer before rating; after the delay, the buttons activate. The rating drives SRS scheduling per §2.7.
+
+**Engagement-method prompt (descriptive only).**
+
+After the student rates a descriptive question, an optional prompt asks how they engaged with it:
+
+- "Wrote my answer; checked with a friend or peer."
+- "Wrote my answer; checked it myself against the model answer."
+- "Worked it out mentally — said it out loud or thought it through."
+
+The student picks one. Their pick becomes the default for the next descriptive question; they can change it per-card if their method varies. Declining is silent — no method is recorded for that card. The method is logged as analytics metadata only and does not affect SRS scheduling. The data exists to support later analysis of how different study methods correlate with retention, and to inform metacognitive calibration features when AI grading lands in v2.
+
+**SRS rating mapping.** The rating each format produces feeds the SM-2 scheduler per §2.7:
+
+- *MCQ.* Correct → Good. Wrong → Again. "I don't know" → Don't know. (Hint usage on a correct answer downgrades to Hard once hint-ladder integration on this surface lands; v1 ships without it.)
+- *Fill-blank.* Green → Good. Yellow → Hard. Red → Again. "I don't know" → Don't know.
+- *Descriptive.* Green → Good. Yellow → Hard. Red → Again. (No Don't know — the empty-submission + Red rating already covers it.)
 
 Sessions can be paused at any point. Unrated cards from a paused session do not have their states updated until the session is resumed and the rating completed.
 
@@ -265,18 +293,29 @@ The 5-second delay is a forcing function: the student cannot rate without spendi
 
 **Queueing for offline.** All grading paths in v1 are deterministic or self-rated and run entirely client-side. No grading queue, no offline-to-online grading round-trip, no in-app notification on grade arrival. This simplification is one of the principal cost savings from deferring AI grading.
 
-### 2.7 SRS Scheduler (SM-2 with modifications)
+### 2.7 SRS Scheduler (SM-2 with three modifications)
 
-SM-2 algorithm, pure function with comprehensive test coverage.
+SM-2 algorithm, pure function with comprehensive test coverage. Three modifications from textbook SM-2:
+
+**Modification 1 — Ease floor at 1.5.** Standard SM-2 floor is 1.3. Raised to prevent "ease hell" while keeping self-adjusting behavior intact for cards the learner is genuinely struggling with.
+
+**Modification 2 — Leech detection at 5 consecutive lapses.** Cards failed five times in a row are flagged. Student is offered three options: open the mechanism detail page (was "Learn mode"), suspend the card, or continue trying.
+
+**Modification 3 — Five rating inputs instead of four.** The standard SM-2 ratings are Again, Hard, Good, Easy. The system adds a fifth rating, **Don't know**, for use on MCQ and fill-blank formats. Don't know produces the same next-interval as Again (card returns next day) but does *not* decrement ease and does *not* increment lapse count. The pedagogical rationale: a student who admitted ignorance has not consolidated a wrong mental model, so future intervals don't need tightening — only the next encounter does. A student who confidently picked a wrong answer demonstrated a wrong mental model that needs unlearning, justifying the ease drop.
 
 **Initial parameters.**
 - New card default ease factor: 2.5.
 - Minimum ease factor floor: 1.5 (modified from standard 1.3).
-- Intervals after rating: Again → 1 minute (same session) then 1 day, Hard → current × 1.2, Good → current × ease, Easy → current × ease × 1.3.
-- Ease adjustments: Again -0.2, Hard -0.15, Good no change, Easy +0.15.
 
-**Leech detection.** Cards failed 5 consecutive times flagged. Student prompted:
-- "Review the full mechanism" (opens Learn mode).
+**Interval and ease rules per rating.**
+- **Easy** → interval × ease × 1.3; ease + 0.15.
+- **Good** → interval × ease; ease unchanged.
+- **Hard** → interval × 1.2; ease − 0.15.
+- **Again** → 1 day (after the 1-minute in-session re-show on a learning-step card); ease − 0.2; consecutive-again counter increments (drives leech detection); status drops back to "learning."
+- **Don't know** → 1 day; ease *unchanged*; consecutive-again counter does not advance (so a string of "I don't know" submissions does not promote the card to leech); status drops back to "learning" so the card re-enters the in-session learning ladder on next encounter.
+
+**Leech detection.** Cards failed 5 consecutive times (counted on Again ratings; Don't know does not increment the counter) are flagged. Student prompted:
+- "Review the full mechanism" (opens the mechanism detail page).
 - "Suspend this card" (kept in leech list).
 - "Continue trying" (stays in queue).
 
@@ -287,7 +326,8 @@ SM-2 algorithm, pure function with comprehensive test coverage.
 **Test coverage.** 100% coverage on scheduler function against reference outputs. Explicit edge cases tested:
 - Cards at ease floor behavior.
 - Transition from learning to review.
-- Leech detection triggering.
+- Leech detection triggering on Again (and *not* triggering on Don't know).
+- Don't know never decrements ease and never increments the consecutive-again counter.
 - Interval calculation at various ease values.
 - Card reset on Again after long interval.
 - Precedence when multiple rules interact.
@@ -415,11 +455,16 @@ V1 is done when all of the following are demonstrable:
 - [ ] A student can read each of the four layers without any test-related interruption.
 - [ ] A student can tap "Test yourself" and see three format options (MCQ / Descriptive / Fill-in-the-blank) with brief descriptions.
 - [ ] A student can pick a format and see optional filter controls (type, priority, difficulty) with sensible defaults.
-- [ ] A student can start a test session and answer questions in the chosen format, with format-appropriate grading firing correctly:
-  - MCQ: deterministic grading against the correct option, with misconception feedback on wrong choices that match misconception map entries.
+- [ ] A student can start a test session and answer questions in the chosen format, with a primary "Submit answer" button as the commit action across all formats.
+- [ ] For MCQ and fill-in-the-blank, a visually subordinate "I don't know" affordance is available alongside the answer input.
+- [ ] Students can change their answer (including switching between selected options, typed text, and "I don't know") freely until they tap Submit; after Submit the input is locked.
+- [ ] After Submit, the reveal screen displays format-appropriate feedback:
+  - MCQ: deterministic grading against the correct option; misconception correction fires on wrong choices that match misconception map entries; no correction fires on "I don't know."
   - Descriptive: model answer reveal, then student self-rates Green/Yellow/Red after the 5-second minimum delay.
-  - Fill-in-the-blank: deterministic grading against author-specified answer space, with Green/Yellow/Red distinguishing exact match, partial (unit errors or near-misses), and wrong.
-- [ ] A test session correctly updates SRS state per question, and cards appear in the student's daily review queue at the appropriate next-due times.
+  - Fill-in-the-blank: deterministic grading against author-specified answer space, with Green/Yellow/Red distinguishing exact match, partial (unit errors or near-misses), and wrong; "Don't know" recorded distinctly.
+- [ ] For descriptive, after self-rating, an optional engagement-method prompt is displayed (written-peer / written-self / mental). Selection is recorded as analytics metadata; SRS scheduling is unaffected.
+- [ ] A test session correctly updates SRS state per question via the five-rating mapping (Easy / Good / Hard / Again / Don't know) per the SM-2 rules in §2.7. Cards appear in the student's daily review queue at the appropriate next-due times.
+- [ ] "Don't know" submissions are recorded distinctly from wrong attempts in the reviews log so analytics can distinguish the two; the consecutive-again counter does not advance on Don't know, so a string of Don't knows does not promote the card to leech.
 - [ ] The "practice only" toggle on a test session correctly suppresses SRS state updates while still rendering questions and feedback identically.
 - [ ] The end-of-session summary correctly displays performance breakdown and routes to either Systems or daily review.
 - [ ] Filter selections persist as the default for the next test session on the same mechanism.
@@ -477,6 +522,8 @@ V1 is done when all of the following are demonstrable:
 - [ ] Students report that the textbook-reading zone and the test zone feel like complementary parts of one workflow, not disconnected features.
 - [ ] Students who use mechanism-centric tests as their primary entry point also use daily review at least 3 times per week for ongoing retention.
 - [ ] Students who self-rate descriptive answers report that the rating buttons feel clear and the 5-second delay does not feel arbitrary.
+- [ ] The "I don't know" button is used by students at a measurable rate on MCQ (suggesting they perceive it as a legitimate option rather than a hidden fallback). Target: at least 5% of MCQ encounters use the option, indicating students aren't always guessing.
+- [ ] The ratio of "I don't know" submissions to wrong-attempt submissions per student is tracked and surfaced in the weekly progress view as a metacognitive calibration signal.
 
 ---
 

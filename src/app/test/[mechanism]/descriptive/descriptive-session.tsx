@@ -265,12 +265,17 @@ function SummaryScreen({
   mechanismSystem: string;
   practiceMode: boolean;
 }) {
+  // Descriptive doesn't surface a "Don't know" affordance — the
+  // empty-submission + Red rating already covers that case — but
+  // GradingBand's union now includes "dont_know" so we initialise
+  // the record with all four keys to satisfy the type. The
+  // dont_know slot stays zero in practice for this format.
   const counts = outcomes.reduce<Record<GradingBand, number>>(
     (acc, o) => {
       acc[o.band] += 1;
       return acc;
     },
-    { green: 0, yellow: 0, red: 0 },
+    { green: 0, yellow: 0, red: 0, dont_know: 0 },
   );
   return (
     <article className="border-border flex flex-col gap-5 rounded-md border p-5">

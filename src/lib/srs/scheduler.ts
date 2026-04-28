@@ -23,6 +23,14 @@ import { SRS_DEFAULTS, type CardState, type Rating } from "./types";
  *     Again, we drop the ease AND collapse the interval back to the
  *     1-minute learning step. Otherwise a single lapse would stay weeks
  *     ahead and the learner gets no recovery reps.
+ *   - "Don't know" (build spec §2.7 modification 3): same next-interval
+ *     as Again (1 day) but does NOT decrement ease and does NOT
+ *     increment the consecutive-again counter. A student who admitted
+ *     ignorance hasn't consolidated a wrong mental model, so future
+ *     intervals don't tighten — only the next encounter does. This is
+ *     also why Don't know never promotes a card to leech: the leech
+ *     trigger is a streak of confidently-wrong attempts, not a streak
+ *     of acknowledged blanks.
  */
 export function scheduleNext(state: CardState, rating: Rating, now: Date = new Date()): CardState {
   // Suspended cards are inert. Caller must unsuspend explicitly.
@@ -49,6 +57,15 @@ export function scheduleNext(state: CardState, rating: Rating, now: Date = new D
       // learning (build spec §2.7 "card reset on Again after long interval").
       status = "learning";
     }
+  } else if (rating === "dont_know") {
+    // Same scheduling outcome as Again — card returns next day — but
+    // ease stays put and the consecutive-again counter does not advance.
+    // The card drops back into the learning ladder so its next encounter
+    // re-introduces the content. (Suspended cards already returned at
+    // the top of the function, so we don't need to check for that here.)
+    interval_days = SRS_DEFAULTS.again_interval_minutes / (60 * 24);
+    // consecutive_again_count, ease left untouched.
+    status = "learning";
   } else {
     consecutive_again_count = 0;
     // Any non-again rating exits leech status.

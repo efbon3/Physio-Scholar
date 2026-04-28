@@ -676,7 +676,7 @@ export type Database = {
       content_flag_status: "open" | "resolved" | "rejected"
       content_mechanism_status: "draft" | "review" | "published" | "retired"
       srs_card_status: "learning" | "review" | "leech" | "suspended"
-      srs_rating: "again" | "hard" | "good" | "easy"
+      srs_rating: "again" | "hard" | "good" | "easy" | "dont_know"
       study_session_status: "active" | "completed" | "abandoned"
       subscription_status: "active" | "past_due" | "cancelled" | "expired"
       subscription_tier: "free" | "pilot" | "student" | "institution"
@@ -813,7 +813,7 @@ export const Constants = {
       content_flag_status: ["open", "resolved", "rejected"],
       content_mechanism_status: ["draft", "review", "published", "retired"],
       srs_card_status: ["learning", "review", "leech", "suspended"],
-      srs_rating: ["again", "hard", "good", "easy"],
+      srs_rating: ["again", "hard", "good", "easy", "dont_know"],
       study_session_status: ["active", "completed", "abandoned"],
       subscription_status: ["active", "past_due", "cancelled", "expired"],
       subscription_tier: ["free", "pilot", "student", "institution"],

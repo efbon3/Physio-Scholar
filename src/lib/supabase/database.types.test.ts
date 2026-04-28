@@ -104,8 +104,10 @@ describe("Database type", () => {
     >();
   });
 
-  it("srs_rating enum matches the Phase 3 migration", () => {
-    expectTypeOf<PublicEnums["srs_rating"]>().toEqualTypeOf<"again" | "hard" | "good" | "easy">();
+  it("srs_rating enum matches the Phase 3 migration + the v1.3 dont_know addition", () => {
+    expectTypeOf<PublicEnums["srs_rating"]>().toEqualTypeOf<
+      "again" | "hard" | "good" | "easy" | "dont_know"
+    >();
   });
 
   it("card_states row carries the SRS scheduling columns", () => {

@@ -23,23 +23,33 @@ type SessionStatus = "answering" | "feedback" | "complete";
 type Outcome = {
   cardId: string;
   band: GradingBand;
-  selectedIndex: number;
+  selectedIndex: number | null;
 };
+
+/** A symbolic value used for `selectedIndex` when the student picks
+ * "I don't know" rather than one of the four options. Distinct from
+ * `null` (no selection yet) so the lock-on-Submit logic can tell
+ * "didn't pick yet" from "explicitly opted out." */
+const DONT_KNOW = -1 as const;
 
 /**
  * Mechanism-centric MCQ session. Walks through pre-built `McqQuestion`
  * objects (server-shuffled) one at a time:
- *   1. Show stem + four option buttons.
- *   2. On select, lock the choice, reveal correct/wrong + the
+ *   1. Show stem + four option cards + a subordinate "I don't know"
+ *      button. Tapping any option (or "I don't know") highlights it;
+ *      the student can change their mind freely until they tap Submit.
+ *   2. Submit locks the choice and reveals the correct option, the
  *      misconception coaching string (if the wrong-answer text matches
- *      a misconception map entry) + the elaborative explanation.
+ *      a misconception map entry; "I don't know" suppresses it), and
+ *      the elaborative explanation.
  *   3. SRS rating per `mcqOutcomeToBand`: correct + no hints → Green,
- *      correct + hints → Yellow, wrong → Red. v1 has no hint ladder
- *      on this surface yet, so hintsUsed is always 0 — every correct
- *      answer goes Green. (Build spec §2.5 leaves hints optional;
- *      threading them in is a future commit.)
+ *      correct + hints → Yellow, wrong → Red, "I don't know" →
+ *      dont_know (build spec §2.7 modification 3 — same next-interval
+ *      as Again but no ease drop, no lapse increment). v1 has no hint
+ *      ladder on this surface yet, so hintsUsed is always 0.
  *   4. Continue → next card.
- *   5. End-of-session summary with Green/Yellow/Red counts.
+ *   5. End-of-session summary with Correct / Partial / Incorrect /
+ *      Don't-know counts.
  *
  * Practice-only toggle suppresses SRS schedule writes per build spec
  * §2.3 — review row still records (analytics), card_state stays
@@ -82,24 +92,35 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
   if (!question || !card) return null;
 
   const correctIndex = question.options.findIndex((o) => o.isCorrect);
-  const isCorrect = selectedIndex !== null && selectedIndex === correctIndex;
-  const selectedOptionText = selectedIndex !== null ? question.options[selectedIndex].text : null;
+  const isDontKnow = selectedIndex === DONT_KNOW;
+  const isCorrect = selectedIndex !== null && !isDontKnow && selectedIndex === correctIndex;
+  const selectedOptionText =
+    selectedIndex !== null && selectedIndex !== DONT_KNOW
+      ? question.options[selectedIndex].text
+      : null;
   const matchingMisconception =
-    selectedOptionText !== null && !isCorrect
+    !isDontKnow && selectedOptionText !== null && !isCorrect
       ? card.misconceptions.find((m) => m.wrong_answer === selectedOptionText)
       : undefined;
 
-  async function handleSelect(i: number) {
+  function handleSelect(i: number) {
     if (status !== "answering") return;
     setSelectedIndex(i);
+  }
 
-    const correct = i === correctIndex;
-    const band = mcqOutcomeToBand({ correct, hintsUsed: 0 });
+  function handleDontKnow() {
+    if (status !== "answering") return;
+    setSelectedIndex(DONT_KNOW);
+  }
+
+  async function handleSubmit() {
+    if (status !== "answering") return;
+    if (selectedIndex === null) return;
+
+    const dontKnow = selectedIndex === DONT_KNOW;
+    const correct = !dontKnow && selectedIndex === correctIndex;
+    const band = mcqOutcomeToBand({ correct, hintsUsed: 0, dontKnow });
     const rating = bandToRating(band);
-    // Date.now() in an event handler is fine — React's purity rule
-    // applies to render code, not handlers. The lint rule occasionally
-    // misclassifies an arrow-wrapped onClick callee as render context.
-    // eslint-disable-next-line react-hooks/purity
     const elapsedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
 
     try {
@@ -116,7 +137,14 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
       console.error("Failed to record MCQ review locally", err);
     }
 
-    setOutcomes((prior) => [...prior, { cardId: question.cardId, band, selectedIndex: i }]);
+    setOutcomes((prior) => [
+      ...prior,
+      {
+        cardId: question.cardId,
+        band,
+        selectedIndex: dontKnow ? null : selectedIndex,
+      },
+    ]);
     setStatus("feedback");
   }
 
@@ -131,6 +159,8 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
     setStartTime(Date.now());
   }
 
+  const submitDisabled = status !== "answering" || selectedIndex === null;
+
   return (
     <article className="border-border flex flex-col gap-5 rounded-md border p-5">
       <header className="flex flex-col gap-3">
@@ -138,7 +168,9 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
           <p className="text-muted-foreground tracking-widest uppercase">
             Question {index + 1} of {questions.length}
           </p>
-          {selectedIndex !== null ? <BandPill band={isCorrect ? "green" : "red"} /> : null}
+          {status === "feedback" ? (
+            <BandPill band={isDontKnow ? "dont_know" : isCorrect ? "green" : "red"} />
+          ) : null}
         </div>
         <label className="text-muted-foreground flex items-center gap-2 text-xs">
           <input
@@ -168,9 +200,11 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
                 type="button"
                 onClick={() => handleSelect(i)}
                 disabled={status !== "answering"}
+                aria-pressed={isSelected}
                 className={cn(
                   "border-input bg-background flex w-full items-start gap-3 rounded-md border p-3 text-left text-sm transition-colors",
                   status === "answering" && "hover:bg-muted",
+                  status === "answering" && isSelected && "border-primary bg-primary/5",
                   showCorrect && "border-emerald-500 bg-emerald-50 text-emerald-900",
                   showWrong && "border-red-500 bg-red-50 text-red-900",
                   status !== "answering" && !showCorrect && !showWrong && "opacity-70",
@@ -186,9 +220,46 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
         })}
       </ul>
 
+      {/* "I don't know" lives below the four options as a deliberately
+          subordinate but clearly available choice — build spec §2.3
+          ("visually subordinate but clearly available"). */}
+      <button
+        type="button"
+        onClick={handleDontKnow}
+        disabled={status !== "answering"}
+        aria-pressed={isDontKnow}
+        className={cn(
+          "border-input text-muted-foreground self-start rounded-md border border-dashed px-3 py-1.5 text-xs transition-colors",
+          status === "answering" && "hover:bg-muted",
+          status === "answering" && isDontKnow && "border-primary text-primary bg-primary/5",
+          status !== "answering" && isDontKnow && "border-amber-500 bg-amber-50 text-amber-900",
+          status !== "answering" && !isDontKnow && "opacity-50",
+        )}
+      >
+        I don&apos;t know
+      </button>
+
+      {status === "answering" ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitDisabled}
+            className={cn(buttonVariants({ size: "default" }))}
+          >
+            Submit answer
+          </button>
+        </div>
+      ) : null}
+
       {status === "feedback" ? (
         <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-md border p-4 text-sm leading-relaxed">
-          {!isCorrect && matchingMisconception ? (
+          {isDontKnow ? (
+            <p className="text-muted-foreground text-xs">
+              You opted out — the card returns tomorrow without an ease change.
+            </p>
+          ) : null}
+          {!isCorrect && !isDontKnow && matchingMisconception ? (
             <div>
               <p className="text-muted-foreground text-xs tracking-widest uppercase">
                 What went wrong
@@ -212,13 +283,22 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
 }
 
 function BandPill({ band }: { band: GradingBand }) {
-  const label = band === "green" ? "Correct" : band === "yellow" ? "Partial" : "Incorrect";
+  const label =
+    band === "green"
+      ? "Correct"
+      : band === "yellow"
+        ? "Partial"
+        : band === "red"
+          ? "Incorrect"
+          : "Don't know";
   const cls =
     band === "green"
       ? "bg-emerald-100 text-emerald-900"
       : band === "yellow"
         ? "bg-amber-100 text-amber-900"
-        : "bg-red-100 text-red-900";
+        : band === "red"
+          ? "bg-red-100 text-red-900"
+          : "bg-slate-100 text-slate-700";
   return (
     <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium", cls)}>{label}</span>
   );
@@ -240,7 +320,7 @@ function SummaryScreen({
       acc[o.band] += 1;
       return acc;
     },
-    { green: 0, yellow: 0, red: 0 },
+    { green: 0, yellow: 0, red: 0, dont_know: 0 },
   );
   return (
     <article className="border-border flex flex-col gap-5 rounded-md border p-5">
@@ -251,10 +331,11 @@ function SummaryScreen({
           {outcomes.length === 1 ? "" : "s"}.
         </p>
       </header>
-      <dl className="grid grid-cols-3 gap-2 text-center text-sm">
+      <dl className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
         <SummaryStat label="Correct" count={counts.green} band="green" />
         <SummaryStat label="Partial" count={counts.yellow} band="yellow" />
         <SummaryStat label="Incorrect" count={counts.red} band="red" />
+        <SummaryStat label="Don't know" count={counts.dont_know} band="dont_know" />
       </dl>
       <p className="text-muted-foreground text-xs leading-relaxed">
         {practiceMode
@@ -282,7 +363,9 @@ function SummaryStat({ label, count, band }: { label: string; count: number; ban
       ? "bg-emerald-50 text-emerald-900"
       : band === "yellow"
         ? "bg-amber-50 text-amber-900"
-        : "bg-red-50 text-red-900";
+        : band === "red"
+          ? "bg-red-50 text-red-900"
+          : "bg-slate-50 text-slate-700";
   return (
     <div className={cn("flex flex-col rounded-md py-3", cls)}>
       <dt className="text-[11px] tracking-widest uppercase">{label}</dt>

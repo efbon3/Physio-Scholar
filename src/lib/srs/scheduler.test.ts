@@ -195,6 +195,77 @@ describe("scheduleNext — ease ratcheting across multiple reviews", () => {
   });
 });
 
+describe("scheduleNext — Don't know rating (build spec §2.7 modification 3)", () => {
+  it("brand-new card: Don't know returns to learning at the 1-minute step, ease unchanged", () => {
+    const next = scheduleNext(stateWith(), "dont_know", NOW);
+    expect(next.status).toBe("learning");
+    expect(next.interval_days).toBeCloseTo(MINUTE_IN_DAYS, 10);
+    expect(next.ease).toBe(SRS_DEFAULTS.ease);
+    expect(next.consecutive_again_count).toBe(0);
+  });
+
+  it("does not increment consecutive_again_count (no leech promotion path)", () => {
+    let s = stateWith();
+    for (let i = 0; i < SRS_DEFAULTS.leech_threshold + 2; i += 1) {
+      s = scheduleNext(s, "dont_know", NOW);
+    }
+    expect(s.consecutive_again_count).toBe(0);
+    expect(s.status).toBe("learning");
+  });
+
+  it("does not decrement ease, even from a low starting point", () => {
+    const low = stateWith({ ease: SRS_DEFAULTS.ease_floor + 0.01 });
+    const next = scheduleNext(low, "dont_know", NOW);
+    expect(next.ease).toBe(low.ease);
+  });
+
+  it("graduated card: Don't know collapses interval back to 1 minute and drops to learning", () => {
+    const graduated = stateWith({
+      status: "review",
+      interval_days: 14,
+      ease: 2.6,
+      last_reviewed_at: "2026-04-17T10:00:00Z",
+    });
+    const next = scheduleNext(graduated, "dont_know", NOW);
+    expect(next.status).toBe("learning");
+    expect(next.interval_days).toBeCloseTo(MINUTE_IN_DAYS, 10);
+    expect(next.ease).toBe(graduated.ease);
+    expect(next.consecutive_again_count).toBe(0);
+  });
+
+  it("does not change a suspended card", () => {
+    const suspended = stateWith({ status: "suspended", interval_days: 7 });
+    const next = scheduleNext(suspended, "dont_know", NOW);
+    expect(next).toEqual(suspended);
+  });
+
+  it("an Again-streak followed by Don't know does not advance the leech counter further", () => {
+    let s = stateWith();
+    // Three Agains brings the counter to 3, well below leech threshold (5).
+    s = scheduleNext(s, "again", NOW);
+    s = scheduleNext(s, "again", NOW);
+    s = scheduleNext(s, "again", NOW);
+    expect(s.consecutive_again_count).toBe(3);
+    // Don't know should NOT increment the counter.
+    s = scheduleNext(s, "dont_know", NOW);
+    expect(s.consecutive_again_count).toBe(3);
+    expect(s.status).toBe("learning");
+  });
+
+  it("a Don't know on a leech card does NOT bring it out of leech (only Easy/Good/Hard do)", () => {
+    const leech = stateWith({
+      status: "leech",
+      consecutive_again_count: SRS_DEFAULTS.leech_threshold,
+    });
+    const next = scheduleNext(leech, "dont_know", NOW);
+    // Counter is unchanged; the card moves to learning per the standard
+    // Don't know path. Leech recovery requires a non-again, non-don't_know
+    // rating per the spec.
+    expect(next.consecutive_again_count).toBe(leech.consecutive_again_count);
+    expect(next.status).toBe("learning");
+  });
+});
+
 describe("newCardState helper", () => {
   it("builds a sensible default", () => {
     const s = newCardState(NOW);
