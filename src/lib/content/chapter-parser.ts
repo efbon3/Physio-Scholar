@@ -201,16 +201,20 @@ export function mapPartToOrganSystem(partField: string): OrganSystem {
  * questions transformed to platform shape.
  */
 function transformBody(raw: string): string {
-  // 1. Drop the optional `# Chapter N — MCQs` heading and any preamble
+  // 1. Normalise CRLF → LF and strip a leading UTF-8 BOM so that
+  //    files saved by Notepad / PowerShell parse the same as
+  //    files saved by VS Code on Linux.
+  // 2. Drop the optional `# Chapter N — MCQs` heading and any preamble
   //    paragraph between it and the first `## Pass` heading.
-  // 2. Drop `## Pass N — …` group headings; their grouping is meta
+  // 3. Drop `## Pass N — …` group headings; their grouping is meta
   //    information for the author and doesn't survive into the runtime.
-  // 3. Drop the trailing `# Final Summary` section if present — it is
+  // 4. Drop the trailing `# Final Summary` section if present — it is
   //    author meta-notes, not student-facing content.
-  // 4. Walk the rest splitting on `\n---\n` separators, identify each
+  // 5. Walk the rest splitting on `\n---\n` separators, identify each
   //    chunk that opens with `QUESTION <n>`, transform to a `##
   //    Question <n>` block.
-  const stripped = stripFinalSummary(raw);
+  const normalised = raw.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+  const stripped = stripFinalSummary(normalised);
   const blocks = stripped.split(/\n-{3,}\n/);
   const transformedQuestions: string[] = [];
   for (const block of blocks) {
@@ -248,6 +252,19 @@ function transformQuestionBlock(block: string): string | null {
 
   const type = get("Type");
   const blooms = get("Bloom's level") ?? get("Bloom's Level");
+  // Priority and Difficulty live on the question block in two
+  // shapes the author uses interchangeably:
+  //   - canonical:  `Priority: must`         /  `Difficulty: foundational`
+  //   - shorthand:  `Priority (M / S / G): m` /  `Difficulty (F / I / A): f`
+  // The shorthand form (single letter) maps to the canonical token
+  // before being emitted, so cards.ts's enum normaliser sees a value
+  // it already recognises.
+  const priority = mapPriorityShorthand(
+    get("Priority (M / S / G)") ?? get("Priority (M/S/G)") ?? get("Priority"),
+  );
+  const difficulty = mapDifficultyShorthand(
+    get("Difficulty (F / I / A)") ?? get("Difficulty (F/I/A)") ?? get("Difficulty"),
+  );
   const stem = extractMultilineField(block, "Stem");
   const correct = extractMultilineField(block, "Correct answer");
   const explanation = extractMultilineField(block, "Explanation");
@@ -261,6 +278,8 @@ function transformQuestionBlock(block: string): string | null {
   lines.push(`**Status:** published`);
   if (type) lines.push(`**Type:** ${type}`);
   if (blooms) lines.push(`**Bloom's level:** ${blooms}`);
+  if (priority) lines.push(`**Priority:** ${priority}`);
+  if (difficulty) lines.push(`**Difficulty:** ${difficulty}`);
   if (stem) lines.push(`**Stem:** ${stem}`);
   if (correct) lines.push(`**Correct answer:** ${correct}`);
   if (explanation) lines.push(`**Elaborative explanation:** ${explanation}`);
@@ -356,6 +375,44 @@ function extractListField(block: string, label: string): string[] {
     break;
   }
   return items;
+}
+
+/**
+ * Map a Priority shorthand to its canonical token. Accepts:
+ *   - single-letter shorthand: m / s / g
+ *   - full names: must / should / good (and the synonyms cards.ts
+ *     accepts: essential / core / expected / optional / bonus)
+ * Returns null when the input is missing — the chapter file may
+ * legitimately omit Priority on a per-question basis.
+ */
+function mapPriorityShorthand(raw: string | null): string | null {
+  if (raw === null) return null;
+  const lower = raw.trim().toLowerCase();
+  if (lower.length === 0) return null;
+  if (lower === "m") return "must";
+  if (lower === "s") return "should";
+  if (lower === "g") return "good";
+  // Full word — pass through; cards.ts's normaliser handles synonyms.
+  return lower;
+}
+
+/**
+ * Map a Difficulty shorthand to its canonical token. Accepts:
+ *   - single-letter shorthand: f / i / a
+ *   - full names: foundational / standard / advanced (and the
+ *     synonyms cards.ts accepts: easy / intermediate / hard)
+ *
+ *   "i" maps to "standard" — the chapter shorthand uses "I" for
+ *   "Intermediate," which is the spec's synonym for "standard."
+ */
+function mapDifficultyShorthand(raw: string | null): string | null {
+  if (raw === null) return null;
+  const lower = raw.trim().toLowerCase();
+  if (lower.length === 0) return null;
+  if (lower === "f") return "foundational";
+  if (lower === "i") return "standard";
+  if (lower === "a") return "advanced";
+  return lower;
 }
 
 /**

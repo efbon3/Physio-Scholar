@@ -327,5 +327,97 @@ describe("chapterToMechanism — shipped chapter file", () => {
     expect(cards[0].format).toBe("mcq");
     expect(cards[0].correct_answer.length).toBeGreaterThan(0);
     expect(cards[0].misconceptions.length).toBeGreaterThanOrEqual(2);
+    // Priority and Difficulty come from the shorthand `Priority (M /
+    // S / G):` / `Difficulty (F / I / A):` lines added in the
+    // 2026-04-28 chapter revision — every authored question should
+    // have both populated, no defaults.
+    for (const card of cards) {
+      expect(["must", "should", "good"]).toContain(card.priority);
+      expect(["foundational", "standard", "advanced"]).toContain(card.difficulty);
+    }
+    // Q1 specifically authored as F (foundational) / S (should).
+    expect(cards[0].priority).toBe("should");
+    expect(cards[0].difficulty).toBe("foundational");
+  });
+});
+
+describe("Priority and Difficulty shorthand mapping", () => {
+  it("transforms shorthand letters to canonical tokens", () => {
+    const RAW = `---
+chapter: Chapter 1 — Test
+part: Part I — Foundations of Physiology
+status: draft
+---
+
+# Questions
+
+QUESTION 1
+Type: recall
+Bloom's level: remember
+Difficulty (F / I / A): f
+Priority (M / S / G): m
+
+Stem: Stem.
+
+Correct answer: Answer.
+
+Distractors:
+- "Wrong A" — Reveals misconception: foo.
+- "Wrong B" — Reveals misconception: bar.
+
+Explanation: Why.
+
+Hints:
+1. Hint A.
+
+---
+
+QUESTION 2
+Type: recall
+Bloom's level: understand
+Difficulty (F / I / A): i
+Priority (M / S / G): s
+
+Stem: Stem.
+
+Correct answer: Answer.
+
+Distractors:
+- "Wrong A" — Reveals misconception: foo.
+
+Explanation: Why.
+
+Hints:
+1. Hint A.
+
+---
+
+QUESTION 3
+Type: recall
+Bloom's level: analyze
+Difficulty (F / I / A): a
+Priority (M / S / G): g
+
+Stem: Stem.
+
+Correct answer: Answer.
+
+Distractors:
+- "Wrong A" — Reveals misconception: foo.
+
+Explanation: Why.
+
+Hints:
+1. Hint A.
+`;
+    const m = parseMechanism(RAW);
+    const cards = extractCards(m);
+    expect(cards).toHaveLength(3);
+    expect(cards[0].priority).toBe("must");
+    expect(cards[0].difficulty).toBe("foundational");
+    expect(cards[1].priority).toBe("should");
+    expect(cards[1].difficulty).toBe("standard");
+    expect(cards[2].priority).toBe("good");
+    expect(cards[2].difficulty).toBe("advanced");
   });
 });

@@ -1,4 +1,4 @@
----
+﻿---
 chapter: Chapter 1 — Introduction to Physiology and Homeostasis
 part: Part I — Foundations of Physiology
 tier: 1
@@ -26,6 +26,8 @@ The questions below were authored in three passes (regulated variable + sensors 
 QUESTION 1
 Type: recall
 Bloom's level: remember
+Difficulty (F / I / A): f
+Priority (M / S / G): s
 
 Stem: Which physiologist coined the term "homeostasis" to describe the maintenance of nearly constant conditions in the internal environment?
 
@@ -50,6 +52,8 @@ Hints:
 QUESTION 2
 Type: recall
 Bloom's level: remember
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: The 19th-century French physiologist Claude Bernard introduced which foundational concept?
 
@@ -74,6 +78,8 @@ Hints:
 QUESTION 3
 Type: recall
 Bloom's level: remember
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: The adult human body is approximately what percentage water?
 
@@ -98,6 +104,8 @@ Hints:
 QUESTION 4
 Type: comparison
 Bloom's level: understand
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: How is total body water distributed between intracellular and extracellular compartments?
 
@@ -122,6 +130,8 @@ Hints:
 QUESTION 5
 Type: recall
 Bloom's level: understand
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: The extracellular fluid (ECF) is itself divided into two subcompartments. Which subcompartment is the larger of the two, and what separates them?
 
@@ -146,6 +156,8 @@ Hints:
 QUESTION 6
 Type: comparison
 Bloom's level: understand
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: Which set of ions and substances is characteristic of _extracellular_ (rather than intracellular) fluid?
 
@@ -170,6 +182,8 @@ Hints:
 QUESTION 7
 Type: prediction
 Bloom's level: apply
+Difficulty (F / I / A): i
+Priority (M / S / G): s
 
 Stem: Blood circulates through the entire body about once per minute when a person is at rest. By approximately how many times can this circulation rate increase during strenuous exercise?
 
@@ -194,6 +208,8 @@ Hints:
 QUESTION 8
 Type: clinical application
 Bloom's level: understand
+Difficulty (F / I / A): a
+Priority (M / S / G): m
 
 Stem: A medical student notices that capillaries are present throughout almost every tissue of the body. What is the approximate maximum distance that any cell lies from a capillary, and why does this matter?
 
@@ -220,6 +236,8 @@ Hints:
 QUESTION 9
 Type: recall
 Bloom's level: understand
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: A homeostatic control system contains three essential components. Which of the following correctly names them?
 
@@ -244,6 +262,8 @@ Hints:
 QUESTION 10
 Type: recall
 Bloom's level: understand
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: Which of the following best describes a _negative feedback_ system in physiology?
 
@@ -268,6 +288,8 @@ Hints:
 QUESTION 11
 Type: calculation
 Bloom's level: apply
+Difficulty (F / I / A): i
+Priority (M / S / G): s
 
 Stem: A blood transfusion is given to a patient whose baroreceptor reflex is non-functional, and arterial pressure rises from 100 to 175 mm Hg. When the same transfusion is given to a patient with an intact baroreceptor reflex, pressure rises only to 125 mm Hg. The gain of the baroreceptor pressure-control system in this scenario is approximately:
 
@@ -292,6 +314,8 @@ Hints:
 QUESTION 12
 Type: comparison
 Bloom's level: analyze
+Difficulty (F / I / A): a
+Priority (M / S / G): g
 
 Stem: The body temperature control system has a gain of about −33, whereas the baroreceptor system controlling arterial pressure has a gain of about −2. What does this difference imply?
 
@@ -316,6 +340,8 @@ Hints:
 QUESTION 13
 Type: misconception-targeted
 Bloom's level: understand
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: Which of the following is the _best_ example of physiologically useful positive feedback?
 
@@ -340,6 +366,8 @@ Hints:
 QUESTION 14
 Type: clinical application
 Bloom's level: apply
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: A meal arrives in the duodenum and triggers insulin secretion _before_ blood glucose has appreciably risen. Which control mechanism best describes this anticipatory release?
 
@@ -364,6 +392,8 @@ Hints:
 QUESTION 15
 Type: prediction
 Bloom's level: analyze
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: A pregnant woman in late labour experiences progressively stronger uterine contractions that culminate in delivery, after which the contractions stop. Which feature of this process is most characteristic?
 
@@ -388,6 +418,8 @@ Hints:
 QUESTION 16
 Type: misconception-targeted
 Bloom's level: understand
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: Which statement about useful positive feedback in physiology is _correct_?
 
@@ -414,6 +446,8 @@ Hints:
 QUESTION 17
 Type: clinical application
 Bloom's level: apply
+Difficulty (F / I / A): f
+Priority (M / S / G): m
 
 Stem: A trauma patient bleeds 2 L of blood. Cardiac output falls, coronary perfusion drops, the heart weakens further, cardiac output falls more, and so on. Which architectural feature describes this lethal sequence?
 
@@ -438,6 +472,8 @@ Hints:
 QUESTION 18
 Type: clinical application
 Bloom's level: analyze
+Difficulty (F / I / A): i
+Priority (M / S / G): s
 
 Stem: A patient with severe heatstroke has a core temperature of 42°C. The cooling mechanisms of the hypothalamus are themselves becoming impaired by the high temperature, so the body cannot dissipate heat. This is best classified as:
 
@@ -462,6 +498,8 @@ Hints:
 QUESTION 19
 Type: recall
 Bloom's level: remember
+Difficulty (F / I / A): a
+Priority (M / S / G): g
 
 Stem: The _short-term non-lethal_ range of arterial pH is approximately:
 
@@ -486,6 +524,8 @@ Hints:
 QUESTION 20
 Type: prediction
 Bloom's level: apply
+Difficulty (F / I / A): i
+Priority (M / S / G): s
 
 Stem: When the plasma calcium ion concentration falls to about _half_ its normal value, what is the most likely consequence?
 
@@ -510,6 +550,8 @@ Hints:
 QUESTION 21
 Type: clinical application
 Bloom's level: apply
+Difficulty (F / I / A): a
+Priority (M / S / G): g
 
 Stem: A diabetic patient on insulin therapy is found to have a plasma glucose of about 35 mg/dL — roughly half the normal fasting value. What symptoms are most likely?
 
@@ -534,6 +576,8 @@ Hints:
 QUESTION 22
 Type: analysis
 Bloom's level: analyze
+Difficulty (F / I / A): a
+Priority (M / S / G): g
 
 Stem: A patient with longstanding renal disease develops sustained hypertension. The raised pressure is initially helpful — it returns sodium and water excretion to balanced levels — but harmful in the long term because it damages the kidneys, worsening the original problem. Which concept does this best illustrate?
 
