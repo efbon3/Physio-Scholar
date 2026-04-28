@@ -145,6 +145,16 @@ export const cardSchema = z.object({
    * or `**Tolerance:** 0.05`.
    */
   tolerance_pct: z.number().min(0).max(1).optional(),
+  /**
+   * Descriptive only: the multi-paragraph rubric the student uses to
+   * self-rate Green / Yellow / Red after seeing the model answer.
+   * Authored as a `### Self-Grading Checklist` subsection (rather
+   * than a `**Label:**` line) so the rubric can span paragraphs and
+   * include bullet lists without the field extractor terminating at
+   * the first blank line. Stored verbatim — the renderer treats it
+   * as markdown.
+   */
+  self_grading_checklist: z.string().min(1).optional(),
 });
 export type Card = z.infer<typeof cardSchema>;
 
@@ -211,7 +221,19 @@ function parseCardBody(
     acceptable_answers: extractAcceptableAnswers(body),
     unit: extractLabeledField(body, "Unit") ?? undefined,
     tolerance_pct: parseTolerance(extractLabeledField(body, "Tolerance")),
+    self_grading_checklist: extractSelfGradingChecklist(body),
   };
+}
+
+function extractSelfGradingChecklist(body: string): string | undefined {
+  // Section heading is `### Self-Grading Checklist`. Mirrors
+  // `extractHintLadder`'s shape: stops at the next `###` subheading
+  // or end of body. Returns undefined when absent so the optional
+  // schema field stays out rather than being explicitly empty.
+  const match = body.match(/###\s+Self-Grading\s+Checklist\s*\n([\s\S]+?)(?=\n\s*###\s|$)/i);
+  if (!match) return undefined;
+  const trimmed = match[1].trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

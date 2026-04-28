@@ -319,7 +319,7 @@ describe("chapterToMechanism — shipped chapter file (merged)", () => {
   // id (`ch01-introduction-and-homeostasis`, no format suffix) anchors
   // the URL, and the merged questions section carries cards from both
   // files renumbered sequentially.
-  it("merges MCQ + fill-blank chapter files into a single mechanism", async () => {
+  it("merges MCQ + fill-blank + descriptive chapter files into a single mechanism", async () => {
     const { readMechanismById } = await import("./fs");
     const m = await readMechanismById("ch01-introduction-and-homeostasis");
     expect(m).not.toBeNull();
@@ -328,20 +328,22 @@ describe("chapterToMechanism — shipped chapter file (merged)", () => {
     expect(m.frontmatter.organ_system).toBe("foundations");
     expect(m.frontmatter.title).toMatch(/Introduction/);
     const cards = extractCards(m);
-    // 22 MCQ + 18 fill-blank = 40 cards, renumbered 1..40.
-    expect(cards).toHaveLength(40);
+    // 22 MCQ + 18 fill-blank + 15 descriptive = 55 cards, renumbered 1..55.
+    expect(cards).toHaveLength(55);
     const mcq = cards.filter((c) => c.format === "mcq");
     const fillBlank = cards.filter((c) => c.format === "fill_blank");
+    const descriptive = cards.filter((c) => c.format === "descriptive");
     expect(mcq).toHaveLength(22);
     expect(fillBlank).toHaveLength(18);
-    // First batch (MCQ from primary) precedes the fill-blank batch in
-    // the merged body — primary's questions land first, then extras
-    // in lex-id order.
+    expect(descriptive).toHaveLength(15);
+    // Format batches concatenate in lex-id order of the source files:
+    // primary (no suffix) → -descriptive → -fillblank.
     expect(cards[0].format).toBe("mcq");
-    expect(cards[22].format).toBe("fill_blank");
+    expect(cards[22].format).toBe("descriptive");
+    expect(cards[37].format).toBe("fill_blank");
     // Card ids stay unique under the primary's mechanism_id.
     const ids = new Set(cards.map((c) => c.id));
-    expect(ids.size).toBe(40);
+    expect(ids.size).toBe(55);
     // Spot-check the first MCQ has the structured fields the platform
     // expects (Priority/Difficulty shorthand, misconceptions).
     expect(cards[0].correct_answer.length).toBeGreaterThan(0);
@@ -349,11 +351,19 @@ describe("chapterToMechanism — shipped chapter file (merged)", () => {
     expect(cards[0].priority).toBe("should");
     expect(cards[0].difficulty).toBe("foundational");
     // Every card has both Priority and Difficulty populated — no
-    // defaults — across both formats.
+    // defaults — across all three formats.
     for (const card of cards) {
       expect(["must", "should", "good"]).toContain(card.priority);
       expect(["foundational", "standard", "advanced"]).toContain(card.difficulty);
     }
+    // Descriptive cards carry the self-grading checklist where authored.
+    const checklistCards = descriptive.filter((c) => c.self_grading_checklist);
+    expect(checklistCards.length).toBeGreaterThanOrEqual(10);
+    // The first descriptive question's checklist references the
+    // Green / Yellow / Red rubric structure.
+    expect(descriptive[0].self_grading_checklist).toMatch(/Green answer/);
+    expect(descriptive[0].self_grading_checklist).toMatch(/Yellow answer/);
+    expect(descriptive[0].self_grading_checklist).toMatch(/Red answer/);
   });
 
   it("does not expose the extra (fill-blank) file under its own id", async () => {

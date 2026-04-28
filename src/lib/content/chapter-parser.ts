@@ -261,6 +261,7 @@ function stripFinalSummary(raw: string): string {
  * Transform a single `QUESTION N` block into a `## Question N`
  * block with bold-labeled fields. Detects the shape and dispatches:
  *   - `Canonical answer:` present → fill-blank
+ *   - `Model answer:` present → descriptive (free-text + self-rated)
  *   - otherwise (`Correct answer:` + `Distractors:`) → MCQ
  *
  * Returns null if the block doesn't begin with a recognisable
@@ -272,6 +273,9 @@ function transformQuestionBlock(block: string): string | null {
   const number = headingMatch[1];
   if (/^Canonical answer:/im.test(block)) {
     return transformFillBlankBlock(block, number);
+  }
+  if (/^Model answer:/im.test(block)) {
+    return transformDescriptiveBlock(block, number);
   }
   return transformMcqBlock(block, number);
 }
@@ -386,6 +390,44 @@ function transformFillBlankBlock(block: string, number: string): string {
   return lines.join("\n");
 }
 
+function transformDescriptiveBlock(block: string, number: string): string {
+  const lines = buildCommonHeader(block, number);
+  lines.splice(1, 0, `**Format:** descriptive`);
+
+  const stem = extractMultilineField(block, "Stem");
+  const model = extractMultilineField(block, "Model answer");
+  const explanation = extractMultilineField(block, "Elaborative explanation");
+  const checklist = extractMultilineField(block, "Self-grading checklist");
+  const hints = extractListField(block, "Hints");
+
+  if (stem) lines.push(`**Stem:** ${stem}`);
+  if (model) lines.push(`**Correct answer:** ${model}`);
+  if (explanation) lines.push(`**Elaborative explanation:** ${explanation}`);
+
+  if (hints.length > 0) {
+    lines.push("");
+    lines.push("### Hint Ladder");
+    hints.forEach((h, i) => lines.push(`${i + 1}. ${h}`));
+  }
+
+  // Self-grading checklist is a multi-paragraph rubric (Green /
+  // Yellow / Red criteria) — emit as a `### Self-Grading Checklist`
+  // subsection so cards.ts's section-based extractor can grab the
+  // whole block. A `**Label:**` line would terminate at the first
+  // blank line and lose the Yellow/Red paragraphs.
+  if (checklist) {
+    lines.push("");
+    lines.push("### Self-Grading Checklist");
+    lines.push(checklist);
+  }
+
+  // `Common misconceptions:` is intentionally dropped for now — only
+  // a handful of questions carry it, and the descriptive UI doesn't
+  // surface them yet. Re-introduce as a `### Common Pitfalls`
+  // section if/when there's UI to display them.
+  return lines.join("\n");
+}
+
 /**
  * Convert a chapter-format Tolerance string into the percent form the
  * platform's grader expects. Three cases:
@@ -465,18 +507,25 @@ function extractLineField(block: string, label: string): string | null {
 
 /**
  * Pull a possibly-multiline `Label: value` from a question block.
- * Multiline fields are: Stem, Correct answer, Canonical answer,
- * Explanation. The value runs until the next known `Label:` line or
- * end of block. The stop list includes both MCQ-shape labels
- * (Correct answer, Distractors) and fill-blank-shape labels (Canonical
- * answer, Accepted variants, Tolerance, Yellow conditions) so that
- * `Stem:` extracted from a fill-blank block doesn't run into the
- * `Canonical answer:` line that follows.
+ * Multiline fields span all three chapter shapes:
+ *   - MCQ:        Stem, Correct answer, Explanation
+ *   - Fill-blank: Stem, Canonical answer, Explanation
+ *   - Descriptive: Stem, Model answer, Elaborative explanation,
+ *                  Self-grading checklist, Common misconceptions
+ *
+ * The stop-list lookahead unions all known field labels so an
+ * extracted multiline value can never run past the next field. New
+ * shapes need their distinguishing labels added here.
  */
 function extractMultilineField(block: string, label: string): string | null {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // End-of-string anchor: JS regex has no `\z`, and `$` with the `m`
+  // flag matches end-of-line — which would terminate a multi-paragraph
+  // value (like the descriptive Self-grading checklist) at the first
+  // line break. Use `(?![\s\S])` instead — a negative lookahead for
+  // any character, true only at the end of input.
   const re = new RegExp(
-    `^${escaped}:\\s*([\\s\\S]+?)(?=\\n\\s*(?:Type|Bloom's level|Bloom's Level|Stem|Correct answer|Canonical answer|Accepted variants|Tolerance|Yellow conditions|Distractors|Explanation|Hints):|$)`,
+    `^${escaped}:\\s*([\\s\\S]+?)(?=\\n\\s*(?:Type|Bloom's level|Bloom's Level|Stem|Correct answer|Canonical answer|Accepted variants|Tolerance|Yellow conditions|Distractors|Model answer|Elaborative explanation|Self-grading checklist|Common misconceptions|Explanation|Hints):|(?![\\s\\S]))`,
     "im",
   );
   const m = block.match(re);

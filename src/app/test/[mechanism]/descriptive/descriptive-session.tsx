@@ -222,6 +222,14 @@ export function DescriptiveSession({ cards, mechanismId, mechanismSystem, profil
               <p className="whitespace-pre-wrap">{card.elaborative_explanation}</p>
             </div>
           ) : null}
+          {card.self_grading_checklist ? (
+            <div>
+              <p className="text-muted-foreground text-xs tracking-widest uppercase">
+                Self-grading checklist
+              </p>
+              <p className="whitespace-pre-wrap">{card.self_grading_checklist}</p>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-2">
             <p className="text-muted-foreground text-xs">
               {ratingUnlocked
