@@ -110,8 +110,12 @@ type LayerKey = keyof typeof LAYER_HEADINGS;
  * Split a markdown body on top-level `# ` headings that match the
  * canonical layer names. Content inside fenced code blocks is ignored
  * so that a stray `#` in an example block can't tear a section in half.
+ *
+ * Exported so the filesystem loader can re-derive layers after
+ * merging chapter files (it concatenates question sections and needs
+ * the rebuilt `layers.questions` to drive `extractCards`).
  */
-function splitLayers(body: string): MechanismLayers {
+export function splitLayers(body: string): MechanismLayers {
   const lines = body.split(/\r?\n/);
   const layers: MechanismLayers = {};
 

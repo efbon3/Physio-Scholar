@@ -310,41 +310,59 @@ Hints:
   });
 });
 
-describe("chapterToMechanism — shipped chapter file", () => {
-  // Smoke test against the real ch01-introduction-and-homeostasis.md
-  // we ship under content/mechanisms/. If the chapter format drifts
-  // and breaks the parser, this test catches it on every CI run.
-  it("loads ch01-introduction-and-homeostasis.md and produces 22 cards", async () => {
+describe("chapterToMechanism — shipped chapter file (merged)", () => {
+  // Smoke test against the real chapter-1 content. The MCQ file
+  // (ch01-introduction-and-homeostasis.md) and the fill-blank file
+  // (ch01-introduction-and-homeostasis-fillblank.md) share a
+  // `chapter:` frontmatter, so `readAllMechanisms` merges them into
+  // one mechanism (see `mergeChapterFiles` in fs.ts). The primary's
+  // id (`ch01-introduction-and-homeostasis`, no format suffix) anchors
+  // the URL, and the merged questions section carries cards from both
+  // files renumbered sequentially.
+  it("merges MCQ + fill-blank chapter files into a single mechanism", async () => {
     const { readMechanismById } = await import("./fs");
     const m = await readMechanismById("ch01-introduction-and-homeostasis");
     expect(m).not.toBeNull();
     if (!m) return;
-    // The on-disk filename governs the mechanism id. The chapter title
-    // would slug to `ch01-introduction-to-physiology-and-homeostasis`,
-    // but the file is named `ch01-introduction-and-homeostasis.md`, so
-    // that is what the platform exposes — the URL `/systems/foundations/
-    // ch01-introduction-and-homeostasis` must resolve.
     expect(m.frontmatter.id).toBe("ch01-introduction-and-homeostasis");
     expect(m.frontmatter.organ_system).toBe("foundations");
     expect(m.frontmatter.title).toMatch(/Introduction/);
     const cards = extractCards(m);
-    expect(cards.length).toBe(22);
-    // Spot-check the first card has the structured fields the
-    // platform expects.
+    // 22 MCQ + 18 fill-blank = 40 cards, renumbered 1..40.
+    expect(cards).toHaveLength(40);
+    const mcq = cards.filter((c) => c.format === "mcq");
+    const fillBlank = cards.filter((c) => c.format === "fill_blank");
+    expect(mcq).toHaveLength(22);
+    expect(fillBlank).toHaveLength(18);
+    // First batch (MCQ from primary) precedes the fill-blank batch in
+    // the merged body — primary's questions land first, then extras
+    // in lex-id order.
     expect(cards[0].format).toBe("mcq");
+    expect(cards[22].format).toBe("fill_blank");
+    // Card ids stay unique under the primary's mechanism_id.
+    const ids = new Set(cards.map((c) => c.id));
+    expect(ids.size).toBe(40);
+    // Spot-check the first MCQ has the structured fields the platform
+    // expects (Priority/Difficulty shorthand, misconceptions).
     expect(cards[0].correct_answer.length).toBeGreaterThan(0);
     expect(cards[0].misconceptions.length).toBeGreaterThanOrEqual(2);
-    // Priority and Difficulty come from the shorthand `Priority (M /
-    // S / G):` / `Difficulty (F / I / A):` lines added in the
-    // 2026-04-28 chapter revision — every authored question should
-    // have both populated, no defaults.
+    expect(cards[0].priority).toBe("should");
+    expect(cards[0].difficulty).toBe("foundational");
+    // Every card has both Priority and Difficulty populated — no
+    // defaults — across both formats.
     for (const card of cards) {
       expect(["must", "should", "good"]).toContain(card.priority);
       expect(["foundational", "standard", "advanced"]).toContain(card.difficulty);
     }
-    // Q1 specifically authored as F (foundational) / S (should).
-    expect(cards[0].priority).toBe("should");
-    expect(cards[0].difficulty).toBe("foundational");
+  });
+
+  it("does not expose the extra (fill-blank) file under its own id", async () => {
+    // Once merged, the suffix file's id is no longer routable —
+    // there's exactly one URL per chapter regardless of how many
+    // format files contribute to it.
+    const { readMechanismById } = await import("./fs");
+    const m = await readMechanismById("ch01-introduction-and-homeostasis-fillblank");
+    expect(m).toBeNull();
   });
 });
 
@@ -494,28 +512,30 @@ Hints:
   });
 });
 
-describe("chapterToMechanism — shipped fill-blank chapter file", () => {
-  // Smoke test against the real ch01-introduction-and-homeostasis-fillblank.md
-  // we ship under content/mechanisms/. If the chapter format drifts
-  // and breaks the parser, this test catches it on every CI run.
-  it("loads the fill-blank chapter and produces 18 fill-blank cards", async () => {
+describe("chapterToMechanism — shipped fill-blank questions (post-merge)", () => {
+  // Post-merge the fill-blank file is folded into the chapter's
+  // primary mechanism, so the assertions target the primary id and
+  // filter cards by format. If the chapter parser regresses, this
+  // catches it on every CI run.
+  it("contributes 18 fill-blank cards to the merged Chapter 1 mechanism", async () => {
     const { readMechanismById } = await import("./fs");
-    const m = await readMechanismById("ch01-introduction-and-homeostasis-fillblank");
+    const m = await readMechanismById("ch01-introduction-and-homeostasis");
     expect(m).not.toBeNull();
     if (!m) return;
-    expect(m.frontmatter.id).toBe("ch01-introduction-and-homeostasis-fillblank");
-    expect(m.frontmatter.organ_system).toBe("foundations");
     const cards = extractCards(m);
-    expect(cards).toHaveLength(18);
-    for (const card of cards) {
-      expect(card.format).toBe("fill_blank");
+    const fillBlank = cards.filter((c) => c.format === "fill_blank");
+    expect(fillBlank).toHaveLength(18);
+    for (const card of fillBlank) {
       expect(card.correct_answer.length).toBeGreaterThan(0);
     }
-    // Q13 is the "homeostasis" recall — the year correction (1929 → 1926)
-    // landed in the stem. Catch a regression that would un-fix the date.
-    const q13 = cards.find((c) => c.index === 13);
-    expect(q13?.stem).toMatch(/1926/);
-    expect(q13?.stem).not.toMatch(/1929/);
+    // The fill-blank batch's "Cannon coined homeostasis in __" recall
+    // (originally Q13 in the file, now globally renumbered) carries
+    // the corrected 1926 date in its stem. Find it by stem content
+    // since the global index moved during merge.
+    const homeostasisQ = fillBlank.find((c) => /Cannon coined the term/.test(c.stem));
+    expect(homeostasisQ).toBeDefined();
+    expect(homeostasisQ?.stem).toMatch(/1926/);
+    expect(homeostasisQ?.stem).not.toMatch(/1929/);
   });
 });
 
