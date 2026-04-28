@@ -5,10 +5,11 @@ import { readVisibleEvents } from "@/lib/calendar/events";
 import { buildBoostCardIds, findActiveExamWindow } from "@/lib/calendar/srs-weighting";
 import {
   applyCardFilters,
+  filterByFormat,
   parseDifficultyFilter,
   parsePriorityFilter,
 } from "@/lib/content/card-filters";
-import { extractCards, type Card } from "@/lib/content/cards";
+import { extractCards, type Card, type QuestionFormat } from "@/lib/content/cards";
 import { normaliseMechanismId } from "@/lib/content/filters";
 import { readAllMechanisms } from "@/lib/content/source";
 import { requireApprovedUser } from "@/lib/auth/approval";
@@ -24,7 +25,22 @@ type SearchParams = {
   mechanism?: string | string[];
   priority?: string | string[];
   difficulty?: string | string[];
+  /**
+   * Optional format filter ("descriptive" by default for /review since
+   * the session-player UI is text-input-based). Passed by the
+   * mechanism-page format picker so a learner who picks "Descriptive"
+   * lands on a queue of just descriptive-format cards.
+   */
+  format?: string | string[];
 };
+
+const VALID_FORMATS = new Set<QuestionFormat>(["mcq", "descriptive", "fill_blank"]);
+function parseFormatFilter(raw: string | string[] | undefined): QuestionFormat | null {
+  if (!raw) return null;
+  const value = (Array.isArray(raw) ? raw[0] : raw)?.trim().toLowerCase().replace(/-/g, "_");
+  if (!value) return null;
+  return VALID_FORMATS.has(value as QuestionFormat) ? (value as QuestionFormat) : null;
+}
 
 /**
  * Review-session entry point. Server-rendered so the card universe is
@@ -58,6 +74,7 @@ export default async function ReviewPage({
   // the per-mechanism / per-system filters that already exist.
   const priorityFilter = parsePriorityFilter(resolvedParams.priority);
   const difficultyFilter = parseDifficultyFilter(resolvedParams.difficulty);
+  const formatFilter = parseFormatFilter(resolvedParams.format);
 
   // Approval gate before anything else — unapproved learners bounce
   // to /pending-approval. (app) layout enforces this for /today etc;
@@ -137,6 +154,15 @@ export default async function ReviewPage({
       priority: priorityFilter,
       difficulty: difficultyFilter,
     });
+    if (filtered.length > 0) cards = filtered;
+  }
+
+  // Format filter — applied after priority / difficulty so that a
+  // strict format choice doesn't override what the learner asked for
+  // on the other axes. Same empty-state fallback: if no cards match,
+  // keep the wider deck rather than trap on "no questions found."
+  if (formatFilter) {
+    const filtered = filterByFormat(cards, formatFilter);
     if (filtered.length > 0) cards = filtered;
   }
 

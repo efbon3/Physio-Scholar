@@ -1,12 +1,10 @@
-import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { buttonVariants } from "@/components/ui/button";
 import { extractCards } from "@/lib/content/cards";
 import type { Mechanism } from "@/lib/content/loader";
-import { cn } from "@/lib/utils";
 
+import { FormatPicker } from "./format-picker";
 import { MechanismStats } from "./mechanism-stats";
 import { MechanismTabs, type MechanismTabKey } from "./mechanism-tabs";
 
@@ -75,24 +73,18 @@ export function MechanismRenderer({ mechanism, profileId }: Props) {
         className="border-border bg-muted/40 flex flex-col gap-4 rounded-md border p-4"
       >
         <MechanismStats cardIds={cardIds} profileId={profileId} />
-        {hasCards ? (
-          <div>
-            <Link
-              href={`/review?mechanism=${encodeURIComponent(frontmatter.id)}`}
-              className={cn(buttonVariants({ size: "lg" }))}
-            >
-              Study this mechanism
-            </Link>
-          </div>
-        ) : (
+        {!hasCards ? (
           <p className="text-muted-foreground text-xs">
-            No cards have been authored for this mechanism yet — once the `# Questions` section
-            lands in the markdown, a Study CTA will appear here.
+            No questions have been authored for this mechanism yet. The textbook layers below are
+            still readable; the &ldquo;Test yourself&rdquo; panel appears once the
+            <code> # Questions</code> section lands in the markdown.
           </p>
-        )}
+        ) : null}
       </section>
 
       <MechanismTabs panels={panels} />
+
+      {hasCards ? <FormatPicker mechanismId={frontmatter.id} cards={cards} /> : null}
 
       {layers.sources ? (
         <footer className="text-muted-foreground flex flex-col gap-2 border-t pt-4 text-xs">
