@@ -115,18 +115,18 @@ type Props = {
   cards: readonly Card[];
   profileId: string;
   /**
-   * When the learner entered via `/review?mechanism=<id>` the page passes
-   * in the matched mechanism here. The session renders a header strip
+   * When the learner entered via `/review?Chapter=<id>` the page passes
+   * in the matched Chapter here. The session renders a header strip
    * that confirms which topic is being drilled and offers a "Back to
-   * mechanism" escape hatch — without this, a filtered session looks
+   * Chapter" escape hatch — without this, a filtered session looks
    * identical to a general one.
    */
   focusMechanism?: { id: string; title: string } | null;
   /**
-   * Map of mechanism_id → { title, organSystem } so the always-on
+   * Map of chapter_id → { title, organSystem } so the always-on
    * ReviewHeader can show the proper title of the current card's
-   * mechanism. Earlier we only showed the kebab-case slug, which
-   * looked like "FRANK STARLING" — fine for one-mechanism pilots,
+   * Chapter. Earlier we only showed the kebab-case slug, which
+   * looked like "FRANK STARLING" — fine for one-Chapter pilots,
    * confusing for general queues.
    */
   mechanismTitles?: Record<string, { title: string; organSystem: string }>;
@@ -242,7 +242,7 @@ export function SessionPlayer({
     void autoSync.runSync();
   }
 
-  // Resolve the title + organ system of whichever mechanism the
+  // Resolve the title + organ system of whichever Chapter the
   // current card belongs to, falling back to focusMechanism (filtered
   // mode) or the kebab-case id if no titles map was supplied.
   const currentMechanismInfo = (() => {
@@ -252,12 +252,12 @@ export function SessionPlayer({
         organSystem: mechanismTitles[focusMechanism.id]?.organSystem ?? "",
       };
     }
-    if (current?.card.mechanism_id && mechanismTitles[current.card.mechanism_id]) {
-      return mechanismTitles[current.card.mechanism_id];
+    if (current?.card.chapter_id && mechanismTitles[current.card.chapter_id]) {
+      return mechanismTitles[current.card.chapter_id];
     }
-    if (current?.card.mechanism_id) {
+    if (current?.card.chapter_id) {
       return {
-        title: current.card.mechanism_id.replace(/-/g, " "),
+        title: current.card.chapter_id.replace(/-/g, " "),
         organSystem: "",
       };
     }
@@ -375,10 +375,10 @@ export function SessionPlayer({
 /**
  * Sticky header bar for every review-session state. Always shows a
  * "← Today" escape hatch (so the learner is never trapped) plus the
- * proper title of the mechanism the current card belongs to.
+ * proper title of the Chapter the current card belongs to.
  *
  * `isFiltered=true` dims the title to "Studying: X" framing so the
- * learner knows they're inside a `/review?mechanism=<id>` filtered
+ * learner knows they're inside a `/review?Chapter=<id>` filtered
  * session, not a general queue.
  */
 function ReviewHeader({

@@ -1,8 +1,8 @@
 import type { Card } from "./cards";
 
 /**
- * MCQ-assembly helpers used by the mechanism-page MCQ session
- * (`/test/[mechanism]/mcq`).
+ * MCQ-assembly helpers used by the Chapter-page MCQ session
+ * (`/test/[Chapter]/mcq`).
  *
  * Pure and deterministic given a seed. The /exam timed-drill route
  * that originally drove this module was retired in the two-zone
@@ -23,7 +23,7 @@ export type McqOption = {
 
 export type McqQuestion = {
   cardId: string;
-  mechanismId: string;
+  chapterId: string;
   stem: string;
   options: McqOption[];
   /**
@@ -95,7 +95,7 @@ export function buildMcqFromCard(card: Card, seed: number): McqQuestion | null {
   }
   return {
     cardId: card.id,
-    mechanismId: card.mechanism_id,
+    chapterId: card.chapter_id,
     stem: card.stem,
     options,
     elaborativeExplanation: card.elaborative_explanation,

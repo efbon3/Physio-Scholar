@@ -14,7 +14,7 @@ function card(
 ): Card {
   return {
     id,
-    mechanism_id: id.split(":")[0],
+    chapter_id: id.split(":")[0],
     index,
     format: "descriptive",
     status: "published",

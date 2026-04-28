@@ -1,23 +1,23 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { MechanismRenderer } from "@/components/content/mechanism-renderer";
-import { readAllMechanisms, readMechanismById } from "@/lib/content/source";
+import { ChapterRenderer } from "@/components/content/mechanism-renderer";
+import { readAllChapters, readChapterById } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
-type Params = { params: Promise<{ system: string; mechanism: string }> };
+type Params = { params: Promise<{ system: string; Chapter: string }> };
 
 export async function generateStaticParams() {
-  const mechanisms = await readAllMechanisms();
+  const mechanisms = await readAllChapters();
   return mechanisms.map((m) => ({
     system: m.frontmatter.organ_system,
-    mechanism: m.frontmatter.id,
+    Chapter: m.frontmatter.id,
   }));
 }
 
 export async function generateMetadata({ params }: Params) {
-  const { mechanism: id } = await params;
-  const m = await readMechanismById(id);
+  const { Chapter: id } = await params;
+  const m = await readChapterById(id);
   return { title: m?.frontmatter.title ?? "Chapter not found" };
 }
 
@@ -34,14 +34,14 @@ async function getProfileId(nextPath: string): Promise<string> {
   }
 }
 
-export default async function MechanismPage({ params }: Params) {
-  const { system, mechanism: id } = await params;
-  const mechanism = await readMechanismById(id);
+export default async function ChapterPage({ params }: Params) {
+  const { system, Chapter: id } = await params;
+  const Chapter = await readChapterById(id);
 
-  // 404 cleanly if the mechanism id doesn't exist OR if the URL's
-  // system slug doesn't match the mechanism's actual system — prevents
+  // 404 cleanly if the Chapter id doesn't exist OR if the URL's
+  // system slug doesn't match the Chapter's actual system — prevents
   // "renal/frank-starling" from rendering as if it were a renal topic.
-  if (!mechanism || mechanism.frontmatter.organ_system !== system) {
+  if (!Chapter || Chapter.frontmatter.organ_system !== system) {
     notFound();
   }
 
@@ -58,7 +58,7 @@ export default async function MechanismPage({ params }: Params) {
           {system}
         </Link>
       </nav>
-      <MechanismRenderer mechanism={mechanism} profileId={profileId} />
+      <ChapterRenderer Chapter={Chapter} profileId={profileId} />
     </main>
   );
 }

@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { Card } from "@/lib/content/cards";
 
-import { buildCohortHeatmap, type CohortCardAggregate, type MechanismMeta } from "./heatmap";
+import { buildCohortHeatmap, type CohortCardAggregate, type ChapterMeta } from "./heatmap";
 
-function card(id: string, mechanismId: string): Card {
+function card(id: string, chapterId: string): Card {
   return {
     id,
-    mechanism_id: mechanismId,
+    chapter_id: chapterId,
     index: Number.parseInt(id.split(":")[1] ?? "1", 10),
     format: "descriptive",
     status: "published",
@@ -34,9 +34,9 @@ function agg(
   return { card_id, reviews_total, reviews_last_30d, retention_pct_30d, unique_learners };
 }
 
-const meta = (mechanismId: string, organSystem: string, title?: string): MechanismMeta => ({
-  mechanismId,
-  title: title ?? mechanismId,
+const meta = (chapterId: string, organSystem: string, title?: string): ChapterMeta => ({
+  chapterId,
+  title: title ?? chapterId,
   organSystem,
 });
 
@@ -45,11 +45,11 @@ describe("buildCohortHeatmap", () => {
     const result = buildCohortHeatmap({
       aggregates: [],
       cards: [card("frank-starling:1", "frank-starling")],
-      mechanismMeta: new Map([["frank-starling", meta("frank-starling", "cardiovascular")]]),
+      ChapterMeta: new Map([["frank-starling", meta("frank-starling", "cardiovascular")]]),
     });
     expect(result.hasAnyReviews).toBe(false);
     expect(result.totalReviews).toBe(0);
-    // Mechanism with no aggregates still groups under its system
+    // Chapter with no aggregates still groups under its system
     expect(result.systems).toHaveLength(1);
     expect(result.systems[0].organSystem).toBe("cardiovascular");
     expect(result.systems[0].mechanisms[0].reviewsTotal).toBe(0);
@@ -66,12 +66,12 @@ describe("buildCohortHeatmap", () => {
       agg("frank-starling:2", 6, 6, 50, 5),
       agg("nephron-filtration:1", 4, 4, 100, 3),
     ];
-    const mechanismMeta = new Map<string, MechanismMeta>([
+    const ChapterMeta = new Map<string, ChapterMeta>([
       ["frank-starling", meta("frank-starling", "cardiovascular", "Frank-Starling")],
       ["nephron-filtration", meta("nephron-filtration", "renal", "Nephron filtration")],
     ]);
 
-    const result = buildCohortHeatmap({ aggregates, cards, mechanismMeta });
+    const result = buildCohortHeatmap({ aggregates, cards, ChapterMeta });
     expect(result.totalReviews).toBe(20);
     expect(result.systems).toHaveLength(2);
     // Sorted by retention ascending — cardio's weighted retention should
@@ -91,11 +91,11 @@ describe("buildCohortHeatmap", () => {
   it("orders mechanisms inside a system by retention ascending (weakest first)", () => {
     const cards = [card("strong:1", "strong"), card("weak:1", "weak")];
     const aggregates = [agg("strong:1", 10, 10, 90, 4), agg("weak:1", 10, 10, 40, 4)];
-    const mechanismMeta = new Map<string, MechanismMeta>([
+    const ChapterMeta = new Map<string, ChapterMeta>([
       ["strong", meta("strong", "cardiovascular", "Strong topic")],
       ["weak", meta("weak", "cardiovascular", "Weak topic")],
     ]);
-    const result = buildCohortHeatmap({ aggregates, cards, mechanismMeta });
+    const result = buildCohortHeatmap({ aggregates, cards, ChapterMeta });
     expect(result.systems).toHaveLength(1);
     expect(result.systems[0].mechanisms.map((m) => m.title)).toEqual([
       "Weak topic",
@@ -106,19 +106,19 @@ describe("buildCohortHeatmap", () => {
   it("ignores aggregates for cards not in the authored universe", () => {
     const cards = [card("frank-starling:1", "frank-starling")];
     const aggregates = [agg("frank-starling:1", 5, 5, 80, 3), agg("ghost:1", 100, 100, 0, 100)];
-    const mechanismMeta = new Map<string, MechanismMeta>([
+    const ChapterMeta = new Map<string, ChapterMeta>([
       ["frank-starling", meta("frank-starling", "cardiovascular")],
     ]);
-    const result = buildCohortHeatmap({ aggregates, cards, mechanismMeta });
+    const result = buildCohortHeatmap({ aggregates, cards, ChapterMeta });
     expect(result.totalReviews).toBe(5);
   });
 
-  it("handles a mechanism with no aggregates (zero reviews)", () => {
+  it("handles a Chapter with no aggregates (zero reviews)", () => {
     const cards = [card("untouched:1", "untouched")];
-    const mechanismMeta = new Map<string, MechanismMeta>([
+    const ChapterMeta = new Map<string, ChapterMeta>([
       ["untouched", meta("untouched", "cardiovascular", "Untouched")],
     ]);
-    const result = buildCohortHeatmap({ aggregates: [], cards, mechanismMeta });
+    const result = buildCohortHeatmap({ aggregates: [], cards, ChapterMeta });
     expect(result.systems[0].mechanisms[0].retentionPct30d).toBeNull();
     expect(result.systems[0].mechanisms[0].reviewsTotal).toBe(0);
   });
@@ -126,10 +126,10 @@ describe("buildCohortHeatmap", () => {
   it("returns null retention when all cards have null retention_pct_30d", () => {
     const cards = [card("frank-starling:1", "frank-starling")];
     const aggregates = [agg("frank-starling:1", 5, 0, null, 3)];
-    const mechanismMeta = new Map<string, MechanismMeta>([
+    const ChapterMeta = new Map<string, ChapterMeta>([
       ["frank-starling", meta("frank-starling", "cardiovascular")],
     ]);
-    const result = buildCohortHeatmap({ aggregates, cards, mechanismMeta });
+    const result = buildCohortHeatmap({ aggregates, cards, ChapterMeta });
     expect(result.systems[0].mechanisms[0].retentionPct30d).toBeNull();
   });
 });

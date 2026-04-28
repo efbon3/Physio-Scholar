@@ -1,5 +1,5 @@
 import { getContentDB, toStored, type StoredMechanism } from "./db";
-import type { Mechanism } from "./loader";
+import type { Chapter } from "./loader";
 
 export type SyncResult = {
   /** IDs whose stored row was created or replaced. */
@@ -11,7 +11,7 @@ export type SyncResult = {
 /**
  * Upsert a batch of mechanisms into the local content database.
  *
- * Write policy: a mechanism is written if
+ * Write policy: a Chapter is written if
  *   - no row exists for that id, OR
  *   - the stored frontmatter.version differs from the incoming version.
  * Otherwise the existing row is considered current and we skip the write.
@@ -20,7 +20,7 @@ export type SyncResult = {
  * author-controlled (`1.0`, `1.1`, etc.). If the author bumps it, we
  * resync; if not, we don't touch the row.
  */
-export async function syncMechanisms(mechanisms: Mechanism[]): Promise<SyncResult> {
+export async function syncMechanisms(mechanisms: Chapter[]): Promise<SyncResult> {
   if (mechanisms.length === 0) return { written: [], skipped: [] };
 
   const db = getContentDB();
@@ -51,7 +51,7 @@ export async function syncMechanisms(mechanisms: Mechanism[]): Promise<SyncResul
   return { written: toWrite.map((row) => row.id), skipped };
 }
 
-/** Fetch a single mechanism from the local store. Returns undefined if absent. */
+/** Fetch a single Chapter from the local store. Returns undefined if absent. */
 export async function getMechanism(id: string): Promise<StoredMechanism | undefined> {
   const db = getContentDB();
   return db.mechanisms.get(id);
@@ -67,7 +67,7 @@ export async function listMechanismsBySystem(system: string): Promise<StoredMech
   return rows.sort((a, b) => a.frontmatter.title.localeCompare(b.frontmatter.title));
 }
 
-/** List every mechanism in the store, for admin / debug views. */
+/** List every Chapter in the store, for admin / debug views. */
 export async function listAllMechanisms(): Promise<StoredMechanism[]> {
   const db = getContentDB();
   return db.mechanisms.toArray();

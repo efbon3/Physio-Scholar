@@ -6,9 +6,9 @@
  * so a freshly-templated file parses without modification.
  */
 
-export const MECHANISM_TEMPLATE = `---
-id: new-mechanism-id
-title: New Mechanism
+export const CHAPTER_TEMPLATE = `---
+id: new-Chapter-id
+title: New Chapter
 organ_system: cardiovascular
 nmc_competencies:
   - PY-CV-1.1
@@ -16,7 +16,7 @@ exam_patterns:
   - mbbs
   - pre-pg
 prerequisites: []
-related_mechanisms: []
+related_chapters: []
 blooms_distribution:
   remember: 20
   understand: 30
@@ -32,7 +32,7 @@ last_reviewed: 2026-04-24
 
 # Layer 1 — Core
 
-Write one paragraph explaining the mechanism at its simplest. What it
+Write one paragraph explaining the Chapter at its simplest. What it
 is, and why it matters.
 
 ## Clinical Hook
@@ -41,7 +41,7 @@ One-sentence clinical resonance — why the student cares.
 
 # Layer 2 — Working Explanation
 
-Step-by-step breakdown. The mechanism as a sequence or system.
+Step-by-step breakdown. The Chapter as a sequence or system.
 
 # Layer 3 — Deep Dive
 
@@ -60,7 +60,7 @@ Vignettes, pathophysiology, common pitfalls, diagnostic implications.
 **Exam patterns:** mbbs, pre-pg
 **Stem:** The question goes here.
 **Correct answer:** The correct answer.
-**Elaborative explanation:** Why this is correct, with mechanism detail.
+**Elaborative explanation:** Why this is correct, with Chapter detail.
 
 ### Hint Ladder
 

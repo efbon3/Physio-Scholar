@@ -108,11 +108,11 @@ describe("PreflightModal", () => {
         kind="Review session"
         questionCount={3}
         estimatedMinutes={5}
-        context="Frank-Starling mechanism"
+        context="Frank-Starling Chapter"
         onAccept={() => {}}
       />,
     );
-    expect(screen.getByText("Frank-Starling mechanism")).toBeInTheDocument();
+    expect(screen.getByText("Frank-Starling Chapter")).toBeInTheDocument();
   });
 
   it("cancel link defaults to /today and is overridable", () => {

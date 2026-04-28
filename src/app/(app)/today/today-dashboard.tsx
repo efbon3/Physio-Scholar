@@ -9,7 +9,7 @@ import type { Quote } from "@/lib/motivation/quotes";
 import { loadAllCardStates, loadAllReviews } from "@/lib/srs/local";
 import {
   computeProgressSnapshot,
-  type MechanismProgress,
+  type ChapterProgress,
   type ProgressSnapshot,
 } from "@/lib/srs/progress";
 import { assembleQueue, summariseQueue } from "@/lib/srs/queue";
@@ -121,7 +121,7 @@ export function TodayDashboard({
           mechanismTitles: titlesMap,
           now,
         });
-        const weakArea = pickWeakestMechanism(snapshot.byMechanism as MechanismProgress[]);
+        const weakArea = pickWeakestMechanism(snapshot.byChapter as ChapterProgress[]);
         if (cancelled) return;
         setData({ queue, weakArea });
       } catch {
@@ -287,7 +287,7 @@ function WeakSystemCard({ weakArea }: { weakArea: WeakArea | null }) {
         {weakArea.seen === 1 ? "" : "s"}.
       </p>
       <Link
-        href={`/review?mechanism=${encodeURIComponent(weakArea.mechanismId)}`}
+        href={`/review?Chapter=${encodeURIComponent(weakArea.chapterId)}`}
         className="text-foreground mt-1 self-start rounded-md border px-2 py-1 text-xs hover:underline"
       >
         Drill this chapter

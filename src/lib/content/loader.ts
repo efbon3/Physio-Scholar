@@ -1,10 +1,10 @@
 import matter from "gray-matter";
 
-import { chapterToMechanism, isChapterFrontmatter } from "./chapter-parser";
-import { mechanismFrontmatterSchema, type MechanismFrontmatter } from "./schema";
+import { parseAuthorChapter, isAuthorChapterFrontmatter } from "./chapter-parser";
+import { chapterFrontmatterSchema, type ChapterFrontmatter } from "./schema";
 
 /**
- * Typed representation of a parsed mechanism markdown file.
+ * Typed representation of a parsed Chapter markdown file.
  *
  * `body` is the raw markdown body (everything after the frontmatter).
  * `layers` is the same body split into the six canonical top-level
@@ -12,12 +12,12 @@ import { mechanismFrontmatterSchema, type MechanismFrontmatter } from "./schema"
  * quick overview without loading the rest, or for computing a layer-level
  * index without re-parsing.
  *
- * Sections absent from the source (e.g. a draft mechanism without
+ * Sections absent from the source (e.g. a draft Chapter without
  * `# Questions` yet) resolve to `undefined`; a missing section is not an
  * error at parse time — the content lifecycle (SOP §6.1) decides when
  * missing sections gate publication.
  */
-export type MechanismLayers = {
+export type ChapterLayers = {
   core?: string;
   working?: string;
   deepDive?: string;
@@ -26,29 +26,29 @@ export type MechanismLayers = {
   sources?: string;
 };
 
-export type Mechanism = {
-  frontmatter: MechanismFrontmatter;
+export type Chapter = {
+  frontmatter: ChapterFrontmatter;
   body: string;
-  layers: MechanismLayers;
+  layers: ChapterLayers;
 };
 
 /**
  * Parse a raw markdown document (frontmatter + body) into a validated
- * `Mechanism`. Throws a `ZodError` if frontmatter is missing, malformed,
+ * `Chapter`. Throws a `ZodError` if frontmatter is missing, malformed,
  * or fails any schema invariant (see schema.ts).
  *
  * Two input formats are accepted:
- *   - Canonical mechanism format: frontmatter has `id` (kebab-case),
+ *   - Canonical Chapter format: frontmatter has `id` (kebab-case),
  *     `organ_system`, etc. Body has the four reading layers + a
  *     `# Questions` section. Parsed as-is.
  *   - Chapter format: frontmatter has `chapter` and `part` fields and
  *     no `id`. Body has `QUESTION N` blocks under optional `## Pass N`
- *     groupings. Routed through `chapterToMechanism()` which derives
+ *     groupings. Routed through `parseAuthorChapter()` which derives
  *     `id` from the chapter title (or, when provided, the filename),
  *     maps `part` → `organ_system`, and transforms the question blocks
- *     into the canonical mechanism shape. The returned Mechanism is
+ *     into the canonical Chapter shape. The returned Chapter is
  *     indistinguishable from one parsed from a hand-authored
- *     mechanism file.
+ *     Chapter file.
  *
  * `filenameHint` is the basename of the source file (without `.md`),
  * passed through by the filesystem loader. When present and the input
@@ -62,11 +62,11 @@ export type Mechanism = {
  * same parser can run on author IDE previews, Edge runtime handlers
  * (where `fs` is not available), and plain Node tests.
  */
-export function parseMechanism(raw: string, filenameHint?: string): Mechanism {
+export function parseChapter(raw: string, filenameHint?: string): Chapter {
   const parsed = matter(raw);
 
-  if (isChapterFrontmatter(parsed.data)) {
-    const transformed = chapterToMechanism(parsed.data, parsed.content, filenameHint);
+  if (isAuthorChapterFrontmatter(parsed.data)) {
+    const transformed = parseAuthorChapter(parsed.data, parsed.content, filenameHint);
     return {
       frontmatter: transformed.frontmatter,
       body: transformed.body,
@@ -74,7 +74,7 @@ export function parseMechanism(raw: string, filenameHint?: string): Mechanism {
     };
   }
 
-  const frontmatter = mechanismFrontmatterSchema.parse(parsed.data);
+  const frontmatter = chapterFrontmatterSchema.parse(parsed.data);
   const body = parsed.content;
   const layers = splitLayers(body);
   return { frontmatter, body, layers };
@@ -115,9 +115,9 @@ type LayerKey = keyof typeof LAYER_HEADINGS;
  * merging chapter files (it concatenates question sections and needs
  * the rebuilt `layers.questions` to drive `extractCards`).
  */
-export function splitLayers(body: string): MechanismLayers {
+export function splitLayers(body: string): ChapterLayers {
   const lines = body.split(/\r?\n/);
-  const layers: MechanismLayers = {};
+  const layers: ChapterLayers = {};
 
   let currentKey: LayerKey | null = null;
   let currentBuffer: string[] = [];

@@ -20,24 +20,24 @@ const PATH_PREFIX = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 /**
  * Upload a diagram to the public `diagrams` Supabase Storage bucket.
  *
- * Path convention: `<mechanism_id>/<timestamped-filename>`. Keeping the
- * file name partitioned by mechanism id means the bucket stays legible
+ * Path convention: `<chapter_id>/<timestamped-filename>`. Keeping the
+ * file name partitioned by Chapter id means the bucket stays legible
  * at 100+ uploads, and a future "orphan cleanup" job can scan per-
- * mechanism-id prefixes without a full object scan.
+ * Chapter-id prefixes without a full object scan.
  *
- * Returns the **public URL** the admin can paste into the mechanism
+ * Returns the **public URL** the admin can paste into the Chapter
  * markdown as `![alt](url)`. The URL is stable across deploys and
  * cacheable by Serwist, so diagrams render offline after the first
  * load.
  */
 export async function uploadDiagramAction(formData: FormData): Promise<UploadResult> {
   const file = formData.get("file");
-  const mechanismId = formData.get("mechanism_id");
+  const chapterId = formData.get("chapter_id");
   if (!(file instanceof File)) {
     return { status: "error", message: "Missing upload." };
   }
-  if (typeof mechanismId !== "string" || !PATH_PREFIX.test(mechanismId)) {
-    return { status: "error", message: "Invalid mechanism id — kebab-case only." };
+  if (typeof chapterId !== "string" || !PATH_PREFIX.test(chapterId)) {
+    return { status: "error", message: "Invalid Chapter id — kebab-case only." };
   }
   if (!ALLOWED_TYPES.has(file.type)) {
     return {
@@ -66,7 +66,7 @@ export async function uploadDiagramAction(formData: FormData): Promise<UploadRes
   // File names get sanitised to a-z0-9.-_ to avoid URL-encoding weirdness
   // in the rendered markdown.
   const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, "-");
-  const path = `${mechanismId}/${Date.now()}-${safeName}`;
+  const path = `${chapterId}/${Date.now()}-${safeName}`;
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const { error } = await supabase.storage.from("diagrams").upload(path, bytes, {

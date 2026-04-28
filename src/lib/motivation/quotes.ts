@@ -134,7 +134,7 @@ export const QUOTES: readonly Quote[] = [
   { text: "Work harder than you think you possibly can.", category: "hardwork" },
   { text: "Pages don't read themselves. Open the book.", category: "hardwork" },
   {
-    text: "Reading one mechanism today beats planning to read ten tomorrow.",
+    text: "Reading one Chapter today beats planning to read ten tomorrow.",
     category: "hardwork",
   },
   { text: "Cardiac output won't memorise itself.", category: "hardwork" },

@@ -3,12 +3,12 @@ import type { Card } from "@/lib/content/cards";
 /**
  * Cohort topic-heatmap aggregator. Pure function: takes the raw
  * per-card aggregates the DB returns + the authored card universe,
- * and rolls up by mechanism + organ_system.
+ * and rolls up by Chapter + organ_system.
  *
- * The DB only knows card_ids (the authored mechanism markdown isn't
- * mirrored to Postgres). So we join in memory: card_id → mechanism_id
- * via the loaded Card[], mechanism_id → organ_system via the
- * mechanismMeta lookup the page builds at request time.
+ * The DB only knows card_ids (the authored Chapter markdown isn't
+ * mirrored to Postgres). So we join in memory: card_id → chapter_id
+ * via the loaded Card[], chapter_id → organ_system via the
+ * ChapterMeta lookup the page builds at request time.
  *
  * Output is grouped by organ_system, with mechanisms inside each
  * group sorted by retention ascending (the cohort's weakest topics
@@ -23,14 +23,14 @@ export type CohortCardAggregate = {
   unique_learners: number;
 };
 
-export type MechanismMeta = {
-  mechanismId: string;
+export type ChapterMeta = {
+  chapterId: string;
   title: string;
   organSystem: string;
 };
 
 export type MechanismHeat = {
-  mechanismId: string;
+  chapterId: string;
   title: string;
   reviewsTotal: number;
   reviewsLast30d: number;
@@ -80,11 +80,11 @@ function weightedRetention(
 export function buildCohortHeatmap({
   aggregates,
   cards,
-  mechanismMeta,
+  ChapterMeta,
 }: {
   aggregates: readonly CohortCardAggregate[];
   cards: readonly Card[];
-  mechanismMeta: ReadonlyMap<string, MechanismMeta>;
+  ChapterMeta: ReadonlyMap<string, ChapterMeta>;
 }): CohortHeatmap {
   // card_id → aggregate lookup
   const aggByCard = new Map<string, CohortCardAggregate>();
@@ -94,14 +94,14 @@ export function buildCohortHeatmap({
   // known (drops orphaned aggregate rows from retired mechanisms).
   const cardsByMechanism = new Map<string, Card[]>();
   for (const c of cards) {
-    const arr = cardsByMechanism.get(c.mechanism_id) ?? [];
+    const arr = cardsByMechanism.get(c.chapter_id) ?? [];
     arr.push(c);
-    cardsByMechanism.set(c.mechanism_id, arr);
+    cardsByMechanism.set(c.chapter_id, arr);
   }
 
   const mechanismHeats: MechanismHeat[] = [];
-  for (const [mechanismId, mechCards] of cardsByMechanism) {
-    const meta = mechanismMeta.get(mechanismId);
+  for (const [chapterId, mechCards] of cardsByMechanism) {
+    const meta = ChapterMeta.get(chapterId);
     if (!meta) continue;
     const parts: CohortCardAggregate[] = [];
     let reviewsTotal = 0;
@@ -114,16 +114,16 @@ export function buildCohortHeatmap({
       reviewsTotal += agg.reviews_total;
       reviewsLast30d += agg.reviews_last_30d;
       // unique_learners is per-card; we can't union sets from aggregates
-      // alone. Use the max as a lower-bound proxy for the mechanism.
+      // alone. Use the max as a lower-bound proxy for the Chapter.
       // This is acknowledged-imprecise — a future migration could expose
-      // a per-mechanism unique_learners count if the heatmap needs it.
+      // a per-Chapter unique_learners count if the heatmap needs it.
       if (agg.unique_learners > learners.size) {
         learners.clear();
         for (let i = 0; i < agg.unique_learners; i += 1) learners.add(`#${i}`);
       }
     }
     mechanismHeats.push({
-      mechanismId,
+      chapterId,
       title: meta.title,
       reviewsTotal,
       reviewsLast30d,
@@ -138,7 +138,7 @@ export function buildCohortHeatmap({
   // Group mechanisms by organ system
   const systemMap = new Map<string, MechanismHeat[]>();
   for (const m of mechanismHeats) {
-    const meta = mechanismMeta.get(m.mechanismId);
+    const meta = ChapterMeta.get(m.chapterId);
     if (!meta) continue;
     const arr = systemMap.get(meta.organSystem) ?? [];
     arr.push(m);

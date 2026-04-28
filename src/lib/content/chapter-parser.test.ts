@@ -2,19 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { extractCards } from "./cards";
 import {
-  chapterToMechanism,
+  parseAuthorChapter,
   deriveChapterId,
   formatToleranceForChapter,
-  isChapterFrontmatter,
+  isAuthorChapterFrontmatter,
   mapPartToOrganSystem,
   parseDistractorLine,
 } from "./chapter-parser";
-import { parseMechanism } from "./loader";
+import { parseChapter } from "./loader";
 
-describe("isChapterFrontmatter", () => {
+describe("isAuthorChapterFrontmatter", () => {
   it("returns true for chapter-shaped frontmatter", () => {
     expect(
-      isChapterFrontmatter({
+      isAuthorChapterFrontmatter({
         chapter: "Chapter 1 — Introduction",
         part: "Part I — Foundations of Physiology",
         status: "draft",
@@ -22,9 +22,9 @@ describe("isChapterFrontmatter", () => {
     ).toBe(true);
   });
 
-  it("returns false when `id` is present (canonical mechanism format)", () => {
+  it("returns false when `id` is present (canonical Chapter format)", () => {
     expect(
-      isChapterFrontmatter({
+      isAuthorChapterFrontmatter({
         id: "frank-starling",
         chapter: "anything",
         part: "anything",
@@ -33,11 +33,11 @@ describe("isChapterFrontmatter", () => {
   });
 
   it("returns false when chapter or part is missing", () => {
-    expect(isChapterFrontmatter({ chapter: "x" })).toBe(false);
-    expect(isChapterFrontmatter({ part: "x" })).toBe(false);
-    expect(isChapterFrontmatter({})).toBe(false);
-    expect(isChapterFrontmatter(null)).toBe(false);
-    expect(isChapterFrontmatter("string")).toBe(false);
+    expect(isAuthorChapterFrontmatter({ chapter: "x" })).toBe(false);
+    expect(isAuthorChapterFrontmatter({ part: "x" })).toBe(false);
+    expect(isAuthorChapterFrontmatter({})).toBe(false);
+    expect(isAuthorChapterFrontmatter(null)).toBe(false);
+    expect(isAuthorChapterFrontmatter("string")).toBe(false);
   });
 });
 
@@ -129,10 +129,10 @@ describe("parseDistractorLine", () => {
   });
 });
 
-describe("chapterToMechanism — full conversion", () => {
+describe("parseAuthorChapter — full conversion", () => {
   // Inline fixture: a 2-question chapter, exercising both distractor
   // shapes, hint ladder, and explanation. End-to-end test below
-  // verifies the ch1mcq.md content/mechanism file extracts 22 cards.
+  // verifies the ch1mcq.md content/Chapter file extracts 22 cards.
   const FIXTURE_BODY = `# Chapter 1 — MCQs
 
 (intro paragraph that should be stripped)
@@ -195,8 +195,8 @@ Hints:
     status: "draft" as const,
   };
 
-  it("converts to a Mechanism with the right id, title, and organ_system", () => {
-    const out = chapterToMechanism(FIXTURE_DATA, FIXTURE_BODY);
+  it("converts to a Chapter with the right id, title, and organ_system", () => {
+    const out = parseAuthorChapter(FIXTURE_DATA, FIXTURE_BODY);
     expect(out.frontmatter.id).toBe("ch01-introduction-to-physiology-and-homeostasis");
     expect(out.frontmatter.title).toBe("Chapter 1 — Introduction to Physiology and Homeostasis");
     expect(out.frontmatter.organ_system).toBe("foundations");
@@ -205,19 +205,19 @@ Hints:
   });
 
   it("body opens with `# Questions` so the layer splitter finds the cards", () => {
-    const out = chapterToMechanism(FIXTURE_DATA, FIXTURE_BODY);
+    const out = parseAuthorChapter(FIXTURE_DATA, FIXTURE_BODY);
     expect(out.body).toMatch(/^#\s+Questions/m);
   });
 
   it("strips Pass headers, the optional preamble, and the Final Summary section", () => {
-    const out = chapterToMechanism(FIXTURE_DATA, FIXTURE_BODY);
+    const out = parseAuthorChapter(FIXTURE_DATA, FIXTURE_BODY);
     expect(out.body).not.toContain("Pass 1");
     expect(out.body).not.toContain("(intro paragraph");
     expect(out.body).not.toContain("Final Summary");
   });
 
   it("transforms each question block to the canonical `## Question N` shape", () => {
-    const out = chapterToMechanism(FIXTURE_DATA, FIXTURE_BODY);
+    const out = parseAuthorChapter(FIXTURE_DATA, FIXTURE_BODY);
     expect(out.body).toContain("## Question 1");
     expect(out.body).toContain("## Question 2");
     expect(out.body).toContain("**Format:** mcq");
@@ -231,9 +231,9 @@ Hints:
   });
 });
 
-describe("chapterToMechanism — end-to-end via parseMechanism + extractCards", () => {
+describe("parseAuthorChapter — end-to-end via parseChapter + extractCards", () => {
   // Same fixture, full pipeline: gray-matter parse → chapter detect →
-  // chapter-to-mechanism transform → splitLayers → extractCards.
+  // chapter-to-Chapter transform → splitLayers → extractCards.
   const RAW = `---
 chapter: Chapter 1 — Introduction to Physiology and Homeostasis
 part: Part I — Foundations of Physiology
@@ -284,8 +284,8 @@ Hints:
 1. One compartment is roughly twice the other.
 `;
 
-  it("produces a parseable Mechanism that extractCards can walk", () => {
-    const m = parseMechanism(RAW);
+  it("produces a parseable Chapter that extractCards can walk", () => {
+    const m = parseChapter(RAW);
     expect(m.frontmatter.id).toBe("ch01-introduction-to-physiology-and-homeostasis");
     expect(m.frontmatter.organ_system).toBe("foundations");
     const cards = extractCards(m);
@@ -310,18 +310,18 @@ Hints:
   });
 });
 
-describe("chapterToMechanism — shipped chapter file (merged)", () => {
+describe("parseAuthorChapter — shipped chapter file (merged)", () => {
   // Smoke test against the real chapter-1 content. The MCQ file
   // (ch01-introduction-and-homeostasis.md) and the fill-blank file
   // (ch01-introduction-and-homeostasis-fillblank.md) share a
-  // `chapter:` frontmatter, so `readAllMechanisms` merges them into
-  // one mechanism (see `mergeChapterFiles` in fs.ts). The primary's
+  // `chapter:` frontmatter, so `readAllChapters` merges them into
+  // one Chapter (see `mergeChapterFiles` in fs.ts). The primary's
   // id (`ch01-introduction-and-homeostasis`, no format suffix) anchors
   // the URL, and the merged questions section carries cards from both
   // files renumbered sequentially.
-  it("merges MCQ + fill-blank + descriptive chapter files into a single mechanism", async () => {
-    const { readMechanismById } = await import("./fs");
-    const m = await readMechanismById("ch01-introduction-and-homeostasis");
+  it("merges MCQ + fill-blank + descriptive chapter files into a single Chapter", async () => {
+    const { readChapterById } = await import("./fs");
+    const m = await readChapterById("ch01-introduction-and-homeostasis");
     expect(m).not.toBeNull();
     if (!m) return;
     expect(m.frontmatter.id).toBe("ch01-introduction-and-homeostasis");
@@ -341,7 +341,7 @@ describe("chapterToMechanism — shipped chapter file (merged)", () => {
     expect(cards[0].format).toBe("mcq");
     expect(cards[22].format).toBe("descriptive");
     expect(cards[37].format).toBe("fill_blank");
-    // Card ids stay unique under the primary's mechanism_id.
+    // Card ids stay unique under the primary's chapter_id.
     const ids = new Set(cards.map((c) => c.id));
     expect(ids.size).toBe(55);
     // Spot-check the first MCQ has the structured fields the platform
@@ -370,8 +370,8 @@ describe("chapterToMechanism — shipped chapter file (merged)", () => {
     // Once merged, the suffix file's id is no longer routable —
     // there's exactly one URL per chapter regardless of how many
     // format files contribute to it.
-    const { readMechanismById } = await import("./fs");
-    const m = await readMechanismById("ch01-introduction-and-homeostasis-fillblank");
+    const { readChapterById } = await import("./fs");
+    const m = await readChapterById("ch01-introduction-and-homeostasis-fillblank");
     expect(m).toBeNull();
   });
 });
@@ -408,7 +408,7 @@ describe("formatToleranceForChapter", () => {
   });
 });
 
-describe("chapterToMechanism — fill-blank conversion", () => {
+describe("parseAuthorChapter — fill-blank conversion", () => {
   // Two-question fill-blank fixture, exercising:
   //   - canonical → **Correct answer:**
   //   - accepted variants (filter out exact canonical duplicate) → **Acceptable answers:**
@@ -479,14 +479,14 @@ Hints:
 `;
 
   it("emits Format: fill_blank and a Correct answer line from Canonical answer", () => {
-    const m = parseMechanism(RAW);
+    const m = parseChapter(RAW);
     expect(m.body).toContain("**Format:** fill_blank");
     expect(m.body).toContain("**Correct answer:** 60%");
     expect(m.body).toContain("**Correct answer:** sodium (Na⁺)");
   });
 
   it("emits Acceptable answers as quoted pipe-separated, deduping the canonical", () => {
-    const m = parseMechanism(RAW);
+    const m = parseChapter(RAW);
     // The canonical "60%" is duplicated in the variants list — it should
     // not reappear under Acceptable answers; only "60" and "0.6" remain.
     expect(m.body).toContain('**Acceptable answers:** "60" | "0.6"');
@@ -496,20 +496,20 @@ Hints:
   });
 
   it("converts absolute tolerance to percent and omits Tolerance for not-applicable", () => {
-    const m = parseMechanism(RAW);
+    const m = parseChapter(RAW);
     expect(m.body).toContain("**Tolerance:** ±16.67%"); // Q1: 10pp on 60
     expect(m.body).not.toMatch(/Question 2[\s\S]*?\*\*Tolerance:\*\*/); // Q2 has none
   });
 
   it("strips Yellow conditions silently — algorithmic grader handles that band", () => {
-    const m = parseMechanism(RAW);
+    const m = parseChapter(RAW);
     expect(m.body).not.toContain("Yellow conditions");
     expect(m.body).not.toContain("missing %");
     expect(m.body).not.toContain("ICF cation");
   });
 
   it("end-to-end: extractCards produces fill-blank cards", () => {
-    const m = parseMechanism(RAW);
+    const m = parseChapter(RAW);
     const cards = extractCards(m);
     expect(cards).toHaveLength(2);
     expect(cards[0].format).toBe("fill_blank");
@@ -522,14 +522,14 @@ Hints:
   });
 });
 
-describe("chapterToMechanism — shipped fill-blank questions (post-merge)", () => {
+describe("parseAuthorChapter — shipped fill-blank questions (post-merge)", () => {
   // Post-merge the fill-blank file is folded into the chapter's
-  // primary mechanism, so the assertions target the primary id and
+  // primary Chapter, so the assertions target the primary id and
   // filter cards by format. If the chapter parser regresses, this
   // catches it on every CI run.
-  it("contributes 18 fill-blank cards to the merged Chapter 1 mechanism", async () => {
-    const { readMechanismById } = await import("./fs");
-    const m = await readMechanismById("ch01-introduction-and-homeostasis");
+  it("contributes 18 fill-blank cards to the merged Chapter 1 Chapter", async () => {
+    const { readChapterById } = await import("./fs");
+    const m = await readChapterById("ch01-introduction-and-homeostasis");
     expect(m).not.toBeNull();
     if (!m) return;
     const cards = extractCards(m);
@@ -579,19 +579,19 @@ Hints:
 `;
 
   it("falls back to the chapter-derived id when no hint is provided", () => {
-    const m = parseMechanism(RAW);
+    const m = parseChapter(RAW);
     expect(m.frontmatter.id).toBe("ch01-introduction-to-physiology-and-homeostasis");
   });
 
   it("uses the filename hint as the id when one is provided", () => {
-    const m = parseMechanism(RAW, "ch01-introduction-and-homeostasis");
+    const m = parseChapter(RAW, "ch01-introduction-and-homeostasis");
     expect(m.frontmatter.id).toBe("ch01-introduction-and-homeostasis");
   });
 
   it("ignores a filename hint that isn't a valid kebab-case id", () => {
     // "Foo Bar" is not kebab-case — fall back to derived id rather
-    // than producing a malformed mechanism id.
-    const m = parseMechanism(RAW, "Foo Bar");
+    // than producing a malformed Chapter id.
+    const m = parseChapter(RAW, "Foo Bar");
     expect(m.frontmatter.id).toBe("ch01-introduction-to-physiology-and-homeostasis");
   });
 });
@@ -665,7 +665,7 @@ Explanation: Why.
 Hints:
 1. Hint A.
 `;
-    const m = parseMechanism(RAW);
+    const m = parseChapter(RAW);
     const cards = extractCards(m);
     expect(cards).toHaveLength(3);
     expect(cards[0].priority).toBe("must");

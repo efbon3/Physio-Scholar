@@ -60,7 +60,7 @@ export default async function Home() {
       <header className="flex flex-col gap-3">
         <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Physio-Scholar</h1>
         <p className="text-muted-foreground text-base">
-          Mechanism-based active recall for first-year MBBS physiology.
+          Chapter-based active recall for first-year MBBS physiology.
         </p>
       </header>
 

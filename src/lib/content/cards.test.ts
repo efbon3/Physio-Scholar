@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { extractCards } from "./cards";
-import { parseMechanism } from "./loader";
+import { parseChapter } from "./loader";
 
 const BASE_FRONTMATTER = `---
 id: frank-starling
-title: Frank-Starling Mechanism
+title: Frank-Starling Chapter
 organ_system: cardiovascular
 nmc_competencies: [PY-CV-1.5]
 exam_patterns: [neet-pg]
 prerequisites: []
-related_mechanisms: []
+related_chapters: []
 blooms_distribution: { remember: 25, understand: 25, apply: 25, analyze: 25 }
 author: a
 reviewer: pending
@@ -26,8 +26,8 @@ function withBody(body: string): string {
 }
 
 describe("extractCards — happy path", () => {
-  it("extracts the single card from the placeholder Frank-Starling mechanism", () => {
-    const mechanism = parseMechanism(
+  it("extracts the single card from the placeholder Frank-Starling Chapter", () => {
+    const Chapter = parseChapter(
       withBody(`# Layer 1 — Core
 
 core text
@@ -52,7 +52,7 @@ core text
 `),
     );
 
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards).toHaveLength(1);
     const c = cards[0];
     expect(c.id).toBe("frank-starling:1");
@@ -72,7 +72,7 @@ core text
   });
 
   it("extracts multiple cards in order", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -100,7 +100,7 @@ core text
 `),
     );
 
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards.map((c) => c.id)).toEqual(["frank-starling:1", "frank-starling:2"]);
     expect(cards[0].blooms_level).toBe("remember");
     expect(cards[1].blooms_level).toBe("analyze");
@@ -109,20 +109,20 @@ core text
     expect(cards[0].misconceptions).toEqual([]);
   });
 
-  it("returns [] for a mechanism with no Questions section (draft)", () => {
-    const mechanism = parseMechanism(
+  it("returns [] for a Chapter with no Questions section (draft)", () => {
+    const Chapter = parseChapter(
       withBody(`# Layer 1 — Core
 
 core only — no questions yet
 `),
     );
-    expect(extractCards(mechanism)).toEqual([]);
+    expect(extractCards(Chapter)).toEqual([]);
   });
 });
 
 describe("extractCards — field edge cases", () => {
   it("accepts ASCII `->` and Unicode `→` in misconception mappings", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -137,7 +137,7 @@ describe("extractCards — field edge cases", () => {
 - Wrong answer: "Unicode arrow" → Misconception: unicode test
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards[0].misconceptions).toEqual([
       { wrong_answer: "ASCII arrow", description: "ascii test" },
       { wrong_answer: "Unicode arrow", description: "unicode test" },
@@ -145,7 +145,7 @@ describe("extractCards — field edge cases", () => {
   });
 
   it("caps hints at 3 even if the author provides more", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -163,11 +163,11 @@ describe("extractCards — field edge cases", () => {
 5. five (should be dropped)
 `),
     );
-    expect(extractCards(mechanism)[0].hints).toEqual(["one", "two", "three"]);
+    expect(extractCards(Chapter)[0].hints).toEqual(["one", "two", "three"]);
   });
 
   it("coerces unsupported Bloom's levels to the closest v1 bucket", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -179,11 +179,11 @@ describe("extractCards — field edge cases", () => {
 `),
     );
     // v1 supports remember/understand/apply/analyze; evaluate coerces to analyze.
-    expect(extractCards(mechanism)[0].blooms_level).toBe("analyze");
+    expect(extractCards(Chapter)[0].blooms_level).toBe("analyze");
   });
 
   it("defaults Bloom's level to apply when the label is missing", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -193,12 +193,12 @@ describe("extractCards — field edge cases", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0].blooms_level).toBe("apply");
+    expect(extractCards(Chapter)[0].blooms_level).toBe("apply");
   });
 
   it("throws when a required field is missing entirely", () => {
     // No Stem at all — schema requires it non-empty.
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -208,13 +208,13 @@ describe("extractCards — field edge cases", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(() => extractCards(mechanism)).toThrow();
+    expect(() => extractCards(Chapter)).toThrow();
   });
 });
 
 describe("extractCards — exam_patterns (Option Y)", () => {
-  it("inherits the mechanism-level list when the card has no line", () => {
-    const mechanism = parseMechanism(
+  it("inherits the Chapter-level list when the card has no line", () => {
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -225,11 +225,11 @@ describe("extractCards — exam_patterns (Option Y)", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0].exam_patterns).toEqual(["neet-pg"]);
+    expect(extractCards(Chapter)[0].exam_patterns).toEqual(["neet-pg"]);
   });
 
-  it("per-card line overrides the mechanism fallback", () => {
-    const mechanism = parseMechanism(
+  it("per-card line overrides the Chapter fallback", () => {
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -241,11 +241,11 @@ describe("extractCards — exam_patterns (Option Y)", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0].exam_patterns).toEqual(["mbbs", "pre-pg"]);
+    expect(extractCards(Chapter)[0].exam_patterns).toEqual(["mbbs", "pre-pg"]);
   });
 
   it("normalises case, whitespace, and duplicates", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -257,11 +257,11 @@ describe("extractCards — exam_patterns (Option Y)", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0].exam_patterns).toEqual(["mbbs", "pre-pg"]);
+    expect(extractCards(Chapter)[0].exam_patterns).toEqual(["mbbs", "pre-pg"]);
   });
 
-  it("different cards in the same mechanism can carry different patterns", () => {
-    const mechanism = parseMechanism(
+  it("different cards in the same Chapter can carry different patterns", () => {
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -281,7 +281,7 @@ describe("extractCards — exam_patterns (Option Y)", () => {
 **Elaborative explanation:** e
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards[0].exam_patterns).toEqual(["mbbs"]);
     expect(cards[1].exam_patterns).toEqual(["pre-pg"]);
   });
@@ -289,7 +289,7 @@ describe("extractCards — exam_patterns (Option Y)", () => {
 
 describe("extractCards — priority + difficulty classification", () => {
   it("defaults to should/standard when both labels are omitted", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -300,13 +300,13 @@ describe("extractCards — priority + difficulty classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    const card = extractCards(mechanism)[0]!;
+    const card = extractCards(Chapter)[0]!;
     expect(card.priority).toBe("should");
     expect(card.difficulty).toBe("standard");
   });
 
   it("reads explicit priority and difficulty labels", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -328,7 +328,7 @@ describe("extractCards — priority + difficulty classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards[0]!.priority).toBe("must");
     expect(cards[0]!.difficulty).toBe("foundational");
     expect(cards[1]!.priority).toBe("good");
@@ -336,7 +336,7 @@ describe("extractCards — priority + difficulty classification", () => {
   });
 
   it("accepts known priority synonyms (essential/core/optional/bonus/expected)", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -364,14 +364,14 @@ describe("extractCards — priority + difficulty classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards[0]!.priority).toBe("must");
     expect(cards[1]!.priority).toBe("good");
     expect(cards[2]!.priority).toBe("should");
   });
 
   it("accepts known difficulty synonyms (intermediate/easy/hard)", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -399,14 +399,14 @@ describe("extractCards — priority + difficulty classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards[0]!.difficulty).toBe("foundational");
     expect(cards[1]!.difficulty).toBe("standard");
     expect(cards[2]!.difficulty).toBe("advanced");
   });
 
   it("falls back to should/standard for unrecognised values rather than failing", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -419,13 +419,13 @@ describe("extractCards — priority + difficulty classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    const card = extractCards(mechanism)[0]!;
+    const card = extractCards(Chapter)[0]!;
     expect(card.priority).toBe("should");
     expect(card.difficulty).toBe("standard");
   });
 
   it("priority and difficulty are independent — must/advanced is legitimate", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -438,7 +438,7 @@ describe("extractCards — priority + difficulty classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    const card = extractCards(mechanism)[0]!;
+    const card = extractCards(Chapter)[0]!;
     expect(card.priority).toBe("must");
     expect(card.difficulty).toBe("advanced");
   });
@@ -446,7 +446,7 @@ describe("extractCards — priority + difficulty classification", () => {
 
 describe("extractCards — format classification", () => {
   it("defaults to descriptive when no Format label is given", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -457,11 +457,11 @@ describe("extractCards — format classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.format).toBe("descriptive");
+    expect(extractCards(Chapter)[0]!.format).toBe("descriptive");
   });
 
   it("reads explicit format labels", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -489,14 +489,14 @@ describe("extractCards — format classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards[0]!.format).toBe("mcq");
     expect(cards[1]!.format).toBe("fill_blank");
     expect(cards[2]!.format).toBe("descriptive");
   });
 
   it("accepts known format synonyms (multiple choice / fill in the blank / free text)", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -524,14 +524,14 @@ describe("extractCards — format classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards[0]!.format).toBe("mcq");
     expect(cards[1]!.format).toBe("fill_blank");
     expect(cards[2]!.format).toBe("descriptive");
   });
 
   it("falls back to descriptive for unrecognised values rather than failing", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -543,13 +543,13 @@ describe("extractCards — format classification", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.format).toBe("descriptive");
+    expect(extractCards(Chapter)[0]!.format).toBe("descriptive");
   });
 });
 
 describe("extractCards — status lifecycle", () => {
   it("defaults to published when no Status label is given", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -560,11 +560,11 @@ describe("extractCards — status lifecycle", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.status).toBe("published");
+    expect(extractCards(Chapter)[0]!.status).toBe("published");
   });
 
   it("reads an explicit Status: retired label", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -576,11 +576,11 @@ describe("extractCards — status lifecycle", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.status).toBe("retired");
+    expect(extractCards(Chapter)[0]!.status).toBe("retired");
   });
 
   it("retired questions still parse — they're tombstones, not errors", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -599,7 +599,7 @@ describe("extractCards — status lifecycle", () => {
 **Elaborative explanation:** e
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards).toHaveLength(2);
     expect(cards[0]!.status).toBe("retired");
     expect(cards[1]!.status).toBe("published");
@@ -608,7 +608,7 @@ describe("extractCards — status lifecycle", () => {
 
 describe("extractCards — uuid identity", () => {
   it("is undefined when no ID label is given", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -619,11 +619,11 @@ describe("extractCards — uuid identity", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.uuid).toBeUndefined();
+    expect(extractCards(Chapter)[0]!.uuid).toBeUndefined();
   });
 
   it("reads a valid UUID from the ID label", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -635,11 +635,11 @@ describe("extractCards — uuid identity", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.uuid).toBe("8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a");
+    expect(extractCards(Chapter)[0]!.uuid).toBe("8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a");
   });
 
   it("normalises uppercase UUIDs to lowercase", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -651,11 +651,11 @@ describe("extractCards — uuid identity", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.uuid).toBe("8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a");
+    expect(extractCards(Chapter)[0]!.uuid).toBe("8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a");
   });
 
   it("ignores malformed IDs and leaves uuid undefined", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -667,13 +667,13 @@ describe("extractCards — uuid identity", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.uuid).toBeUndefined();
+    expect(extractCards(Chapter)[0]!.uuid).toBeUndefined();
   });
 });
 
 describe("extractCards — fill-blank fields", () => {
   it("reads quoted, pipe-separated acceptable_answers", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -688,14 +688,14 @@ describe("extractCards — fill-blank fields", () => {
 **Elaborative explanation:** e
 `),
     );
-    const c = extractCards(mechanism)[0]!;
+    const c = extractCards(Chapter)[0]!;
     expect(c.acceptable_answers).toEqual(["5.6 L/min", "5.6 liters per minute", "5.6 l/min"]);
     expect(c.unit).toBe("L/min");
     expect(c.tolerance_pct).toBeCloseTo(0.05);
   });
 
   it("falls back to bare-pipe parsing when answers are unquoted", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -708,11 +708,11 @@ describe("extractCards — fill-blank fields", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.acceptable_answers).toEqual(["72", "70", "75"]);
+    expect(extractCards(Chapter)[0]!.acceptable_answers).toEqual(["72", "70", "75"]);
   });
 
   it("parses tolerance from percent (with or without ±)", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -734,13 +734,13 @@ describe("extractCards — fill-blank fields", () => {
 **Elaborative explanation:** e
 `),
     );
-    const cards = extractCards(mechanism);
+    const cards = extractCards(Chapter);
     expect(cards[0]!.tolerance_pct).toBeCloseTo(0.1);
     expect(cards[1]!.tolerance_pct).toBeCloseTo(0.025);
   });
 
   it("parses tolerance from a decimal fraction", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -753,11 +753,11 @@ describe("extractCards — fill-blank fields", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.tolerance_pct).toBeCloseTo(0.05);
+    expect(extractCards(Chapter)[0]!.tolerance_pct).toBeCloseTo(0.05);
   });
 
   it("acceptable_answers, unit, tolerance are all undefined when not authored", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -768,14 +768,14 @@ describe("extractCards — fill-blank fields", () => {
 **Elaborative explanation:** e
 `),
     );
-    const c = extractCards(mechanism)[0]!;
+    const c = extractCards(Chapter)[0]!;
     expect(c.acceptable_answers).toBeUndefined();
     expect(c.unit).toBeUndefined();
     expect(c.tolerance_pct).toBeUndefined();
   });
 
   it("ignores garbage tolerance strings rather than throwing", () => {
-    const mechanism = parseMechanism(
+    const Chapter = parseChapter(
       withBody(`# Questions
 
 ## Question 1
@@ -788,6 +788,6 @@ describe("extractCards — fill-blank fields", () => {
 **Elaborative explanation:** e
 `),
     );
-    expect(extractCards(mechanism)[0]!.tolerance_pct).toBeUndefined();
+    expect(extractCards(Chapter)[0]!.tolerance_pct).toBeUndefined();
   });
 });

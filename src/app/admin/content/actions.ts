@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { parseMechanism } from "@/lib/content/loader";
+import { parseChapter } from "@/lib/content/loader";
 import { createClient } from "@/lib/supabase/server";
 
 type Result = { status: "ok"; id: string } | { status: "error"; message: string };
@@ -12,7 +12,7 @@ const STATUS_VALUES = new Set(["draft", "review", "published", "retired"]);
 
 /**
  * Validates + writes the markdown as a CMS row. Used by both the
- * new-mechanism page (insert) and the edit page (upsert).
+ * new-Chapter page (insert) and the edit page (upsert).
  *
  * The validation pass calls the same parser the renderer uses, so a
  * misformatted frontmatter or malformed question shape is caught at
@@ -36,7 +36,7 @@ async function saveMechanism({
 
   let parsed;
   try {
-    parsed = parseMechanism(markdown);
+    parsed = parseChapter(markdown);
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Markdown failed to parse — check the frontmatter.";
@@ -88,7 +88,7 @@ async function saveMechanism({
       if (error.code === "23505") {
         return {
           status: "error",
-          message: `A mechanism with id "${parsed.frontmatter.id}" already exists. Edit it instead, or change the id.`,
+          message: `A Chapter with id "${parsed.frontmatter.id}" already exists. Edit it instead, or change the id.`,
         };
       }
       return { status: "error", message: `Failed to save: ${error.message}` };
@@ -110,7 +110,7 @@ async function saveMechanism({
       // than saying "Saved" when nothing happened.
       return {
         status: "error",
-        message: `No row matched id "${parsed.frontmatter.id}". Did the id change? Try creating a new mechanism instead.`,
+        message: `No row matched id "${parsed.frontmatter.id}". Did the id change? Try creating a new Chapter instead.`,
       };
     }
   }

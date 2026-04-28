@@ -18,7 +18,7 @@ function card(
 ): Card {
   return {
     id,
-    mechanism_id: id.split(":")[0] ?? "mech",
+    chapter_id: id.split(":")[0] ?? "mech",
     index: Number.parseInt(id.split(":")[1] ?? "1", 10),
     format: "descriptive",
     status: "published",

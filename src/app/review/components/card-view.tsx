@@ -79,7 +79,7 @@ export function CardView({
 
       <section aria-label="Question" className="flex flex-col gap-3">
         <p className="text-muted-foreground text-xs tracking-widest uppercase">
-          {card.mechanism_id.replace(/-/g, " ")}
+          {card.chapter_id.replace(/-/g, " ")}
         </p>
         <h1 className="font-heading text-2xl leading-snug font-medium">{card.stem}</h1>
       </section>
@@ -203,7 +203,7 @@ export function CardView({
             In your own words — why?
           </label>
           <p className="text-muted-foreground text-xs leading-5">
-            Optional. A sentence or two explaining the mechanism in your own words. Doesn&apos;t
+            Optional. A sentence or two explaining the Chapter in your own words. Doesn&apos;t
             affect your grade.
           </p>
           <textarea

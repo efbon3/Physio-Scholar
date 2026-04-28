@@ -31,7 +31,7 @@ const SHADE_TEXT: Record<0 | 1 | 2 | 3 | 4, string> = {
  *
  * Cells are colour-shaded by quartile of non-zero activity (so a
  * sparse pilot still shows distinct levels). Clicking a cell opens
- * a detail panel below the grid showing per-mechanism breakdown for
+ * a detail panel below the grid showing per-Chapter breakdown for
  * that day. Tapping the same cell twice closes the panel.
  *
  * Read-only — this is a retrospective timeline, not an editor. All
@@ -120,12 +120,12 @@ function DayDetail({ cell, onClose }: { cell: ActivityCell; onClose: () => void 
         <>
           <p className="text-sm">
             <strong className="font-medium">{cell.count}</strong> review
-            {cell.count === 1 ? "" : "s"} across {cell.byMechanism.length} mechanism
-            {cell.byMechanism.length === 1 ? "" : "s"}.
+            {cell.count === 1 ? "" : "s"} across {cell.byChapter.length} Chapter
+            {cell.byChapter.length === 1 ? "" : "s"}.
           </p>
           <ul className="flex flex-col gap-1 text-sm">
-            {cell.byMechanism.map((m) => (
-              <li key={m.mechanismId} className="flex justify-between gap-2">
+            {cell.byChapter.map((m) => (
+              <li key={m.chapterId} className="flex justify-between gap-2">
                 <span>{m.title}</span>
                 <span className="text-muted-foreground tabular-nums">{m.count}</span>
               </li>

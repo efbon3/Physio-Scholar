@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
-import { readAllMechanisms } from "@/lib/content/source";
+import { readAllChapters } from "@/lib/content/source";
 
 export const metadata = {
   title: "Assessment",
@@ -13,7 +13,7 @@ type SystemGroup = {
 };
 
 export default async function SystemsPage() {
-  const mechanisms = await readAllMechanisms();
+  const mechanisms = await readAllChapters();
 
   // Group by organ_system; sort systems alphabetically, mechanisms alphabetically.
   const grouped = new Map<string, SystemGroup>();

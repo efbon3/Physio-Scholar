@@ -28,7 +28,7 @@ function review(
 
 describe("buildActivityCalendar", () => {
   const titles = new Map([
-    ["frank-starling", "Frank-Starling Mechanism"],
+    ["frank-starling", "Frank-Starling Chapter"],
     ["baroreceptor-reflex", "Baroreceptor Reflex"],
   ]);
 
@@ -64,9 +64,9 @@ describe("buildActivityCalendar", () => {
     });
     const cell = cells.find((c) => c.dateKey.endsWith("-14"))!;
     expect(cell.count).toBe(3);
-    expect(cell.byMechanism).toEqual([
-      { mechanismId: "frank-starling", title: "Frank-Starling Mechanism", count: 2 },
-      { mechanismId: "baroreceptor-reflex", title: "Baroreceptor Reflex", count: 1 },
+    expect(cell.byChapter).toEqual([
+      { chapterId: "frank-starling", title: "Frank-Starling Chapter", count: 2 },
+      { chapterId: "baroreceptor-reflex", title: "Baroreceptor Reflex", count: 1 },
     ]);
   });
 
@@ -81,21 +81,21 @@ describe("buildActivityCalendar", () => {
       days: 1,
       mechanismTitles: titles,
     });
-    expect(cells[0]!.byMechanism.map((b) => b.title)).toEqual([
+    expect(cells[0]!.byChapter.map((b) => b.title)).toEqual([
       "Baroreceptor Reflex",
-      "Frank-Starling Mechanism",
+      "Frank-Starling Chapter",
     ]);
   });
 
-  it("falls back to mechanism id when title is missing from the lookup", () => {
+  it("falls back to Chapter id when title is missing from the lookup", () => {
     const now = new Date("2026-05-15T12:00:00Z");
     const cells = buildActivityCalendar({
-      reviews: [review({ card_id: "orphan-mechanism:1", created_at: "2026-05-15T10:00:00Z" })],
+      reviews: [review({ card_id: "orphan-Chapter:1", created_at: "2026-05-15T10:00:00Z" })],
       now,
       days: 1,
       mechanismTitles: titles,
     });
-    expect(cells[0]!.byMechanism[0]!.title).toBe("orphan-mechanism");
+    expect(cells[0]!.byChapter[0]!.title).toBe("orphan-Chapter");
   });
 
   it("ignores malformed card ids without crashing", () => {
@@ -126,7 +126,7 @@ describe("buildActivityCalendar", () => {
 
 describe("activityShadingThresholds + activityShade", () => {
   function bucket(counts: number[]): ActivityCell[] {
-    return counts.map((c, i) => ({ dateKey: `2026-05-0${i + 1}`, count: c, byMechanism: [] }));
+    return counts.map((c, i) => ({ dateKey: `2026-05-0${i + 1}`, count: c, byChapter: [] }));
   }
 
   it("returns all-zero thresholds when there's no activity", () => {

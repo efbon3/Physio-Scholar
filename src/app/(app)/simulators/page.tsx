@@ -19,8 +19,8 @@ const SIMULATORS = [
 
 /**
  * Simulators index — interactive living diagrams that complement the
- * static mechanism pages. Each simulator is tied to one mechanism and
- * cross-links from the mechanism detail page, so students discover
+ * static Chapter pages. Each simulator is tied to one Chapter and
+ * cross-links from the Chapter detail page, so students discover
  * them in context too.
  */
 export default function SimulatorsIndex() {

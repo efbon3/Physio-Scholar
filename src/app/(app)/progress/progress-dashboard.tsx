@@ -72,7 +72,7 @@ function formatRelative(ms: number | null, now: Date): string {
  * Widgets are intentionally a first pass:
  *   - headline counters (streak, reviews, study time, retention)
  *   - 14-day activity sparkline
- *   - per-mechanism mastery table linking back to the detail page
+ *   - per-Chapter mastery table linking back to the detail page
  *
  * Build spec §2.3 also asks for a weekly metacognitive-calibration
  * report; that depends on the Phase 4 grader scoring self-explanations,
@@ -124,7 +124,7 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
             retentionPct30d: null,
             cardsByStatus: { learning: 0, review: 0, leech: 0, suspended: 0 },
             dailyReviews: [],
-            byMechanism: [],
+            byChapter: [],
           });
           setActivityCells([]);
         }
@@ -217,21 +217,21 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
 
       <section aria-label="Per-chapter mastery" className="flex flex-col gap-3">
         <h2 className="font-heading text-xl font-medium">Chapters</h2>
-        {snapshot.byMechanism.length === 0 ? (
+        {snapshot.byChapter.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No chapters yet — content lives under <code>content/mechanisms/</code>.
           </p>
         ) : (
           <ul className="flex flex-col gap-2 text-sm">
-            {snapshot.byMechanism.map((m) => (
+            {snapshot.byChapter.map((m) => (
               <li
-                key={m.mechanismId}
+                key={m.chapterId}
                 className="border-border flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
               >
                 <div className="flex flex-col gap-0.5">
                   <Link
                     className="font-medium underline-offset-2 hover:underline"
-                    href={`/review?mechanism=${encodeURIComponent(m.mechanismId)}`}
+                    href={`/review?Chapter=${encodeURIComponent(m.chapterId)}`}
                   >
                     {m.title}
                   </Link>

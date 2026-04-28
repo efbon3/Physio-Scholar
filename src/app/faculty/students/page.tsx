@@ -96,7 +96,7 @@ export default async function FacultyStudentsPage({
         <p className="text-muted-foreground text-sm tracking-widest uppercase">Faculty</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Students</h1>
         <p className="text-muted-foreground text-sm">
-          Drill into one student to see their mechanism-by-mechanism mastery and recent activity.
+          Drill into one student to see their Chapter-by-Chapter mastery and recent activity.
         </p>
       </header>
 

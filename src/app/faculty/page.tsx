@@ -69,19 +69,19 @@ export default async function FacultyHubPage() {
       <section className="grid gap-3 sm:grid-cols-2">
         <FacultyCard
           title="Cohort analytics"
-          description="Roster + per-mechanism retention heatmap for your institution. See where the class is strong and where it's slipping."
+          description="Roster + per-Chapter retention heatmap for your institution. See where the class is strong and where it's slipping."
           href="/admin/cohort"
           cta="Open cohort"
         />
         <FacultyCard
           title="Assignments"
-          description="Create homework — pick a mechanism, set a due date, optionally point to a specific format. Students see the assignment on their Today dashboard."
+          description="Create homework — pick a Chapter, set a due date, optionally point to a specific format. Students see the assignment on their Today dashboard."
           href="/faculty/assignments"
           cta="Manage assignments"
         />
         <FacultyCard
           title="Per-student progress"
-          description="Drill into a single student — their mechanism-by-mechanism mastery, recent activity, and which topics they're slipping on. The struggler-first sort surfaces who needs your attention."
+          description="Drill into a single student — their Chapter-by-Chapter mastery, recent activity, and which topics they're slipping on. The struggler-first sort surfaces who needs your attention."
           href="/faculty/students"
           cta="Open students"
         />

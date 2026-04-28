@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { extractCards, type Card } from "@/lib/content/cards";
-import { readAllMechanisms } from "@/lib/content/source";
+import { readAllChapters } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -44,7 +44,7 @@ const RECENT_REVIEW_LIMIT = 30;
  *
  * Three RPCs at request time, all institution-gated server-side:
  *   - student_profile_summary  → header (name, year, headline stats)
- *   - student_card_aggregates  → mechanism-by-mechanism mastery
+ *   - student_card_aggregates  → Chapter-by-Chapter mastery
  *   - student_recent_reviews   → activity log
  *
  * The student_profile_summary RPC returns zero rows when the caller
@@ -98,9 +98,9 @@ export default async function FacultyStudentDetailPage({
   const aggregates = (aggRes.data ?? []) as CardAgg[];
   const recent = (recentRes.data ?? []) as RecentReview[];
 
-  // Map card_id → mechanism for the breakdown. The authored content
+  // Map card_id → Chapter for the breakdown. The authored content
   // isn't in the DB, so we read it server-side and join in memory.
-  const mechanisms = await readAllMechanisms();
+  const mechanisms = await readAllChapters();
   const cardsById = new Map<string, Card>();
   const mechanismTitles = new Map<string, string>();
   for (const m of mechanisms) {
@@ -108,8 +108,8 @@ export default async function FacultyStudentDetailPage({
     for (const card of extractCards(m)) cardsById.set(card.id, card);
   }
 
-  // Roll the per-card aggregates up to the mechanism level. A
-  // mechanism's retention is the weighted mean of its cards'
+  // Roll the per-card aggregates up to the Chapter level. A
+  // Chapter's retention is the weighted mean of its cards'
   // retention (weighted by reviews_last_30d).
   const mechanismRollup = rollUpToMechanisms(aggregates, cardsById);
 
@@ -149,11 +149,11 @@ export default async function FacultyStudentDetailPage({
         </dl>
       </section>
 
-      <section aria-label="Mechanism breakdown" className="flex flex-col gap-3">
-        <h2 className="font-heading text-xl font-medium">Mechanism breakdown</h2>
+      <section aria-label="Chapter breakdown" className="flex flex-col gap-3">
+        <h2 className="font-heading text-xl font-medium">Chapter breakdown</h2>
         {mechanismRollup.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            This student hasn&apos;t reviewed any cards yet. Once they start, the per-mechanism
+            This student hasn&apos;t reviewed any cards yet. Once they start, the per-Chapter
             breakdown appears here.
           </p>
         ) : (
@@ -161,7 +161,7 @@ export default async function FacultyStudentDetailPage({
             <table className="w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="text-muted-foreground text-left text-xs tracking-widest uppercase">
-                  <th className="px-3 py-2">Mechanism</th>
+                  <th className="px-3 py-2">Chapter</th>
                   <th className="px-3 py-2 text-right">Reviews · 30d</th>
                   <th className="px-3 py-2 text-right">Reviews · total</th>
                   <th className="px-3 py-2 text-right">Retention 30d</th>
@@ -170,10 +170,8 @@ export default async function FacultyStudentDetailPage({
               </thead>
               <tbody>
                 {mechanismRollup.map((m) => (
-                  <tr key={m.mechanismId} className="border-border/40 border-t">
-                    <td className="px-3 py-2">
-                      {mechanismTitles.get(m.mechanismId) ?? m.mechanismId}
-                    </td>
+                  <tr key={m.chapterId} className="border-border/40 border-t">
+                    <td className="px-3 py-2">{mechanismTitles.get(m.chapterId) ?? m.chapterId}</td>
                     <td className="px-3 py-2 text-right">{m.reviewsLast30d}</td>
                     <td className="px-3 py-2 text-right">{m.reviewsTotal}</td>
                     <td className="px-3 py-2 text-right">
@@ -257,11 +255,11 @@ function cardLabel(
 ): string {
   const card = cardsById.get(cardId);
   if (card) {
-    const mTitle = mechanismTitles.get(card.mechanism_id) ?? card.mechanism_id;
+    const mTitle = mechanismTitles.get(card.chapter_id) ?? card.chapter_id;
     return `${mTitle} · Q${card.index}`;
   }
   // Card no longer in the published bank (retired or removed). Fall
-  // back to the mechanism prefix from the id, if present.
+  // back to the Chapter prefix from the id, if present.
   const sep = cardId.indexOf(":");
   if (sep > 0) {
     const prefix = cardId.slice(0, sep);
@@ -271,7 +269,7 @@ function cardLabel(
 }
 
 type MechanismRollup = {
-  mechanismId: string;
+  chapterId: string;
   reviewsTotal: number;
   reviewsLast30d: number;
   retentionPct30d: number | null;
@@ -282,7 +280,7 @@ function rollUpToMechanisms(
   aggregates: readonly CardAgg[],
   cardsById: Map<string, Card>,
 ): MechanismRollup[] {
-  const byMechanism = new Map<
+  const byChapter = new Map<
     string,
     {
       reviewsTotal: number;
@@ -298,8 +296,8 @@ function rollUpToMechanisms(
     // Fall back to splitting the id when the card is no longer
     // published — the rollup still surfaces the activity even if
     // we lost the title lookup.
-    const mechanismId = card?.mechanism_id ?? agg.card_id.split(":")[0] ?? agg.card_id;
-    const bucket = byMechanism.get(mechanismId) ?? {
+    const chapterId = card?.chapter_id ?? agg.card_id.split(":")[0] ?? agg.card_id;
+    const bucket = byChapter.get(chapterId) ?? {
       reviewsTotal: 0,
       reviewsLast30d: 0,
       retentionWeightedSum: 0,
@@ -315,13 +313,13 @@ function rollUpToMechanisms(
     if (agg.last_review_at && (!bucket.lastReviewAt || agg.last_review_at > bucket.lastReviewAt)) {
       bucket.lastReviewAt = agg.last_review_at;
     }
-    byMechanism.set(mechanismId, bucket);
+    byChapter.set(chapterId, bucket);
   }
 
   const out: MechanismRollup[] = [];
-  for (const [mechanismId, b] of byMechanism.entries()) {
+  for (const [chapterId, b] of byChapter.entries()) {
     out.push({
-      mechanismId,
+      chapterId,
       reviewsTotal: b.reviewsTotal,
       reviewsLast30d: b.reviewsLast30d,
       retentionPct30d:

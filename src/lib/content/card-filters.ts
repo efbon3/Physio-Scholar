@@ -104,7 +104,7 @@ export function filterPublished(cards: readonly Card[]): Card[] {
 
 /**
  * Restrict a card list to one or more formats. Used by the
- * mechanism-page format-picker to assemble a session of just MCQs (or
+ * Chapter-page format-picker to assemble a session of just MCQs (or
  * just descriptive, or just fill-in-the-blank). Pass an array to allow
  * multiple formats; pass a single format for the common case.
  */

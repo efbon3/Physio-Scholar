@@ -28,7 +28,7 @@ import { SyncIndicator } from "./sync-indicator";
  */
 
 // Two-zone redesign retired Topics / Facts / Values / Self-test / Exam
-// as standalone surfaces; per-mechanism format-picker covers the test
+// as standalone surfaces; per-Chapter format-picker covers the test
 // affordances and Review handles the daily SRS queue. "Dashboard" is
 // the brand link.
 const STUDENT_TABS = [

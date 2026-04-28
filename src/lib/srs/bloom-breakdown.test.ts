@@ -9,7 +9,7 @@ import type { Rating } from "./types";
 function card(id: string, level: Card["blooms_level"]): Card {
   return {
     id,
-    mechanism_id: id.split(":")[0],
+    chapter_id: id.split(":")[0],
     index: Number.parseInt(id.split(":")[1] ?? "1", 10),
     format: "descriptive",
     status: "published",

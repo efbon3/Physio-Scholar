@@ -2,36 +2,36 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { extractCards } from "@/lib/content/cards";
-import type { Mechanism } from "@/lib/content/loader";
+import type { Chapter } from "@/lib/content/loader";
 
 import { FormatPicker } from "./format-picker";
-import { MechanismStats } from "./mechanism-stats";
-import { MechanismTabs, type MechanismTabKey } from "./mechanism-tabs";
+import { ChapterStats } from "./mechanism-stats";
+import { ChapterTabs, type MechanismTabKey } from "./mechanism-tabs";
 
 type Props = {
-  mechanism: Mechanism;
+  Chapter: Chapter;
   /**
    * Signed-in learner id. Passed in from the server page (falls back to
    * "preview" in CI / unconfigured previews, same sentinel the review
-   * page uses) so the Dexie-backed MechanismStats is scoped correctly.
+   * page uses) so the Dexie-backed ChapterStats is scoped correctly.
    */
   profileId: string;
 };
 
 /**
- * Mechanism detail page — static reading surfaces (Phase 2) plus the
+ * Chapter detail page — static reading surfaces (Phase 2) plus the
  * Phase 5 additions: a proper tablist for the four reading layers,
- * per-mechanism stats pulled from Dexie, and a "Study this mechanism"
- * CTA that launches `/review?mechanism=<id>` filtered to just these
+ * per-Chapter stats pulled from Dexie, and a "Study this Chapter"
+ * CTA that launches `/review?Chapter=<id>` filtered to just these
  * cards.
  *
  * Markdown rendering stays on the server so the `react-markdown` +
- * `remark-gfm` parsers stay out of the client bundle. The `MechanismTabs`
+ * `remark-gfm` parsers stay out of the client bundle. The `ChapterTabs`
  * client component receives the already-rendered ReactNodes as panels
  * and only owns the show/hide state + keyboard interactions.
  */
-export function MechanismRenderer({ mechanism, profileId }: Props) {
-  const { layers, frontmatter } = mechanism;
+export function ChapterRenderer({ Chapter, profileId }: Props) {
+  const { layers, frontmatter } = Chapter;
 
   const panels: Partial<Record<MechanismTabKey, React.ReactNode>> = {};
   if (layers.core) {
@@ -49,7 +49,7 @@ export function MechanismRenderer({ mechanism, profileId }: Props) {
     );
   }
 
-  const cards = extractCards(mechanism);
+  const cards = extractCards(Chapter);
   const cardIds = cards.map((c) => c.id);
   const hasCards = cardIds.length > 0;
 
@@ -72,7 +72,7 @@ export function MechanismRenderer({ mechanism, profileId }: Props) {
         aria-label="Your progress on this chapter"
         className="border-border bg-muted/40 flex flex-col gap-4 rounded-md border p-4"
       >
-        <MechanismStats cardIds={cardIds} profileId={profileId} />
+        <ChapterStats cardIds={cardIds} profileId={profileId} />
         {!hasCards ? (
           <p className="text-muted-foreground text-xs">
             No questions have been authored for this chapter yet. The textbook layers below are
@@ -82,9 +82,9 @@ export function MechanismRenderer({ mechanism, profileId }: Props) {
         ) : null}
       </section>
 
-      <MechanismTabs panels={panels} />
+      <ChapterTabs panels={panels} />
 
-      {hasCards ? <FormatPicker mechanismId={frontmatter.id} cards={cards} /> : null}
+      {hasCards ? <FormatPicker chapterId={frontmatter.id} cards={cards} /> : null}
 
       {layers.sources ? (
         <footer className="text-muted-foreground flex flex-col gap-2 border-t pt-4 text-xs">

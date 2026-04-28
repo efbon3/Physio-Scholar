@@ -64,10 +64,10 @@ export const SELF_GRADE_LABELS: Record<SelfGrade, string> = {
 };
 
 export const SELF_GRADE_DESCRIPTIONS: Record<SelfGrade, string> = {
-  correct: "I got the mechanism right with nothing meaningfully wrong.",
+  correct: "I got the Chapter right with nothing meaningfully wrong.",
   "partially-wrong": "Mostly right but I had some wrong bits in there.",
   "partially-correct": "Mostly wrong but I caught some of the right idea.",
-  wrong: "Essentially wrong — I missed the mechanism.",
+  wrong: "Essentially wrong — I missed the Chapter.",
 };
 
 /**

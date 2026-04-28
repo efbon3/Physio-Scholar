@@ -10,14 +10,14 @@ import { localDateKey } from "./progress";
  * Each cell carries:
  *   - dateKey (YYYY-MM-DD, local time)
  *   - count: total reviews that day
- *   - byMechanism: per-mechanism breakdown sorted by count desc, then
+ *   - byChapter: per-Chapter breakdown sorted by count desc, then
  *     by title asc for stability when counts tie
  *
  * Pure: no I/O, deterministic, fast to test.
  */
 
 export type ActivityMechanismBreakdown = {
-  mechanismId: string;
+  chapterId: string;
   title: string;
   count: number;
 };
@@ -25,12 +25,12 @@ export type ActivityMechanismBreakdown = {
 export type ActivityCell = {
   dateKey: string;
   count: number;
-  byMechanism: ActivityMechanismBreakdown[];
+  byChapter: ActivityMechanismBreakdown[];
 };
 
 /**
- * Pull mechanism_id out of a card_id. Card ids have the shape
- * `{mechanism_id}:{index}`. We pre-validate at parse time, so a
+ * Pull chapter_id out of a card_id. Card ids have the shape
+ * `{chapter_id}:{index}`. We pre-validate at parse time, so a
  * missing colon means a malformed row that the timeline silently
  * drops rather than crashing on.
  */
@@ -50,7 +50,7 @@ export function buildActivityCalendar({
   days?: number;
   mechanismTitles: ReadonlyMap<string, string>;
 }): ActivityCell[] {
-  // Aggregate per-day → per-mechanism counts in a single pass.
+  // Aggregate per-day → per-Chapter counts in a single pass.
   const byDay = new Map<string, Map<string, number>>();
   for (const r of reviews) {
     const ts = new Date(r.created_at).getTime();
@@ -74,7 +74,7 @@ export function buildActivityCalendar({
     if (dayBucket) {
       for (const [mechId, mechCount] of dayBucket) {
         breakdown.push({
-          mechanismId: mechId,
+          chapterId: mechId,
           title: mechanismTitles.get(mechId) ?? mechId,
           count: mechCount,
         });
@@ -85,7 +85,7 @@ export function buildActivityCalendar({
         return a.title.localeCompare(b.title);
       });
     }
-    cells.push({ dateKey, count, byMechanism: breakdown });
+    cells.push({ dateKey, count, byChapter: breakdown });
   }
   return cells;
 }

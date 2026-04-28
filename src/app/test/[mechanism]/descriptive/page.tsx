@@ -9,7 +9,7 @@ import {
   parseDifficultyFilter,
   parsePriorityFilter,
 } from "@/lib/content/card-filters";
-import { readMechanismById } from "@/lib/content/source";
+import { readChapterById } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
 import { DescriptiveSession } from "./descriptive-session";
@@ -18,7 +18,7 @@ export const metadata = {
   title: "Descriptive",
 };
 
-type Params = { params: Promise<{ mechanism: string }> };
+type Params = { params: Promise<{ Chapter: string }> };
 type SearchParams = Promise<{ priority?: string | string[]; difficulty?: string | string[] }>;
 
 async function getProfileId(nextPath: string): Promise<string> {
@@ -37,14 +37,14 @@ export default async function DescriptiveSessionPage({
   params,
   searchParams,
 }: Params & { searchParams: SearchParams }) {
-  const { mechanism: id } = await params;
+  const { Chapter: id } = await params;
   const resolvedSearch = await searchParams;
-  const mechanism = await readMechanismById(id);
-  if (!mechanism) notFound();
+  const Chapter = await readChapterById(id);
+  if (!Chapter) notFound();
 
   const profileId = await getProfileId(`/test/${id}/descriptive`);
 
-  const allCards = extractCards(mechanism);
+  const allCards = extractCards(Chapter);
   const formatCards = filterByFormat(filterPublished(allCards), "descriptive");
 
   const priorityFilter = parsePriorityFilter(resolvedSearch.priority);
@@ -62,7 +62,7 @@ export default async function DescriptiveSessionPage({
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
       <nav className="text-muted-foreground text-xs">
         <Link
-          href={`/systems/${mechanism.frontmatter.organ_system}/${id}`}
+          href={`/systems/${Chapter.frontmatter.organ_system}/${id}`}
           className="underline-offset-2 hover:underline"
         >
           ← Back to chapter
@@ -71,20 +71,20 @@ export default async function DescriptiveSessionPage({
       <header className="flex flex-col gap-2">
         <p className="text-muted-foreground text-sm tracking-widest uppercase">Descriptive</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
-          {mechanism.frontmatter.title}
+          {Chapter.frontmatter.title}
         </h1>
       </header>
 
       {cards.length === 0 ? (
         <p className="text-muted-foreground text-sm leading-relaxed">
-          No descriptive questions have been authored for this mechanism yet. Once a question with{" "}
+          No descriptive questions have been authored for this Chapter yet. Once a question with{" "}
           <code>**Format:** descriptive</code> lands in the markdown, it&apos;ll appear here.
         </p>
       ) : (
         <DescriptiveSession
           cards={cards}
-          mechanismId={id}
-          mechanismSystem={mechanism.frontmatter.organ_system}
+          chapterId={id}
+          mechanismSystem={Chapter.frontmatter.organ_system}
           profileId={profileId}
         />
       )}

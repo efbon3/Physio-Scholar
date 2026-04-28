@@ -12,7 +12,7 @@ export const metadata = {
  * Admin → content flags queue.
  *
  * Shows open flags first (the triage surface), then recent resolved /
- * rejected for audit. Each flag links to the mechanism detail page so
+ * rejected for audit. Each flag links to the Chapter detail page so
  * the admin can read the card in context before resolving.
  *
  * The list is a Supabase query, not paginated — pilot cohort is small
@@ -91,7 +91,7 @@ export default async function AdminFlagsPage() {
 }
 
 function FlagCard({ flag }: { flag: FlagRow }) {
-  const [mechanismId] = flag.card_id.split(":");
+  const [chapterId] = flag.card_id.split(":");
   return (
     <li className="border-border flex flex-col gap-2 rounded-md border p-4 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -111,10 +111,10 @@ function FlagCard({ flag }: { flag: FlagRow }) {
         </div>
         <div className="flex gap-2">
           <Link
-            href={`/systems/cardiovascular/${mechanismId}`}
+            href={`/systems/cardiovascular/${chapterId}`}
             className="text-muted-foreground hover:bg-muted rounded-md border px-3 py-1.5 text-xs"
           >
-            View mechanism
+            View Chapter
           </Link>
         </div>
       </div>

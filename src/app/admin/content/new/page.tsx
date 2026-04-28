@@ -1,7 +1,7 @@
-import { readMechanismById } from "@/lib/content/fs";
-import { MECHANISM_TEMPLATE } from "@/lib/content/templates";
+import { readChapterById } from "@/lib/content/fs";
+import { CHAPTER_TEMPLATE } from "@/lib/content/templates";
 
-import { MechanismEditor } from "../mechanism-editor";
+import { ChapterEditor } from "../mechanism-editor";
 
 export const metadata = {
   title: "New chapter · Admin",
@@ -10,27 +10,27 @@ export const metadata = {
 type SearchParams = { clone?: string };
 
 /**
- * New mechanism form.
+ * New Chapter form.
  *
  * If `?clone=<id>` is present, we seed the editor with the markdown of
- * that filesystem mechanism — useful for "fork this .md file into the
+ * that filesystem Chapter — useful for "fork this .md file into the
  * CMS so the team can edit it without touching git." The clone path
  * reads only from the filesystem source; the dual loader logic doesn't
  * apply here because DB-authored mechanisms are already editable.
  */
-export default async function NewMechanismPage({
+export default async function NewChapterPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
   const { clone } = await searchParams;
 
-  let initialMarkdown = MECHANISM_TEMPLATE;
+  let initialMarkdown = CHAPTER_TEMPLATE;
   let clonedFrom: string | null = null;
   if (clone) {
-    const source = await readMechanismById(clone);
+    const source = await readChapterById(clone);
     if (source) {
-      // We can't just read the parsed mechanism — we need the raw
+      // We can't just read the parsed Chapter — we need the raw
       // markdown text. Re-open from disk in the loader module isn't
       // exposed, so for the clone path we reconstruct from layers
       // plus frontmatter using gray-matter upstream. For simplicity,
@@ -60,7 +60,7 @@ export default async function NewMechanismPage({
         )}
       </header>
 
-      <MechanismEditor mode="create" initialMarkdown={initialMarkdown} initialStatus="draft" />
+      <ChapterEditor mode="create" initialMarkdown={initialMarkdown} initialStatus="draft" />
     </main>
   );
 }

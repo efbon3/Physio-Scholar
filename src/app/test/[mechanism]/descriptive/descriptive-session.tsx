@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   cards: readonly Card[];
-  mechanismId: string;
+  chapterId: string;
   mechanismSystem: string;
   profileId: string;
 };
@@ -26,7 +26,7 @@ type Outcome = {
 const REVEAL_DELAY_SECONDS = 5;
 
 /**
- * Mechanism-centric descriptive session.
+ * Chapter-centric descriptive session.
  *
  * Per build spec §2.6, descriptive grading is student-self-rated:
  *   1. Stem displayed, student types a free-text answer.
@@ -44,7 +44,7 @@ const REVEAL_DELAY_SECONDS = 5;
  * see build spec §2.6 ("the student must read the model answer
  * before rating").
  */
-export function DescriptiveSession({ cards, mechanismId, mechanismSystem, profileId }: Props) {
+export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileId }: Props) {
   const [index, setIndex] = useState(0);
   const [studentAnswer, setStudentAnswer] = useState("");
   const [status, setStatus] = useState<SessionStatus>("answering");
@@ -97,7 +97,7 @@ export function DescriptiveSession({ cards, mechanismId, mechanismSystem, profil
     return (
       <SummaryScreen
         outcomes={outcomes}
-        mechanismId={mechanismId}
+        chapterId={chapterId}
         mechanismSystem={mechanismSystem}
         practiceMode={effectivePracticeMode}
         practiceMissedActive={practiceMissedActive}
@@ -297,14 +297,14 @@ function RatingButton({
 
 function SummaryScreen({
   outcomes,
-  mechanismId,
+  chapterId,
   mechanismSystem,
   practiceMode,
   practiceMissedActive,
   onPracticeMissed,
 }: {
   outcomes: readonly Outcome[];
-  mechanismId: string;
+  chapterId: string;
   mechanismSystem: string;
   practiceMode: boolean;
   practiceMissedActive: boolean;
@@ -356,10 +356,10 @@ function SummaryScreen({
           </button>
         ) : null}
         <Link
-          href={`/systems/${mechanismSystem}/${mechanismId}`}
+          href={`/systems/${mechanismSystem}/${chapterId}`}
           className={cn(buttonVariants({ size: "default", variant: "outline" }))}
         >
-          Back to mechanism
+          Back to Chapter
         </Link>
         <Link
           href="/today"

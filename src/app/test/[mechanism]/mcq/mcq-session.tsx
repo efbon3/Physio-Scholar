@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 type Props = {
   questions: readonly McqQuestion[];
   cards: readonly Card[];
-  mechanismId: string;
+  chapterId: string;
   mechanismSystem: string;
   profileId: string;
 };
@@ -33,7 +33,7 @@ type Outcome = {
 const DONT_KNOW = -1 as const;
 
 /**
- * Mechanism-centric MCQ session. Walks through pre-built `McqQuestion`
+ * Chapter-centric MCQ session. Walks through pre-built `McqQuestion`
  * objects (server-shuffled) one at a time:
  *   1. Show stem + four option cards + a subordinate "I don't know"
  *      button. Tapping any option (or "I don't know") highlights it;
@@ -55,7 +55,7 @@ const DONT_KNOW = -1 as const;
  * §2.3 — review row still records (analytics), card_state stays
  * untouched. Locked once the first answer is committed.
  */
-export function McqSession({ questions, cards, mechanismId, mechanismSystem, profileId }: Props) {
+export function McqSession({ questions, cards, chapterId, mechanismSystem, profileId }: Props) {
   const [index, setIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [status, setStatus] = useState<SessionStatus>("answering");
@@ -111,7 +111,7 @@ export function McqSession({ questions, cards, mechanismId, mechanismSystem, pro
     return (
       <SummaryScreen
         outcomes={outcomes}
-        mechanismId={mechanismId}
+        chapterId={chapterId}
         mechanismSystem={mechanismSystem}
         practiceMode={effectivePracticeMode}
         practiceMissedActive={practiceMissedActive}
@@ -345,14 +345,14 @@ function BandPill({ band }: { band: GradingBand }) {
 
 function SummaryScreen({
   outcomes,
-  mechanismId,
+  chapterId,
   mechanismSystem,
   practiceMode,
   practiceMissedActive,
   onPracticeMissed,
 }: {
   outcomes: readonly Outcome[];
-  mechanismId: string;
+  chapterId: string;
   mechanismSystem: string;
   practiceMode: boolean;
   practiceMissedActive: boolean;
@@ -401,10 +401,10 @@ function SummaryScreen({
           </button>
         ) : null}
         <Link
-          href={`/systems/${mechanismSystem}/${mechanismId}`}
+          href={`/systems/${mechanismSystem}/${chapterId}`}
           className={cn(buttonVariants({ size: "default", variant: "outline" }))}
         >
-          Back to mechanism
+          Back to Chapter
         </Link>
         <Link
           href="/today"

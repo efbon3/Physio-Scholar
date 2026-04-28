@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseMechanism } from "./loader";
+import { parseChapter } from "./loader";
 
 const FIXTURE = `---
 id: frank-starling
-title: Frank-Starling Mechanism
+title: Frank-Starling Chapter
 organ_system: cardiovascular
 nmc_competencies:
   - PY-CV-1.5
@@ -14,7 +14,7 @@ exam_patterns:
   - ini-cet
 prerequisites:
   - cardiac-cycle
-related_mechanisms:
+related_chapters:
   - cardiac-output-regulation
 blooms_distribution:
   remember: 10
@@ -71,9 +71,9 @@ Stem text here.
 - Guyton & Hall, 14e, Ch. 9
 `;
 
-describe("parseMechanism", () => {
-  it("parses a well-formed mechanism end to end", () => {
-    const m = parseMechanism(FIXTURE);
+describe("parseChapter", () => {
+  it("parses a well-formed Chapter end to end", () => {
+    const m = parseChapter(FIXTURE);
     expect(m.frontmatter.id).toBe("frank-starling");
     expect(m.frontmatter.organ_system).toBe("cardiovascular");
     expect(m.frontmatter.nmc_competencies).toContain("PY-CV-1.5");
@@ -81,7 +81,7 @@ describe("parseMechanism", () => {
   });
 
   it("splits the body into the canonical layer sections", () => {
-    const { layers } = parseMechanism(FIXTURE);
+    const { layers } = parseChapter(FIXTURE);
     expect(layers.core).toMatch(/stronger contraction/);
     expect(layers.working).toMatch(/length-tension/);
     expect(layers.deepDive).toMatch(/Myofilament overlap/);
@@ -91,7 +91,7 @@ describe("parseMechanism", () => {
   });
 
   it("does not split on `#` lines inside fenced code blocks", () => {
-    const { layers } = parseMechanism(FIXTURE);
+    const { layers } = parseChapter(FIXTURE);
     // The `# This is inside a fenced code block` line should stay inside
     // Layer 2 — otherwise it would look like a new top-level section.
     expect(layers.working).toMatch(/inside a fenced code block/);
@@ -100,7 +100,7 @@ describe("parseMechanism", () => {
   });
 
   it("preserves the entire body as a fallback reading surface", () => {
-    const { body } = parseMechanism(FIXTURE);
+    const { body } = parseChapter(FIXTURE);
     expect(body.length).toBeGreaterThan(200);
     expect(body).toMatch(/Layer 1 — Core/);
     expect(body).toMatch(/Sources/);
@@ -108,12 +108,12 @@ describe("parseMechanism", () => {
 
   it("raises a ZodError when frontmatter is missing", () => {
     const bodyOnly = "# Layer 1 — Core\n\nNo frontmatter at all.";
-    expect(() => parseMechanism(bodyOnly)).toThrow();
+    expect(() => parseChapter(bodyOnly)).toThrow();
   });
 
   it("raises when blooms_distribution doesn't sum to 100", () => {
     const broken = FIXTURE.replace("apply: 30", "apply: 50");
-    expect(() => parseMechanism(broken)).toThrow(/sum to 100/);
+    expect(() => parseChapter(broken)).toThrow(/sum to 100/);
   });
 
   it("accepts en-dash and hyphen variants in layer headings", () => {
@@ -121,11 +121,11 @@ describe("parseMechanism", () => {
     // via autocorrect; ASCII hyphen (-) is what some authors will literally
     // type. All three must parse cleanly.
     const enDash = FIXTURE.replace("Layer 1 —", "Layer 1 –");
-    const { layers } = parseMechanism(enDash);
+    const { layers } = parseChapter(enDash);
     expect(layers.core).toMatch(/stronger contraction/);
 
     const asciiHyphen = FIXTURE.replace("Layer 2 —", "Layer 2 -");
-    const { layers: l2 } = parseMechanism(asciiHyphen);
+    const { layers: l2 } = parseChapter(asciiHyphen);
     expect(l2.working).toMatch(/length-tension/);
   });
 
@@ -137,7 +137,7 @@ organ_system: cardiovascular
 nmc_competencies: [PY-CV-1.1]
 exam_patterns: [neet-pg]
 prerequisites: []
-related_mechanisms: []
+related_chapters: []
 blooms_distribution: { remember: 25, understand: 25, apply: 25, analyze: 25 }
 author: a
 reviewer: pending
@@ -168,7 +168,7 @@ End of Layer 1.
 
 Layer 2 body.
 `;
-    const { layers } = parseMechanism(body);
+    const { layers } = parseChapter(body);
     expect(layers.core).toMatch(/First code block/);
     expect(layers.core).toMatch(/Regular paragraph/);
     expect(layers.core).toMatch(/End of Layer 1/);
@@ -183,7 +183,7 @@ Layer 2 body.
     const truncated = FIXTURE.split("# Layer 3")[0];
     const withFrontmatter = FIXTURE.slice(0, FIXTURE.indexOf("---\n\n")) + truncated;
     // Partial mechanisms (drafts) are allowed; missing sections => undefined.
-    const { layers } = parseMechanism(withFrontmatter);
+    const { layers } = parseChapter(withFrontmatter);
     expect(layers.core).toBeDefined();
     expect(layers.working).toBeDefined();
     // The slice wiped Layer 3 onward.

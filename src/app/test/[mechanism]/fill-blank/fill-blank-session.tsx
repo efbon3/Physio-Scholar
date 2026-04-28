@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   cards: readonly Card[];
-  mechanismId: string;
+  chapterId: string;
   mechanismSystem: string;
   profileId: string;
 };
@@ -50,7 +50,7 @@ type CardOutcome = {
  * §2.3 — review row still records (analytics), card_state stays
  * untouched. Locked once the first answer is submitted.
  */
-export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileId }: Props) {
+export function FillBlankSession({ cards, chapterId, mechanismSystem, profileId }: Props) {
   const [index, setIndex] = useState(0);
   const [studentAnswer, setStudentAnswer] = useState("");
   const [dontKnow, setDontKnow] = useState(false);
@@ -94,7 +94,7 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
       <SummaryScreen
         outcomes={outcomes}
         mechanismSystem={mechanismSystem}
-        mechanismId={mechanismId}
+        chapterId={chapterId}
         practiceMode={effectivePracticeMode}
         practiceMissedActive={practiceMissedActive}
         onPracticeMissed={handlePracticeMissed}
@@ -322,14 +322,14 @@ function BandPill({ band }: { band: GradingBand }) {
 
 function SummaryScreen({
   outcomes,
-  mechanismId,
+  chapterId,
   mechanismSystem,
   practiceMode,
   practiceMissedActive,
   onPracticeMissed,
 }: {
   outcomes: readonly CardOutcome[];
-  mechanismId: string;
+  chapterId: string;
   mechanismSystem: string;
   practiceMode: boolean;
   practiceMissedActive: boolean;
@@ -378,10 +378,10 @@ function SummaryScreen({
           </button>
         ) : null}
         <Link
-          href={`/systems/${mechanismSystem}/${mechanismId}`}
+          href={`/systems/${mechanismSystem}/${chapterId}`}
           className={cn(buttonVariants({ size: "default", variant: "outline" }))}
         >
-          Back to mechanism
+          Back to Chapter
         </Link>
         <Link
           href="/today"

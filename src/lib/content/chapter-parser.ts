@@ -1,21 +1,21 @@
 import { z } from "zod";
 
-import { mechanismFrontmatterSchema, type MechanismFrontmatter, type OrganSystem } from "./schema";
+import { chapterFrontmatterSchema, type ChapterFrontmatter, type OrganSystem } from "./schema";
 
 /**
  * Chapter-format adapter. The platform's canonical content unit is a
- * "mechanism" — one focused topic, frontmatter + four reading layers
+ * "Chapter" — one focused topic, frontmatter + four reading layers
  * + a Questions section. The author also produces "chapter" files
  * (one chapter of the master syllabus, 20+ MCQs covering several
  * sections of physiology), which use a richer authoring schema.
  *
  * Rather than maintain two parsers downstream, this module detects
  * the chapter format from the frontmatter shape and transforms it
- * into the mechanism shape in memory. The returned `Mechanism` is
- * indistinguishable from one parsed from a hand-authored mechanism
+ * into the Chapter shape in memory. The returned `Chapter` is
+ * indistinguishable from one parsed from a hand-authored Chapter
  * file: same `frontmatter`, same `body`, same `layers.questions`
  * shape — `extractCards()` walks it and produces `Card[]` exactly as
- * for a regular mechanism.
+ * for a regular Chapter.
  *
  * Chapter authoring format (sample at content/mechanisms/
  * ch01-introduction-and-homeostasis.md):
@@ -72,7 +72,7 @@ import { mechanismFrontmatterSchema, type MechanismFrontmatter, type OrganSystem
  *     Physiology and Homeostasis" → "ch01-introduction-and-homeostasis").
  *   - Maps `part` → `organ_system` (e.g. "Part I — Foundations of
  *     Physiology" → "foundations").
- *   - Defaults `nmc_competencies`, `prerequisites`, `related_mechanisms`
+ *   - Defaults `nmc_competencies`, `prerequisites`, `related_chapters`
  *     to empty; defaults `exam_patterns` to ["mbbs"]; defaults
  *     `blooms_distribution` to even split (re-derives from question
  *     levels if any are present).
@@ -82,12 +82,12 @@ import { mechanismFrontmatterSchema, type MechanismFrontmatter, type OrganSystem
  *     with the platform's `**Label:**` shape and the strict
  *     misconception-mapping line format.
  *   - Wraps the resulting question blocks under a `# Questions`
- *     top-level heading so the mechanism loader's `splitLayers()`
+ *     top-level heading so the Chapter loader's `splitLayers()`
  *     can find them.
  */
 
 /** Chapter-file frontmatter shape. */
-const chapterFrontmatterSchema = z.object({
+const authorChapterFrontmatterSchema = z.object({
   chapter: z.string().min(1),
   part: z.string().min(1),
   tier: z
@@ -103,50 +103,50 @@ const chapterFrontmatterSchema = z.object({
   version: z.string().optional(),
 });
 
-export type ChapterFrontmatter = z.infer<typeof chapterFrontmatterSchema>;
+export type AuthorChapterFrontmatter = z.infer<typeof authorChapterFrontmatterSchema>;
 
 /**
  * Detect chapter-format frontmatter. Heuristic: has `chapter` and
  * `part` keys, and no `id` (id presence is the signal for the
- * canonical mechanism format).
+ * canonical Chapter format).
  */
-export function isChapterFrontmatter(data: unknown): boolean {
+export function isAuthorChapterFrontmatter(data: unknown): boolean {
   if (typeof data !== "object" || data === null) return false;
   const d = data as Record<string, unknown>;
   return typeof d.chapter === "string" && typeof d.part === "string" && !("id" in d);
 }
 
 /**
- * Transform chapter-format frontmatter + body into the mechanism
+ * Transform chapter-format frontmatter + body into the Chapter
  * shape. Throws if the frontmatter or the body don't match the
  * documented chapter format.
  *
  * `filenameHint` is the basename of the source file (without `.md`).
  * When provided and shaped like a kebab-case slug, it overrides the
  * chapter-title-derived id. This guarantees the on-disk filename and
- * the mechanism id always agree, which is what the URL routing relies
+ * the Chapter id always agree, which is what the URL routing relies
  * on (`/systems/<system>/<id>` resolves by reading `<id>.md`). When
  * absent (DB rows, in-memory tests), the chapter title is slugified
  * as before.
  */
-export function chapterToMechanism(
+export function parseAuthorChapter(
   data: unknown,
   body: string,
   filenameHint?: string,
-): { frontmatter: MechanismFrontmatter; body: string } {
-  const cf = chapterFrontmatterSchema.parse(data);
+): { frontmatter: ChapterFrontmatter; body: string } {
+  const cf = authorChapterFrontmatterSchema.parse(data);
   const id = pickId(filenameHint, cf.chapter);
   const organ_system = mapPartToOrganSystem(cf.part);
   const transformedBody = transformBody(body);
 
-  const frontmatter: MechanismFrontmatter = mechanismFrontmatterSchema.parse({
+  const frontmatter: ChapterFrontmatter = chapterFrontmatterSchema.parse({
     id,
     title: cf.chapter,
     organ_system,
     nmc_competencies: [],
     exam_patterns: ["mbbs"],
     prerequisites: [],
-    related_mechanisms: [],
+    related_chapters: [],
     blooms_distribution: { remember: 25, understand: 25, apply: 25, analyze: 25 },
     author: cf.author ?? "pending",
     reviewer: cf.reviewer ?? "pending",
@@ -160,7 +160,7 @@ export function chapterToMechanism(
 }
 
 /**
- * Pick the id for a chapter mechanism. Filename wins when it's a
+ * Pick the id for a chapter Chapter. Filename wins when it's a
  * valid kebab-case slug (URL routing reads `<id>.md`, so id and
  * filename must agree). Falls back to slugifying the chapter title
  * when no filename is available.
@@ -217,7 +217,7 @@ export function mapPartToOrganSystem(partField: string): OrganSystem {
 }
 
 /**
- * Transform the chapter body into a mechanism body. The output has
+ * Transform the chapter body into a Chapter body. The output has
  * exactly one top-level section, `# Questions`, containing the
  * questions transformed to platform shape.
  */

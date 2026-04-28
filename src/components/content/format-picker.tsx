@@ -14,7 +14,7 @@ import type { Card, DifficultyLevel, PriorityLevel, QuestionFormat } from "@/lib
 import { cn } from "@/lib/utils";
 
 type Props = {
-  mechanismId: string;
+  chapterId: string;
   cards: readonly Card[];
 };
 
@@ -27,7 +27,7 @@ type FormatCard = {
    * passed through as `?priority=…&difficulty=…` so the destination
    * page can re-apply it server-side.
    */
-  href: (mechanismId: string, query: string) => string;
+  href: (chapterId: string, query: string) => string;
 };
 
 const FORMATS: readonly FormatCard[] = [
@@ -58,10 +58,10 @@ const PRIORITY_VALUES = PRIORITY_FILTER_OPTIONS.map((o) => o.value);
 const DIFFICULTY_VALUES = DIFFICULTY_FILTER_OPTIONS.map((o) => o.value);
 
 /**
- * Zone 2 of the two-zone mechanism page (build spec §2.3). Picks
+ * Zone 2 of the two-zone Chapter page (build spec §2.3). Picks
  * format and (optionally) narrows the deck by priority + difficulty
  * before launching a session. Filter selection persists to
- * localStorage per (mechanism), so a returning student lands on
+ * localStorage per (Chapter), so a returning student lands on
  * their last-used filter automatically.
  *
  * First-time defaults follow the spec: priority = "must", difficulty
@@ -69,7 +69,7 @@ const DIFFICULTY_VALUES = DIFFICULTY_FILTER_OPTIONS.map((o) => o.value);
  * as "no filter" — same convention as the existing FilterChips and
  * URL-param parsers.
  */
-export function FormatPicker({ mechanismId, cards }: Props) {
+export function FormatPicker({ chapterId, cards }: Props) {
   // Defaults match build spec §2.3 ("New students … see priority and
   // difficulty pre-defaulted to 'must' and 'foundational'"). Hydrated
   // from localStorage in a useEffect because SSR can't see the
@@ -80,7 +80,7 @@ export function FormatPicker({ mechanismId, cards }: Props) {
   );
   const [hydrated, setHydrated] = useState(false);
 
-  const storageKey = `physio:filter:${mechanismId}`;
+  const storageKey = `physio:filter:${chapterId}`;
 
   // Hydrate from localStorage on mount. Older / missing entries fall
   // through to the spec defaults set above. Uses the standard
@@ -233,7 +233,7 @@ export function FormatPicker({ mechanismId, cards }: Props) {
                 </span>
               ) : (
                 <Link
-                  href={f.href(mechanismId, query)}
+                  href={f.href(chapterId, query)}
                   className={cn(buttonVariants({ size: "sm" }))}
                 >
                   Start {f.title.toLowerCase()}

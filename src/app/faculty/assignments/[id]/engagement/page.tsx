@@ -23,9 +23,9 @@ const INACTIVE_DAYS_THRESHOLD = 7;
  * has and hasn't engaged with the platform since the assignment
  * went live.
  *
- * v1 caveat: assignments don't carry a target mechanism yet, so
+ * v1 caveat: assignments don't carry a target Chapter yet, so
  * "engagement" is "any activity during the window" rather than a
- * proper mechanism-targeted completion. The page surfaces the count
+ * proper Chapter-targeted completion. The page surfaces the count
  * and last-activity for each student; faculty correlates with the
  * assignment topic in their head. The strugglers (zero reviews
  * since drop, or no activity in the last 7d of the window) get
@@ -119,7 +119,7 @@ export default async function AssignmentEngagementPage({
         <p className="text-muted-foreground text-xs leading-relaxed">
           &ldquo;Reviews since post&rdquo; counts every review that student has done since you
           created this assignment, across all mechanisms. v1 doesn&apos;t yet tie an assignment to a
-          specific mechanism, so a high count just means the student is generally active — correlate
+          specific Chapter, so a high count just means the student is generally active — correlate
           with the assignment topic in your head. Zero is the unambiguous signal: the student
           hasn&apos;t engaged with the platform at all in the assignment window.
         </p>

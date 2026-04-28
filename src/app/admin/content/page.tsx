@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { readAllMechanisms as readFromFs } from "@/lib/content/fs";
+import { readAllChapters as readFromFs } from "@/lib/content/fs";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -18,7 +18,7 @@ type Row = {
 /**
  * Admin → content list.
  *
- * Shows every mechanism visible to the app — both DB rows (CMS-authored)
+ * Shows every Chapter visible to the app — both DB rows (CMS-authored)
  * and filesystem `.md` files. DB rows take precedence per id (the
  * dual-source loader in src/lib/content/source.ts works the same way).
  *

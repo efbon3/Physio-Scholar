@@ -6,7 +6,7 @@ import { loadAllCardStates } from "@/lib/srs/local";
 import type { CardState } from "@/lib/srs/types";
 
 type Props = {
-  /** Card ids that belong to this mechanism — `${mechanismId}:1`, `…:2`, … */
+  /** Card ids that belong to this Chapter — `${chapterId}:1`, `…:2`, … */
   cardIds: readonly string[];
   /** Current learner. Falls back to "preview" in non-Supabase envs. */
   profileId: string;
@@ -80,16 +80,16 @@ export function formatDueSubtitle(args: {
 }
 
 /**
- * Per-mechanism study stats — shown on the mechanism detail page so the
+ * Per-Chapter study stats — shown on the Chapter detail page so the
  * learner has a concrete sense of "how well have I learned this?" before
- * they click "Study this mechanism."
+ * they click "Study this Chapter."
  *
  * Mastery proxy: average ease across seen cards. A card with ease 2.5
  * (the SM-2 default) counts as 0%; ease 3.5 maps to 100%. This is an
  * approximation; Phase 5's Progress tab will replace it with real
  * retention curves.
  */
-export function MechanismStats({ cardIds, profileId }: Props) {
+export function ChapterStats({ cardIds, profileId }: Props) {
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {

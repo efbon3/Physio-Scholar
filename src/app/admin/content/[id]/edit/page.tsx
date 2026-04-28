@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 
-import { MechanismEditor } from "../../mechanism-editor";
+import { ChapterEditor } from "../../mechanism-editor";
 
 export const metadata = {
   title: "Edit chapter · Admin",
@@ -14,7 +14,7 @@ type Params = { params: Promise<{ id: string }> };
 const VALID_ID = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 /**
- * Edit an existing CMS-authored mechanism. FS-only mechanisms are not
+ * Edit an existing CMS-authored Chapter. FS-only mechanisms are not
  * editable here — the list page's "Clone to CMS" button creates a DB
  * row first, then the admin edits that.
  */
@@ -62,7 +62,7 @@ export default async function EditMechanismPage({ params }: Params) {
         </a>
       </header>
 
-      <MechanismEditor
+      <ChapterEditor
         mode="update"
         initialMarkdown={data.markdown}
         initialStatus={data.status}

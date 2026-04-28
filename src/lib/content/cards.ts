@@ -1,15 +1,15 @@
 import { z } from "zod";
 
-import type { Mechanism } from "./loader";
+import type { Chapter } from "./loader";
 
 /**
  * Card extraction — pulls the structured question bank out of the
- * `# Questions` section of a mechanism markdown. Matches SOP Appendix A
+ * `# Questions` section of a Chapter markdown. Matches SOP Appendix A
  * exactly; a mismatch means the content is malformed and we surface a
  * clear error rather than silently skip.
  *
  * A Card is the unit the SRS schedules and the review UI displays.
- * Its id is `{mechanism_id}:{index}` (index is 1-based from
+ * Its id is `{chapter_id}:{index}` (index is 1-based from
  * "## Question N"), deterministic across rebuilds so SRS history
  * survives content edits that don't reorder the question bank.
  */
@@ -53,7 +53,7 @@ export type QuestionStatus = z.infer<typeof questionStatusSchema>;
 
 /**
  * Pedagogic priority — how essential the question is to mastery of the
- * mechanism. Drives adaptive ordering (must-know surfaces first, then
+ * Chapter. Drives adaptive ordering (must-know surfaces first, then
  * should-know, then good-to-know) and curriculum-coverage analytics.
  *
  *   - must:   foundational facts the learner cannot omit
@@ -93,12 +93,12 @@ export type Misconception = z.infer<typeof misconceptionSchema>;
 
 export const cardSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+:\d+$/),
-  mechanism_id: z.string().min(1),
+  chapter_id: z.string().min(1),
   index: z.number().int().min(1),
   /**
    * Stable per-question identifier intended to survive renumbering,
-   * mechanism file renames, and retire-and-replace flows. Optional
-   * during the transition from `{mechanism}:{index}` ids — once the
+   * Chapter file renames, and retire-and-replace flows. Optional
+   * during the transition from `{Chapter}:{index}` ids — once the
    * SRS keys migrate to UUID this field becomes the canonical id.
    * Authored per question via `**ID:** <uuid>`.
    */
@@ -123,7 +123,7 @@ export const cardSchema = z.object({
    * Exam patterns a card is appropriate for — drives the exam-mode
    * filter (MBBS vs pre-PG per build spec §2.11). Authored either
    * per-card via `**Exam patterns:** mbbs, pre-pg` or inherited from
-   * the mechanism frontmatter. Stored lowercased + trimmed here.
+   * the Chapter frontmatter. Stored lowercased + trimmed here.
    */
   exam_patterns: z.array(z.string().min(1)),
   /**
@@ -159,23 +159,23 @@ export const cardSchema = z.object({
 export type Card = z.infer<typeof cardSchema>;
 
 /**
- * Extract all cards from a mechanism. Returns [] for a mechanism
+ * Extract all cards from a Chapter. Returns [] for a Chapter
  * without a Questions section (drafts) rather than throwing.
  */
-export function extractCards(mechanism: Mechanism): Card[] {
-  if (!mechanism.layers.questions) return [];
-  const mechanismExamPatterns = mechanism.frontmatter.exam_patterns ?? [];
+export function extractCards(chapter: Chapter): Card[] {
+  if (!chapter.layers.questions) return [];
+  const chapterExamPatterns = chapter.frontmatter.exam_patterns ?? [];
   return parseQuestionsSection(
-    mechanism.frontmatter.id,
-    mechanism.layers.questions,
-    mechanismExamPatterns,
+    chapter.frontmatter.id,
+    chapter.layers.questions,
+    chapterExamPatterns,
   );
 }
 
 function parseQuestionsSection(
-  mechanismId: string,
+  chapterId: string,
   section: string,
-  mechanismExamPatterns: readonly string[],
+  chapterExamPatterns: readonly string[],
 ): Card[] {
   // Split the section on `## Question N` headings. The regex keeps the
   // heading with the block so we can recover the index.
@@ -188,22 +188,22 @@ function parseQuestionsSection(
     const indexStr = parts[i];
     const body = parts[i + 1] ?? "";
     const index = Number.parseInt(indexStr, 10);
-    const card = parseCardBody(mechanismId, index, body, mechanismExamPatterns);
+    const card = parseCardBody(chapterId, index, body, chapterExamPatterns);
     cards.push(cardSchema.parse(card));
   }
   return cards;
 }
 
 function parseCardBody(
-  mechanismId: string,
+  chapterId: string,
   index: number,
   body: string,
   fallbackExamPatterns: readonly string[],
 ) {
   const rawId = extractLabeledField(body, "ID");
   return {
-    id: `${mechanismId}:${index}`,
-    mechanism_id: mechanismId,
+    id: `${chapterId}:${index}`,
+    chapter_id: chapterId,
     index,
     uuid: rawId && isUuid(rawId) ? rawId.toLowerCase() : undefined,
     format: normaliseQuestionFormat(extractLabeledField(body, "Format")),
@@ -335,8 +335,8 @@ function extractAcceptableAnswers(body: string): string[] | undefined {
 
 /**
  * Parse the optional `**Exam patterns:** mbbs, pre-pg` line from a
- * question body. If absent, inherit the mechanism-level list (Option
- * Y per the plan — questions default to the mechanism's tagging,
+ * question body. If absent, inherit the Chapter-level list (Option
+ * Y per the plan — questions default to the Chapter's tagging,
  * but can override).
  *
  * Values are lower-cased and trimmed so downstream filters don't need
