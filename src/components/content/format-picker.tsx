@@ -29,7 +29,7 @@ const FORMATS: readonly FormatCard[] = [
     title: "Descriptive",
     description:
       "Type a free-text answer, compare against the model answer, then self-rate Green/Yellow/Red.",
-    href: (id) => `/review?mechanism=${encodeURIComponent(id)}&format=descriptive`,
+    href: (id) => `/test/${encodeURIComponent(id)}/descriptive`,
   },
   {
     format: "fill_blank",
