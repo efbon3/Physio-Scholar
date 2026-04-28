@@ -1,3 +1,5 @@
+import matter from "gray-matter";
+
 import { readChapterById } from "@/lib/content/fs";
 import { CHAPTER_TEMPLATE } from "@/lib/content/templates";
 
@@ -13,10 +15,17 @@ type SearchParams = { clone?: string };
  * New Chapter form.
  *
  * If `?clone=<id>` is present, we seed the editor with the markdown of
- * that filesystem Chapter — useful for "fork this .md file into the
- * CMS so the team can edit it without touching git." The clone path
- * reads only from the filesystem source; the dual loader logic doesn't
- * apply here because DB-authored mechanisms are already editable.
+ * that filesystem Chapter — useful for "fork these .md files into the
+ * CMS so the team can edit without touching git."
+ *
+ * The clone reads via `readChapterById`, which routes through the
+ * filesystem loader's merge logic (fs.ts:mergeChapterFiles). For a
+ * chapter authored across multiple suffix files (e.g. ch01-foo.md +
+ * ch01-foo-fillblank.md + ch01-foo-descriptive.md), the returned
+ * Chapter has the merged body — all questions from all formats,
+ * renumbered sequentially. Serialising that back through gray-matter
+ * gives a single canonical .md document the CMS row can hold without
+ * losing any of the suffix files' content.
  */
 export default async function NewChapterPage({
   searchParams,
@@ -30,12 +39,12 @@ export default async function NewChapterPage({
   if (clone) {
     const source = await readChapterById(clone);
     if (source) {
-      // We can't just read the parsed Chapter — we need the raw
-      // markdown text. Re-open from disk in the loader module isn't
-      // exposed, so for the clone path we reconstruct from layers
-      // plus frontmatter using gray-matter upstream. For simplicity,
-      // do the raw read here.
-      initialMarkdown = await readRawMechanism(clone);
+      // gray-matter's stringify(body, data) emits frontmatter + body
+      // as a complete .md document. The merged Chapter's frontmatter
+      // is the canonical shape (id, title, organ_system, etc.), so
+      // the resulting markdown round-trips cleanly through
+      // `parseChapter` when the CMS row is read at render time.
+      initialMarkdown = matter.stringify(source.body, source.frontmatter);
       clonedFrom = clone;
     }
   }
@@ -63,11 +72,4 @@ export default async function NewChapterPage({
       <ChapterEditor mode="create" initialMarkdown={initialMarkdown} initialStatus="draft" />
     </main>
   );
-}
-
-async function readRawMechanism(id: string): Promise<string> {
-  const { readFile } = await import("node:fs/promises");
-  const { join } = await import("node:path");
-  const path = join(process.cwd(), "content", "mechanisms", `${id}.md`);
-  return readFile(path, "utf8");
 }
