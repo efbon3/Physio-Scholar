@@ -22,7 +22,7 @@ const FORMATS: readonly FormatCard[] = [
     title: "Multiple choice",
     description:
       "Four-option questions with misconception-aware feedback on wrong answers. Graded automatically.",
-    href: (id) => `/exam?mechanism=${encodeURIComponent(id)}&format=mcq`,
+    href: (id) => `/test/${encodeURIComponent(id)}/mcq`,
   },
   {
     format: "descriptive",
