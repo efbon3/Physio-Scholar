@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
 import { extractCards } from "@/lib/content/cards";
+import { filterPublished } from "@/lib/content/card-filters";
 import { readAllPrepgChapters } from "@/lib/content/prepg-fs";
+import { createClient } from "@/lib/supabase/server";
+
+import { PrepgDueBanner } from "./prepg-due-banner";
 
 export const metadata = {
   title: "Pre-PG",
@@ -12,6 +17,18 @@ type SystemGroup = {
   system: string;
   chapters: { id: string; title: string; questionCount: number }[];
 };
+
+async function getProfileId(nextPath: string): Promise<string> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return "preview";
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    return data.user.id;
+  } catch {
+    return "preview";
+  }
+}
 
 /**
  * Pre-PG list — chapters drawn from `content/prepg/` grouped by organ
@@ -24,12 +41,15 @@ type SystemGroup = {
  * doesn't surface a blank screen with no diagnostic.
  */
 export default async function PrepgPage() {
+  const profileId = await getProfileId("/prepg");
   const chapters = await readAllPrepgChapters();
   const grouped = new Map<string, SystemGroup>();
+  const allCardIds: string[] = [];
   for (const m of chapters) {
     const key = m.frontmatter.organ_system;
     if (!grouped.has(key)) grouped.set(key, { system: key, chapters: [] });
-    const cards = extractCards(m);
+    const cards = filterPublished(extractCards(m)).filter((c) => c.format === "mcq");
+    for (const c of cards) allCardIds.push(c.id);
     grouped.get(key)!.chapters.push({
       id: m.frontmatter.id,
       title: m.frontmatter.title,
@@ -48,6 +68,12 @@ export default async function PrepgPage() {
           you stand on past papers.
         </p>
       </header>
+
+      <PrepgDueBanner
+        cardIds={allCardIds}
+        profileId={profileId}
+        hasContent={allCardIds.length > 0}
+      />
 
       {groups.length === 0 ? (
         <EmptyState
