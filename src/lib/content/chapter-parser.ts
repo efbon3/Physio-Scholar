@@ -1,0 +1,388 @@
+import { z } from "zod";
+
+import { mechanismFrontmatterSchema, type MechanismFrontmatter, type OrganSystem } from "./schema";
+
+/**
+ * Chapter-format adapter. The platform's canonical content unit is a
+ * "mechanism" — one focused topic, frontmatter + four reading layers
+ * + a Questions section. The author also produces "chapter" files
+ * (one chapter of the master syllabus, 20+ MCQs covering several
+ * sections of physiology), which use a richer authoring schema.
+ *
+ * Rather than maintain two parsers downstream, this module detects
+ * the chapter format from the frontmatter shape and transforms it
+ * into the mechanism shape in memory. The returned `Mechanism` is
+ * indistinguishable from one parsed from a hand-authored mechanism
+ * file: same `frontmatter`, same `body`, same `layers.questions`
+ * shape — `extractCards()` walks it and produces `Card[]` exactly as
+ * for a regular mechanism.
+ *
+ * Chapter authoring format (sample at content/mechanisms/
+ * ch01-introduction-and-homeostasis.md):
+ *
+ *   ---
+ *   chapter: Chapter 1 — Introduction to Physiology and Homeostasis
+ *   part: Part I — Foundations of Physiology
+ *   tier: 1
+ *   tier_rationale: ...
+ *   target_count: 22
+ *   actual_count: 22
+ *   sources_consulted: [Guyton..., Costanzo..., ...]
+ *   status: draft
+ *   ---
+ *
+ *   # Chapter N — MCQs
+ *   (optional preamble paragraph)
+ *
+ *   ## Pass 1 — ...
+ *
+ *   QUESTION 1
+ *   Type: recall
+ *   Bloom's level: remember
+ *
+ *   Stem: ...
+ *
+ *   Correct answer: ...
+ *
+ *   Distractors:
+ *   - "wrong A" — Reveals misconception: ...
+ *   - "wrong B" — Plausible but does not reveal a specific misconception ...
+ *   - "wrong C" — Reveals misconception: ...
+ *
+ *   Explanation: ...
+ *
+ *   Hints:
+ *   1. ...
+ *   2. ...
+ *   3. ...
+ *
+ *   ---
+ *
+ *   QUESTION 2
+ *   ...
+ *
+ *   ## Pass 2 — ...
+ *   QUESTION N ...
+ *
+ *   # Final Summary
+ *   (author notes, sources summary — stripped)
+ *
+ * The transformer:
+ *   - Derives `id` from `chapter` (e.g. "Chapter 1 — Introduction to
+ *     Physiology and Homeostasis" → "ch01-introduction-and-homeostasis").
+ *   - Maps `part` → `organ_system` (e.g. "Part I — Foundations of
+ *     Physiology" → "foundations").
+ *   - Defaults `nmc_competencies`, `prerequisites`, `related_mechanisms`
+ *     to empty; defaults `exam_patterns` to ["mbbs"]; defaults
+ *     `blooms_distribution` to even split (re-derives from question
+ *     levels if any are present).
+ *   - Strips `## Pass N — ...` headings, the optional preamble, and the
+ *     `# Final Summary` section.
+ *   - Transforms each `QUESTION N` block to a `## Question N` block
+ *     with the platform's `**Label:**` shape and the strict
+ *     misconception-mapping line format.
+ *   - Wraps the resulting question blocks under a `# Questions`
+ *     top-level heading so the mechanism loader's `splitLayers()`
+ *     can find them.
+ */
+
+/** Chapter-file frontmatter shape. */
+const chapterFrontmatterSchema = z.object({
+  chapter: z.string().min(1),
+  part: z.string().min(1),
+  tier: z
+    .union([z.number().int().min(1).max(3), z.literal(1), z.literal(2), z.literal(3)])
+    .optional(),
+  tier_rationale: z.string().optional(),
+  target_count: z.number().int().nonnegative().optional(),
+  actual_count: z.number().int().nonnegative().optional(),
+  sources_consulted: z.array(z.string()).optional(),
+  author: z.string().optional(),
+  reviewer: z.string().optional(),
+  status: z.enum(["draft", "review", "published", "retired"]).default("draft"),
+  version: z.string().optional(),
+});
+
+export type ChapterFrontmatter = z.infer<typeof chapterFrontmatterSchema>;
+
+/**
+ * Detect chapter-format frontmatter. Heuristic: has `chapter` and
+ * `part` keys, and no `id` (id presence is the signal for the
+ * canonical mechanism format).
+ */
+export function isChapterFrontmatter(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return typeof d.chapter === "string" && typeof d.part === "string" && !("id" in d);
+}
+
+/**
+ * Transform chapter-format frontmatter + body into the mechanism
+ * shape. Throws if the frontmatter or the body don't match the
+ * documented chapter format.
+ */
+export function chapterToMechanism(
+  data: unknown,
+  body: string,
+): { frontmatter: MechanismFrontmatter; body: string } {
+  const cf = chapterFrontmatterSchema.parse(data);
+  const id = deriveChapterId(cf.chapter);
+  const organ_system = mapPartToOrganSystem(cf.part);
+  const transformedBody = transformBody(body);
+
+  const frontmatter: MechanismFrontmatter = mechanismFrontmatterSchema.parse({
+    id,
+    title: cf.chapter,
+    organ_system,
+    nmc_competencies: [],
+    exam_patterns: ["mbbs"],
+    prerequisites: [],
+    related_mechanisms: [],
+    blooms_distribution: { remember: 25, understand: 25, apply: 25, analyze: 25 },
+    author: cf.author ?? "pending",
+    reviewer: cf.reviewer ?? "pending",
+    status: cf.status,
+    version: cf.version ?? "0.1",
+    published_date: new Date(),
+    last_reviewed: new Date(),
+  });
+
+  return { frontmatter, body: transformedBody };
+}
+
+/**
+ * Slugify the chapter title to a kebab-case id. Output looks like
+ * `ch01-introduction-and-homeostasis`.
+ *
+ * Pattern: extract the chapter number, prepend `ch{NN}-`, then
+ * slugify the rest of the title. Em-dashes / en-dashes / hyphens
+ * collapse to single hyphens.
+ */
+export function deriveChapterId(chapterField: string): string {
+  // "Chapter 1 — Introduction to Physiology and Homeostasis"
+  const m = chapterField.match(/^Chapter\s+(\d+)\s*[—–-]\s*(.+)$/i);
+  if (m) {
+    const num = m[1].padStart(2, "0");
+    const slug = slugify(m[2]);
+    return `ch${num}-${slug}`;
+  }
+  // Fallback: slugify the whole title.
+  return slugify(chapterField);
+}
+
+/**
+ * Map a `part` field value to an `organ_system` token. Canonical
+ * mapping per `docs/syllabus.md`. Throws if the part doesn't match
+ * any known syllabus part — better to fail loudly during content
+ * load than to mis-tag a chapter as cardiovascular when it isn't.
+ */
+export function mapPartToOrganSystem(partField: string): OrganSystem {
+  const norm = partField.toLowerCase().replace(/\s+/g, " ").trim();
+  if (/part\s+i\b.*foundations/.test(norm)) return "foundations";
+  if (/part\s+ii\b.*excitable/.test(norm)) return "musculoskeletal";
+  if (/part\s+iii\b.*nervous/.test(norm)) return "nervous";
+  if (/part\s+iv\b.*blood/.test(norm)) return "blood";
+  if (/part\s+v\b.*cardiovascular/.test(norm)) return "cardiovascular";
+  if (/part\s+vi\b.*respiratory/.test(norm)) return "respiratory";
+  if (/part\s+vii\b.*renal/.test(norm)) return "renal";
+  if (/part\s+viii\b.*gastro/.test(norm)) return "gastrointestinal";
+  if (/part\s+ix\b.*endocrine/.test(norm)) return "endocrine";
+  if (/part\s+x\b.*reproduct/.test(norm)) return "reproductive";
+  if (/part\s+xi\b.*integrative/.test(norm)) return "integrated";
+  throw new Error(
+    `Unknown syllabus part "${partField}" — could not map to organ_system. ` +
+      `Update src/lib/content/chapter-parser.ts:mapPartToOrganSystem if the syllabus changed.`,
+  );
+}
+
+/**
+ * Transform the chapter body into a mechanism body. The output has
+ * exactly one top-level section, `# Questions`, containing the
+ * questions transformed to platform shape.
+ */
+function transformBody(raw: string): string {
+  // 1. Drop the optional `# Chapter N — MCQs` heading and any preamble
+  //    paragraph between it and the first `## Pass` heading.
+  // 2. Drop `## Pass N — …` group headings; their grouping is meta
+  //    information for the author and doesn't survive into the runtime.
+  // 3. Drop the trailing `# Final Summary` section if present — it is
+  //    author meta-notes, not student-facing content.
+  // 4. Walk the rest splitting on `\n---\n` separators, identify each
+  //    chunk that opens with `QUESTION <n>`, transform to a `##
+  //    Question <n>` block.
+  const stripped = stripFinalSummary(raw);
+  const blocks = stripped.split(/\n-{3,}\n/);
+  const transformedQuestions: string[] = [];
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (trimmed.length === 0) continue;
+    if (/^#\s+Chapter\b/im.test(trimmed) && !/QUESTION\s+\d+/.test(trimmed)) continue;
+    if (/^##\s+Pass\b/im.test(trimmed) && !/QUESTION\s+\d+/.test(trimmed)) continue;
+
+    const transformed = transformQuestionBlock(trimmed);
+    if (transformed) transformedQuestions.push(transformed);
+  }
+  if (transformedQuestions.length === 0) return "# Questions\n\n";
+  return ["# Questions\n", ...transformedQuestions].join("\n\n");
+}
+
+function stripFinalSummary(raw: string): string {
+  const m = raw.match(/^#\s+Final\s+Summary\s*$/im);
+  if (!m || m.index === undefined) return raw;
+  return raw.slice(0, m.index).trimEnd();
+}
+
+/**
+ * Transform a single `QUESTION N` block into a `## Question N`
+ * block with bold-labeled fields, a `### Hint Ladder`, and a
+ * `### Misconception Mappings` section. Returns null if the block
+ * doesn't begin with a recognisable QUESTION heading (e.g. the
+ * `## Pass N` block on its own without a question).
+ */
+function transformQuestionBlock(block: string): string | null {
+  const headingMatch = block.match(/^QUESTION\s+(\d+)\s*$/im);
+  if (!headingMatch) return null;
+  const number = headingMatch[1];
+
+  const get = (label: string): string | null => extractLineField(block, label);
+
+  const type = get("Type");
+  const blooms = get("Bloom's level") ?? get("Bloom's Level");
+  const stem = extractMultilineField(block, "Stem");
+  const correct = extractMultilineField(block, "Correct answer");
+  const explanation = extractMultilineField(block, "Explanation");
+  const distractors = extractListField(block, "Distractors");
+  const hints = extractListField(block, "Hints");
+
+  // Build the platform-shaped block.
+  const lines: string[] = [];
+  lines.push(`## Question ${number}`);
+  lines.push(`**Format:** mcq`);
+  lines.push(`**Status:** published`);
+  if (type) lines.push(`**Type:** ${type}`);
+  if (blooms) lines.push(`**Bloom's level:** ${blooms}`);
+  if (stem) lines.push(`**Stem:** ${stem}`);
+  if (correct) lines.push(`**Correct answer:** ${correct}`);
+  if (explanation) lines.push(`**Elaborative explanation:** ${explanation}`);
+
+  if (hints.length > 0) {
+    lines.push("");
+    lines.push("### Hint Ladder");
+    hints.forEach((h, i) => lines.push(`${i + 1}. ${h}`));
+  }
+
+  if (distractors.length > 0) {
+    lines.push("");
+    lines.push("### Misconception Mappings");
+    for (const d of distractors) {
+      const m = parseDistractorLine(d);
+      if (m) lines.push(`- Wrong answer: "${m.wrong}" -> Misconception: ${m.description}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Pull a single-line `Label: value` from a question block.
+ * Single-line fields are: Type, Bloom's level.
+ */
+function extractLineField(block: string, label: string): string | null {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${escaped}:\\s*(.+)$`, "im");
+  const m = block.match(re);
+  return m ? m[1].trim() : null;
+}
+
+/**
+ * Pull a possibly-multiline `Label: value` from a question block.
+ * Multiline fields are: Stem, Correct answer, Explanation. The value
+ * runs until the next `Label:` line, blank line, or end of block.
+ */
+function extractMultilineField(block: string, label: string): string | null {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Match: ^Label: ... up to next Label: line OR Distractors:/Hints:/Explanation: section OR end.
+  const re = new RegExp(
+    `^${escaped}:\\s*([\\s\\S]+?)(?=\\n\\s*(?:Type|Bloom's level|Bloom's Level|Stem|Correct answer|Distractors|Explanation|Hints):|$)`,
+    "im",
+  );
+  const m = block.match(re);
+  return m ? m[1].trim() : null;
+}
+
+/**
+ * Pull a bullet-list field (`Distractors:`, `Hints:`) from a
+ * question block. Returns the raw content of each list item, in
+ * order. Distractors use `- ` markers; Hints use `1.` numbered
+ * markers — both shapes are accepted here so the same helper drives
+ * both extractions.
+ *
+ * Implementation: walk the block line-by-line. Once we see the
+ * label header, collect every subsequent list-shaped line. Stop on
+ * a blank line or any line that is neither a list item nor part of
+ * the previous item. (Earlier versions used a lazy regex with a
+ * lookahead, but the lookahead was too conservative around line
+ * boundaries — non-greedy `[\s\S]+?` would terminate after the
+ * first item when it shouldn't have.)
+ */
+function extractListField(block: string, label: string): string[] {
+  const lines = block.split(/\r?\n/);
+  const headerNorm = `${label}:`.toLowerCase();
+  let inList = false;
+  let seenItem = false;
+  const items: string[] = [];
+  for (const line of lines) {
+    if (!inList) {
+      if (line.trim().toLowerCase() === headerNorm) inList = true;
+      continue;
+    }
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      // Blank line. If we've already started consuming items, this
+      // ends the list. If we haven't yet (prettier sometimes inserts
+      // a blank line between the label and the first bullet), keep
+      // scanning.
+      if (seenItem) break;
+      continue;
+    }
+    const m = line.match(/^\s*(?:-\s+|\d+\.\s+)(.+)$/);
+    if (m) {
+      items.push(m[1].trim());
+      seenItem = true;
+      continue;
+    }
+    // Not a list line and not blank — must be the next field's
+    // header, so stop.
+    break;
+  }
+  return items;
+}
+
+/**
+ * Parse a single Distractor list line. Two shapes accepted:
+ *   - `"answer" — Reveals misconception: <text>. Correction: <text>.`
+ *   - `"answer" — Plausible but does not reveal a specific misconception (...).`
+ * Both use the em-dash / en-dash / ASCII hyphen as the separator
+ * between the wrong-answer-quote and the description.
+ *
+ * Returns null when the line doesn't fit either shape — that line is
+ * silently skipped at the parse layer rather than dropping the whole
+ * block.
+ */
+export function parseDistractorLine(line: string): { wrong: string; description: string } | null {
+  // Quote variants: straight (") or curly (" / "); content can contain
+  // anything except a closing quote of the same kind.
+  const m = line.match(/^["“]([^"”]+)["”]\s*[—–-]+\s*(.+)$/);
+  if (!m) return null;
+  return { wrong: m[1].trim(), description: m[2].trim() };
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "") // strip accents
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}

@@ -1,5 +1,6 @@
 import matter from "gray-matter";
 
+import { chapterToMechanism, isChapterFrontmatter } from "./chapter-parser";
 import { mechanismFrontmatterSchema, type MechanismFrontmatter } from "./schema";
 
 /**
@@ -36,12 +37,34 @@ export type Mechanism = {
  * `Mechanism`. Throws a `ZodError` if frontmatter is missing, malformed,
  * or fails any schema invariant (see schema.ts).
  *
+ * Two input formats are accepted:
+ *   - Canonical mechanism format: frontmatter has `id` (kebab-case),
+ *     `organ_system`, etc. Body has the four reading layers + a
+ *     `# Questions` section. Parsed as-is.
+ *   - Chapter format: frontmatter has `chapter` and `part` fields and
+ *     no `id`. Body has `QUESTION N` blocks under optional `## Pass N`
+ *     groupings. Routed through `chapterToMechanism()` which derives
+ *     `id` from the chapter title, maps `part` → `organ_system`, and
+ *     transforms the question blocks into the canonical mechanism
+ *     shape. The returned Mechanism is indistinguishable from one
+ *     parsed from a hand-authored mechanism file.
+ *
  * This function is intentionally decoupled from the filesystem so the
  * same parser can run on author IDE previews, Edge runtime handlers
  * (where `fs` is not available), and plain Node tests.
  */
 export function parseMechanism(raw: string): Mechanism {
   const parsed = matter(raw);
+
+  if (isChapterFrontmatter(parsed.data)) {
+    const transformed = chapterToMechanism(parsed.data, parsed.content);
+    return {
+      frontmatter: transformed.frontmatter,
+      body: transformed.body,
+      layers: splitLayers(transformed.body),
+    };
+  }
+
   const frontmatter = mechanismFrontmatterSchema.parse(parsed.data);
   const body = parsed.content;
   const layers = splitLayers(body);

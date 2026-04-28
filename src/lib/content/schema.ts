@@ -13,12 +13,30 @@ import { z } from "zod";
  */
 
 /**
- * Canonical physiology systems. v1 content is cardiovascular-only; the
- * enum lists the full set so later content authored under a different
- * system doesn't silently skip validation. Update here when the SOP
- * canonical list changes.
+ * Physiology systems the platform recognises. The values align with
+ * the canonical syllabus parts (`docs/syllabus.md`):
+ *   - foundations  → Part I — Foundations of Physiology
+ *   - musculoskeletal → Part II — Excitable Tissues (legacy token; kept
+ *                       as the closest single-word slug for nerve+muscle)
+ *   - nervous       → Part III — The Nervous System
+ *   - blood         → Part IV — Blood
+ *   - immune        → Part IV — Immunity
+ *   - cardiovascular→ Part V
+ *   - respiratory   → Part VI
+ *   - renal         → Part VII
+ *   - gastrointestinal → Part VIII
+ *   - endocrine     → Part IX
+ *   - reproductive  → Part X
+ *   - integrated    → Part XI — Integrative and Environmental Physiology
+ *   - integumentary → no syllabus chapter currently; reserved capacity
+ *
+ * `general` is preserved as a legacy alias for `foundations`; new
+ * content should prefer `foundations` so the slug matches the
+ * syllabus chapter heading.
  */
 export const organSystemSchema = z.enum([
+  "general",
+  "foundations",
   "cardiovascular",
   "respiratory",
   "renal",
@@ -30,6 +48,8 @@ export const organSystemSchema = z.enum([
   "blood",
   "immune",
   "integumentary",
+  "special-senses",
+  "integrated",
 ]);
 export type OrganSystem = z.infer<typeof organSystemSchema>;
 
@@ -80,7 +100,12 @@ export const mechanismFrontmatterSchema = z.object({
   id: mechanismIdSchema,
   title: z.string().min(1),
   organ_system: organSystemSchema,
-  nmc_competencies: z.array(nmcCompetencyCodeSchema).min(1),
+  // NMC competency codes are optional. Chapter-format content
+  // (`chapter-parser.ts`) doesn't carry NMC tags — they apply to MBBS
+  // curricula but not to general physiology authoring. Mechanism
+  // files authored against a specific NMC competency still tag
+  // accurately; everything else gets an empty array.
+  nmc_competencies: z.array(nmcCompetencyCodeSchema).default([]),
   exam_patterns: z.array(z.string().min(1)).min(1),
   prerequisites: z.array(mechanismIdSchema),
   related_mechanisms: z.array(mechanismIdSchema),

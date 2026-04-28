@@ -3,15 +3,21 @@ import { describe, expect, it } from "vitest";
 import { readMechanismById, readAllMechanisms } from "./fs";
 
 /**
- * Content was reset for the two-zone redesign (no mechanism .md files
- * currently shipped). These tests cover the loader's empty-state and
- * defensive-id-validation behaviour. Re-introduce a fixture-loading test
- * once the new schema lands and a template mechanism is authored.
+ * Smoke tests against whatever mechanism files are currently shipped
+ * in `content/mechanisms/`. The two-zone redesign emptied the
+ * directory in 84b05ea; the chapter-format adapter (chapter-parser.ts)
+ * loaded the first chapter back. Both states are valid — these tests
+ * just confirm the loader doesn't crash and returns a sensible result.
  */
 describe("readAllMechanisms", () => {
-  it("returns an empty array when no mechanism files exist", async () => {
+  it("returns an array of parsed mechanisms (possibly empty)", async () => {
     const mechanisms = await readAllMechanisms();
-    expect(mechanisms).toEqual([]);
+    expect(Array.isArray(mechanisms)).toBe(true);
+    // Every returned row must be a fully validated Mechanism.
+    for (const m of mechanisms) {
+      expect(m.frontmatter.id).toMatch(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/);
+      expect(m.frontmatter.title.length).toBeGreaterThan(0);
+    }
   });
 });
 
