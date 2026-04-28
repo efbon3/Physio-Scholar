@@ -149,9 +149,18 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
       : REVEAL_DELAY_SECONDS;
   const ratingUnlocked = status === "revealed" && secondsUntilUnlock === 0;
 
+  /**
+   * Submit advances to the reveal screen. Empty textarea is permitted
+   * — that path means the learner answered mentally or on paper and
+   * just wants to check themselves against the model answer. The
+   * engagement-method prompt (after self-rating) captures whether the
+   * answer was written on screen, written on paper, or worked
+   * mentally. This is distinct from "I don't know" (no engagement,
+   * auto-rated dont_know without self-rating).
+   */
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (studentAnswer.trim().length === 0) return;
+    if (status !== "answering") return;
     setStatus("revealed");
     const t = Date.now();
     setRevealTime(t);
@@ -293,11 +302,7 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
             >
               I don&apos;t know
             </button>
-            <button
-              type="submit"
-              className={cn(buttonVariants({ size: "default" }))}
-              disabled={studentAnswer.trim().length === 0}
-            >
+            <button type="submit" className={cn(buttonVariants({ size: "default" }))}>
               Submit
             </button>
           </div>
