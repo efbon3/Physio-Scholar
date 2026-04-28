@@ -8,12 +8,12 @@ describe("EmptyState", () => {
     render(
       <EmptyState
         icon="📚"
-        title="No mechanisms yet"
-        description="Content lives under content/mechanisms/."
+        title="No chapters yet"
+        description="Content lives under content/chapters/."
       />,
     );
-    expect(screen.getByText("No mechanisms yet")).toBeInTheDocument();
-    expect(screen.getByText(/content\/mechanisms/)).toBeInTheDocument();
+    expect(screen.getByText("No chapters yet")).toBeInTheDocument();
+    expect(screen.getByText(/content\/chapters/)).toBeInTheDocument();
     // Decoration is aria-hidden so screen readers skip it; assert via text.
     expect(screen.getByText("📚")).toBeInTheDocument();
   });
@@ -25,12 +25,12 @@ describe("EmptyState", () => {
         title="Caught up"
         description="Nothing due."
         actions={[
-          { label: "Browse mechanisms", href: "/systems", variant: "primary" },
+          { label: "Browse chapters", href: "/systems", variant: "primary" },
           { label: "See progress", href: "/progress", variant: "secondary" },
         ]}
       />,
     );
-    const browse = screen.getByRole("link", { name: "Browse mechanisms" });
+    const browse = screen.getByRole("link", { name: "Browse chapters" });
     const progress = screen.getByRole("link", { name: "See progress" });
     expect(browse).toHaveAttribute("href", "/systems");
     expect(progress).toHaveAttribute("href", "/progress");

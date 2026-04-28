@@ -115,7 +115,7 @@ export default async function ReviewPage({
 
   // Build the card universe from authored content. Frank-Starling lands
   // here today via the Phase 2 loader + C3a parser. As the cohort grows,
-  // every file in content/mechanisms/ automatically contributes cards.
+  // every file in content/chapters/ automatically contributes cards.
   const mechanisms = await readAllChapters();
 
   // Apply the per-student "active organ systems" filter (J0). If the

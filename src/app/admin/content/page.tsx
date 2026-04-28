@@ -151,8 +151,8 @@ export default async function AdminContentPage() {
       )}
 
       <p className="text-muted-foreground border-t pt-4 text-xs">
-        Filesystem fallbacks come from <code>content/mechanisms/*.md</code>. Any DB row with the
-        same id overrides the file for rendering.
+        Filesystem fallbacks come from <code>content/chapters/*.md</code>. Any DB row with the same
+        id overrides the file for rendering.
       </p>
     </main>
   );

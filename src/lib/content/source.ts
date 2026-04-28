@@ -8,7 +8,7 @@ import type { Chapter } from "./loader";
  *
  * Ordering:
  *   1. Read every published row from public.content_mechanisms (DB).
- *   2. Read every `.md` file from content/mechanisms/ (filesystem).
+ *   2. Read every `.md` file from content/chapters/ (filesystem).
  *   3. Merge by id — DB wins when both exist.
  *   4. Sort by title for deterministic Assessment-tab rendering.
  *

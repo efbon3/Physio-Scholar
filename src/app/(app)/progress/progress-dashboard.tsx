@@ -219,7 +219,7 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
         <h2 className="font-heading text-xl font-medium">Chapters</h2>
         {snapshot.byChapter.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No chapters yet — content lives under <code>content/mechanisms/</code>.
+            No chapters yet — content lives under <code>content/chapters/</code>.
           </p>
         ) : (
           <ul className="flex flex-col gap-2 text-sm">

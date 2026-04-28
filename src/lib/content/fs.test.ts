@@ -4,7 +4,7 @@ import { readChapterById, readAllChapters } from "./fs";
 
 /**
  * Smoke tests against whatever Chapter files are currently shipped
- * in `content/mechanisms/`. The two-zone redesign emptied the
+ * in `content/chapters/`. The two-zone redesign emptied the
  * directory in 84b05ea; the chapter-format adapter (chapter-parser.ts)
  * loaded the first chapter back. Both states are valid — these tests
  * just confirm the loader doesn't crash and returns a sensible result.

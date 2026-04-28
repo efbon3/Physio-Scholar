@@ -17,7 +17,7 @@ import { chapterFrontmatterSchema, type ChapterFrontmatter, type OrganSystem } f
  * shape — `extractCards()` walks it and produces `Card[]` exactly as
  * for a regular Chapter.
  *
- * Chapter authoring format (sample at content/mechanisms/
+ * Chapter authoring format (sample at content/chapters/
  * ch01-introduction-and-homeostasis.md):
  *
  *   ---

@@ -166,7 +166,7 @@ export function TodayDashboard({
             icon="✓"
             title="Nothing due right now"
             description="The SM-2 scheduler hasn't surfaced any cards for revision today. Open a topic if you want to push ahead."
-            actions={[{ label: "Browse systems", href: "/systems", variant: "primary" }]}
+            actions={[{ label: "Browse chapters", href: "/systems", variant: "primary" }]}
           />
         ) : (
           <p className="text-base leading-7">

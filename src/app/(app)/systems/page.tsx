@@ -38,7 +38,7 @@ export default async function SystemsPage() {
         <EmptyState
           icon="📚"
           title="No chapters yet"
-          description="Chapters appear here as soon as content is published. The author edits markdown under content/mechanisms/ and a deploy ships them."
+          description="Chapters appear here as soon as content is published. The author edits markdown under content/chapters/ and a deploy ships them."
           tone="muted"
         />
       ) : (

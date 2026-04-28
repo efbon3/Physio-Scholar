@@ -18,7 +18,7 @@ const VALID_ID = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
  * Resolved from the project root so it works the same in `next dev`,
  * `next build`, and when read from server components on Vercel.
  */
-const CHAPTERS_DIR = join(process.cwd(), "content", "mechanisms");
+const CHAPTERS_DIR = join(process.cwd(), "content", "chapters");
 
 /**
  * Server-only helpers. These import `node:fs/promises`, which would
@@ -27,7 +27,7 @@ const CHAPTERS_DIR = join(process.cwd(), "content", "mechanisms");
  * build time thanks to the `node:*` protocol.
  */
 
-/** Read + parse every `.md` file in content/mechanisms/. */
+/** Read + parse every `.md` file in content/chapters/. */
 export async function readAllChapters(): Promise<Chapter[]> {
   const entries = await readdir(CHAPTERS_DIR, { withFileTypes: true });
   const markdownFiles = entries
