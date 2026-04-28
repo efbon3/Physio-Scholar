@@ -81,7 +81,7 @@ export function MechanismTabs({ panels, defaultTab }: Props) {
     <div className="flex flex-col gap-4">
       <div
         role="tablist"
-        aria-label="Mechanism layers"
+        aria-label="Chapter layers"
         onKeyDown={onKeyDown}
         className="flex flex-wrap gap-1 border-b"
       >

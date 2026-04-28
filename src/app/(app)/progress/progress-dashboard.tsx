@@ -215,11 +215,11 @@ export function ProgressDashboard({ cards, mechanismTitles, profileId }: Props) 
 
       <ActivityTimeline cells={activityCells} />
 
-      <section aria-label="Per-mechanism mastery" className="flex flex-col gap-3">
-        <h2 className="font-heading text-xl font-medium">Mechanisms</h2>
+      <section aria-label="Per-chapter mastery" className="flex flex-col gap-3">
+        <h2 className="font-heading text-xl font-medium">Chapters</h2>
         {snapshot.byMechanism.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No mechanisms yet — content lives under <code>content/mechanisms/</code>.
+            No chapters yet — content lives under <code>content/mechanisms/</code>.
           </p>
         ) : (
           <ul className="flex flex-col gap-2 text-sm">

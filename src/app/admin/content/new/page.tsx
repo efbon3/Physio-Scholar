@@ -4,7 +4,7 @@ import { MECHANISM_TEMPLATE } from "@/lib/content/templates";
 import { MechanismEditor } from "../mechanism-editor";
 
 export const metadata = {
-  title: "New mechanism · Admin",
+  title: "New chapter · Admin",
 };
 
 type SearchParams = { clone?: string };
@@ -45,7 +45,7 @@ export default async function NewMechanismPage({
       <header className="flex flex-col gap-1">
         <p className="text-muted-foreground text-sm tracking-widest uppercase">Admin · Content</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
-          {clonedFrom ? `Clone from ${clonedFrom}` : "New mechanism"}
+          {clonedFrom ? `Clone from ${clonedFrom}` : "New chapter"}
         </h1>
         {clonedFrom ? (
           <p className="text-muted-foreground text-sm">

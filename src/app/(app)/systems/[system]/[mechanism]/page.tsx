@@ -18,7 +18,7 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Params) {
   const { mechanism: id } = await params;
   const m = await readMechanismById(id);
-  return { title: m?.frontmatter.title ?? "Mechanism not found" };
+  return { title: m?.frontmatter.title ?? "Chapter not found" };
 }
 
 /** Same graceful posture as the middleware: skip Supabase in unconfigured envs. */
@@ -51,7 +51,7 @@ export default async function MechanismPage({ params }: Params) {
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-6 py-12">
       <nav className="text-muted-foreground text-xs">
         <Link href="/systems" className="underline-offset-2 hover:underline">
-          Systems
+          Assessment
         </Link>
         {" / "}
         <Link href={`/systems#${system}`} className="capitalize underline-offset-2 hover:underline">

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { MechanismEditor } from "../../mechanism-editor";
 
 export const metadata = {
-  title: "Edit mechanism · Admin",
+  title: "Edit chapter · Admin",
 };
 
 type Params = { params: Promise<{ id: string }> };

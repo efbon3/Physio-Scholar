@@ -178,9 +178,7 @@ export function MechanismStats({ cardIds, profileId }: Props) {
   }
 
   if (stats.total === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">No cards authored for this mechanism yet.</p>
-    );
+    return <p className="text-muted-foreground text-sm">No cards authored for this chapter yet.</p>;
   }
 
   const now = new Date();

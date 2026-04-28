@@ -76,14 +76,14 @@ export default async function AdminContentPage() {
           <p className="text-muted-foreground text-sm tracking-widest uppercase">Admin</p>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">Content</h1>
           <p className="text-muted-foreground text-sm">
-            CMS-authored mechanisms and filesystem fallbacks, in one place.
+            CMS-authored chapters and filesystem fallbacks, in one place.
           </p>
         </div>
         <Link
           href="/admin/content/new"
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium"
         >
-          New mechanism
+          New chapter
         </Link>
       </header>
 
@@ -95,7 +95,7 @@ export default async function AdminContentPage() {
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No mechanisms yet. Click &ldquo;New mechanism&rdquo; to start.
+          No chapters yet. Click &ldquo;New chapter&rdquo; to start.
         </p>
       ) : (
         <table className="w-full text-sm">

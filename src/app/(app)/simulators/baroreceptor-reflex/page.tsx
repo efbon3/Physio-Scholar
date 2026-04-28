@@ -29,7 +29,7 @@ export default function BaroreceptorPage() {
           href="/systems/cardiovascular/baroreceptor-reflex"
           className="underline-offset-2 hover:underline"
         >
-          Read the mechanism page →
+          Read the chapter page →
         </Link>
         <Link href="/simulators" className="underline-offset-2 hover:underline">
           ← All simulators

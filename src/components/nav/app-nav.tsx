@@ -32,7 +32,7 @@ import { SyncIndicator } from "./sync-indicator";
 // affordances and Review handles the daily SRS queue. "Dashboard" is
 // the brand link.
 const STUDENT_TABS = [
-  { label: "Systems", href: "/systems" },
+  { label: "Assessment", href: "/systems" },
   { label: "Review", href: "/review" },
   { label: "Calendar", href: "/calendar" },
   { label: "Progress", href: "/progress" },

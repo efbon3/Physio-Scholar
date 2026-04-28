@@ -224,8 +224,8 @@ export default async function AdminCohortPage({
               <p className="text-destructive text-sm">Aggregates failed: {aggregatesError}</p>
             ) : !heatmap.hasAnyReviews ? (
               <p className="text-muted-foreground text-sm">
-                No cohort review data yet. Mechanisms appear here as soon as the cohort starts
-                rating cards (Phase 6 syncs reviews to Supabase).
+                No cohort review data yet. Chapters appear here as soon as the cohort starts rating
+                cards (Phase 6 syncs reviews to Supabase).
               </p>
             ) : (
               <ul className="flex flex-col gap-3">

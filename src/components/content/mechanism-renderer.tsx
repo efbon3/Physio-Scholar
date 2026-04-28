@@ -69,13 +69,13 @@ export function MechanismRenderer({ mechanism, profileId }: Props) {
       </header>
 
       <section
-        aria-label="Your progress on this mechanism"
+        aria-label="Your progress on this chapter"
         className="border-border bg-muted/40 flex flex-col gap-4 rounded-md border p-4"
       >
         <MechanismStats cardIds={cardIds} profileId={profileId} />
         {!hasCards ? (
           <p className="text-muted-foreground text-xs">
-            No questions have been authored for this mechanism yet. The textbook layers below are
+            No questions have been authored for this chapter yet. The textbook layers below are
             still readable; the &ldquo;Test yourself&rdquo; panel appears once the
             <code> # Questions</code> section lands in the markdown.
           </p>

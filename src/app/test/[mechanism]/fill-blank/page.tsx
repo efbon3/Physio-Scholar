@@ -71,7 +71,7 @@ export default async function FillBlankSessionPage({
           href={`/systems/${mechanism.frontmatter.organ_system}/${id}`}
           className="underline-offset-2 hover:underline"
         >
-          ← Back to mechanism
+          ← Back to chapter
         </Link>
       </nav>
       <header className="flex flex-col gap-2">

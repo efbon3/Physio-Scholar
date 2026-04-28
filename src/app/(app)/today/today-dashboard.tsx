@@ -290,7 +290,7 @@ function WeakSystemCard({ weakArea }: { weakArea: WeakArea | null }) {
         href={`/review?mechanism=${encodeURIComponent(weakArea.mechanismId)}`}
         className="text-foreground mt-1 self-start rounded-md border px-2 py-1 text-xs hover:underline"
       >
-        Drill this mechanism
+        Drill this chapter
       </Link>
     </article>
   );

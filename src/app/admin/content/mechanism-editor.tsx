@@ -139,7 +139,7 @@ export function MechanismEditor({ mode, initialMarkdown, initialStatus, expected
           disabled={pending}
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
-          {pending ? "Saving…" : mode === "create" ? "Save new mechanism" : "Save changes"}
+          {pending ? "Saving…" : mode === "create" ? "Save new chapter" : "Save changes"}
         </button>
         <Link
           href="/admin/content"

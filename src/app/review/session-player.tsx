@@ -441,11 +441,11 @@ function SessionExitLinks({
       </Link>
       {focusMechanism ? (
         <Link href={`/systems`} className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
-          Browse mechanisms
+          Browse chapters
         </Link>
       ) : (
         <Link href="/systems" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
-          Browse mechanisms
+          Browse chapters
         </Link>
       )}
     </div>
