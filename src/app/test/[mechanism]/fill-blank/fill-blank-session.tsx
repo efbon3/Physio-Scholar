@@ -48,6 +48,14 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
   const [status, setStatus] = useState<SessionStatus>("answering");
   const [outcomes, setOutcomes] = useState<CardOutcome[]>([]);
   const [startTime, setStartTime] = useState<number>(() => Date.now());
+  // Practice-only mode: per-session toggle that suppresses SRS schedule
+  // updates. The review row is still logged so the activity counts
+  // toward analytics (build spec §2.3 — "practice should also
+  // contribute"). Lockable only before the first answer is submitted —
+  // toggling mid-session would mix scheduled and unscheduled cards in
+  // a way the summary screen can't usefully describe.
+  const [practiceMode, setPracticeMode] = useState(false);
+  const practiceLocked = outcomes.length > 0;
 
   const sessionId = useMemo(() => crypto.randomUUID(), []);
   const card = cards[index];
@@ -59,6 +67,7 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
         outcomes={outcomes}
         mechanismSystem={mechanismSystem}
         mechanismId={mechanismId}
+        practiceMode={practiceMode}
       />
     );
   }
@@ -86,6 +95,7 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
         hintsUsed: 0,
         timeSpentSeconds: elapsedSeconds,
         sessionId,
+        practiceMode,
       });
     } catch (err) {
       // Persisting locally is best-effort. The reveal still happens so
@@ -112,11 +122,26 @@ export function FillBlankSession({ cards, mechanismId, mechanismSystem, profileI
 
   return (
     <article className="border-border flex flex-col gap-5 rounded-md border p-5">
-      <header className="flex items-baseline justify-between text-xs">
-        <p className="text-muted-foreground tracking-widest uppercase">
-          Question {index + 1} of {cards.length}
-        </p>
-        {result ? <BandPill band={result.grade} /> : null}
+      <header className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between text-xs">
+          <p className="text-muted-foreground tracking-widest uppercase">
+            Question {index + 1} of {cards.length}
+          </p>
+          {result ? <BandPill band={result.grade} /> : null}
+        </div>
+        <label className="text-muted-foreground flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={practiceMode}
+            onChange={(e) => setPracticeMode(e.target.checked)}
+            disabled={practiceLocked}
+            className="h-3.5 w-3.5"
+          />
+          <span>
+            Practice only — log this session but don&apos;t change my schedule.
+            {practiceLocked ? <em className="ml-1">(Locked after first answer.)</em> : null}
+          </span>
+        </label>
       </header>
 
       <div className="flex flex-col gap-2">
@@ -194,10 +219,12 @@ function SummaryScreen({
   outcomes,
   mechanismId,
   mechanismSystem,
+  practiceMode,
 }: {
   outcomes: readonly CardOutcome[];
   mechanismId: string;
   mechanismSystem: string;
+  practiceMode: boolean;
 }) {
   const counts = outcomes.reduce<Record<FillBlankGrade, number>>(
     (acc, o) => {
@@ -221,8 +248,9 @@ function SummaryScreen({
         <SummaryStat label="Red" count={counts.red} band="red" />
       </dl>
       <p className="text-muted-foreground text-xs leading-relaxed">
-        These ratings have been logged to your daily review queue. The cards will reappear at the
-        intervals SM-2 calculated from your answers.
+        {practiceMode
+          ? "Practice mode — your answers were logged but the SRS schedule wasn't touched. The cards will reappear when they were already due."
+          : "These ratings have been logged to your daily review queue. The cards will reappear at the intervals SM-2 calculated from your answers."}
       </p>
       <div className="flex flex-wrap gap-3">
         <Link
