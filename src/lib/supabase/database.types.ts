@@ -705,6 +705,17 @@ export type Database = {
           created_at: string
         }[]
       }
+      assignment_engagement: {
+        Args: { p_assignment_id: string }
+        Returns: {
+          profile_id: string
+          full_name: string | null
+          nickname: string | null
+          year_of_study: number | null
+          reviews_since_assignment: number
+          last_review_at: string | null
+        }[]
+      }
     }
     Enums: {
       content_flag_status: "open" | "resolved" | "rejected"
