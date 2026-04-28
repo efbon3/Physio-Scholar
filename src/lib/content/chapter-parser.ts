@@ -120,13 +120,22 @@ export function isChapterFrontmatter(data: unknown): boolean {
  * Transform chapter-format frontmatter + body into the mechanism
  * shape. Throws if the frontmatter or the body don't match the
  * documented chapter format.
+ *
+ * `filenameHint` is the basename of the source file (without `.md`).
+ * When provided and shaped like a kebab-case slug, it overrides the
+ * chapter-title-derived id. This guarantees the on-disk filename and
+ * the mechanism id always agree, which is what the URL routing relies
+ * on (`/systems/<system>/<id>` resolves by reading `<id>.md`). When
+ * absent (DB rows, in-memory tests), the chapter title is slugified
+ * as before.
  */
 export function chapterToMechanism(
   data: unknown,
   body: string,
+  filenameHint?: string,
 ): { frontmatter: MechanismFrontmatter; body: string } {
   const cf = chapterFrontmatterSchema.parse(data);
-  const id = deriveChapterId(cf.chapter);
+  const id = pickId(filenameHint, cf.chapter);
   const organ_system = mapPartToOrganSystem(cf.part);
   const transformedBody = transformBody(body);
 
@@ -148,6 +157,18 @@ export function chapterToMechanism(
   });
 
   return { frontmatter, body: transformedBody };
+}
+
+/**
+ * Pick the id for a chapter mechanism. Filename wins when it's a
+ * valid kebab-case slug (URL routing reads `<id>.md`, so id and
+ * filename must agree). Falls back to slugifying the chapter title
+ * when no filename is available.
+ */
+const KEBAB_ID = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+function pickId(filenameHint: string | undefined, chapterField: string): string {
+  if (filenameHint && KEBAB_ID.test(filenameHint)) return filenameHint;
+  return deriveChapterId(chapterField);
 }
 
 /**

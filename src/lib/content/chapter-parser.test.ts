@@ -318,6 +318,12 @@ describe("chapterToMechanism — shipped chapter file", () => {
     const m = await readMechanismById("ch01-introduction-and-homeostasis");
     expect(m).not.toBeNull();
     if (!m) return;
+    // The on-disk filename governs the mechanism id. The chapter title
+    // would slug to `ch01-introduction-to-physiology-and-homeostasis`,
+    // but the file is named `ch01-introduction-and-homeostasis.md`, so
+    // that is what the platform exposes — the URL `/systems/foundations/
+    // ch01-introduction-and-homeostasis` must resolve.
+    expect(m.frontmatter.id).toBe("ch01-introduction-and-homeostasis");
     expect(m.frontmatter.organ_system).toBe("foundations");
     expect(m.frontmatter.title).toMatch(/Introduction/);
     const cards = extractCards(m);
@@ -338,6 +344,53 @@ describe("chapterToMechanism — shipped chapter file", () => {
     // Q1 specifically authored as F (foundational) / S (should).
     expect(cards[0].priority).toBe("should");
     expect(cards[0].difficulty).toBe("foundational");
+  });
+});
+
+describe("filename hint overrides chapter-derived id", () => {
+  // Without a filename hint, the chapter-title slug wins. With a
+  // filename hint, that wins instead — this is what fs.ts does so the
+  // URL slug always matches the on-disk filename.
+  const RAW = `---
+chapter: Chapter 1 — Introduction to Physiology and Homeostasis
+part: Part I — Foundations of Physiology
+status: draft
+---
+
+# Questions
+
+QUESTION 1
+Type: recall
+Bloom's level: remember
+
+Stem: Stem.
+
+Correct answer: Answer.
+
+Distractors:
+- "Wrong" — Reveals misconception: foo.
+
+Explanation: Why.
+
+Hints:
+1. Hint A.
+`;
+
+  it("falls back to the chapter-derived id when no hint is provided", () => {
+    const m = parseMechanism(RAW);
+    expect(m.frontmatter.id).toBe("ch01-introduction-to-physiology-and-homeostasis");
+  });
+
+  it("uses the filename hint as the id when one is provided", () => {
+    const m = parseMechanism(RAW, "ch01-introduction-and-homeostasis");
+    expect(m.frontmatter.id).toBe("ch01-introduction-and-homeostasis");
+  });
+
+  it("ignores a filename hint that isn't a valid kebab-case id", () => {
+    // "Foo Bar" is not kebab-case — fall back to derived id rather
+    // than producing a malformed mechanism id.
+    const m = parseMechanism(RAW, "Foo Bar");
+    expect(m.frontmatter.id).toBe("ch01-introduction-to-physiology-and-homeostasis");
   });
 });
 

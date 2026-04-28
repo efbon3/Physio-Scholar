@@ -44,20 +44,29 @@ export type Mechanism = {
  *   - Chapter format: frontmatter has `chapter` and `part` fields and
  *     no `id`. Body has `QUESTION N` blocks under optional `## Pass N`
  *     groupings. Routed through `chapterToMechanism()` which derives
- *     `id` from the chapter title, maps `part` → `organ_system`, and
- *     transforms the question blocks into the canonical mechanism
- *     shape. The returned Mechanism is indistinguishable from one
- *     parsed from a hand-authored mechanism file.
+ *     `id` from the chapter title (or, when provided, the filename),
+ *     maps `part` → `organ_system`, and transforms the question blocks
+ *     into the canonical mechanism shape. The returned Mechanism is
+ *     indistinguishable from one parsed from a hand-authored
+ *     mechanism file.
+ *
+ * `filenameHint` is the basename of the source file (without `.md`),
+ * passed through by the filesystem loader. When present and the input
+ * is in chapter format, it overrides the chapter-title-derived id so
+ * that the URL slug always matches the filename on disk — otherwise
+ * `/systems/foo/<derived-id>` 404s when the derived id and the
+ * filename don't agree. Callers without a filename (DB rows,
+ * in-memory tests) can omit it.
  *
  * This function is intentionally decoupled from the filesystem so the
  * same parser can run on author IDE previews, Edge runtime handlers
  * (where `fs` is not available), and plain Node tests.
  */
-export function parseMechanism(raw: string): Mechanism {
+export function parseMechanism(raw: string, filenameHint?: string): Mechanism {
   const parsed = matter(raw);
 
   if (isChapterFrontmatter(parsed.data)) {
-    const transformed = chapterToMechanism(parsed.data, parsed.content);
+    const transformed = chapterToMechanism(parsed.data, parsed.content, filenameHint);
     return {
       frontmatter: transformed.frontmatter,
       body: transformed.body,

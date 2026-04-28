@@ -37,7 +37,11 @@ export async function readAllMechanisms(): Promise<Mechanism[]> {
   const mechanisms = await Promise.all(
     markdownFiles.map(async (name) => {
       const raw = await readFile(join(MECHANISMS_DIR, name), "utf8");
-      return parseMechanism(raw);
+      // Pass the basename (sans `.md`) so chapter-format files derive
+      // their id from the filename instead of the chapter title — the
+      // URL slug must equal the filename for `/systems/<sys>/<id>`
+      // routing to find `<id>.md` on disk.
+      return parseMechanism(raw, name.replace(/\.md$/, ""));
     }),
   );
 
@@ -52,7 +56,7 @@ export async function readMechanismById(id: string): Promise<Mechanism | null> {
   if (!VALID_ID.test(id)) return null;
   try {
     const raw = await readFile(join(MECHANISMS_DIR, `${id}.md`), "utf8");
-    return parseMechanism(raw);
+    return parseMechanism(raw, id);
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === "ENOENT") return null;
