@@ -2,7 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { extractCards } from "@/lib/content/cards";
-import { filterByFormat, filterPublished } from "@/lib/content/card-filters";
+import {
+  applyCardFilters,
+  filterByFormat,
+  filterPublished,
+  parseDifficultyFilter,
+  parsePriorityFilter,
+} from "@/lib/content/card-filters";
 import { buildMcqFromCard, seedFromString, type McqQuestion } from "@/lib/content/exam";
 import { readMechanismById } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +20,7 @@ export const metadata = {
 };
 
 type Params = { params: Promise<{ mechanism: string }> };
+type SearchParams = Promise<{ priority?: string | string[]; difficulty?: string | string[] }>;
 
 async function getProfileId(nextPath: string): Promise<string> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return "preview";
@@ -27,15 +34,30 @@ async function getProfileId(nextPath: string): Promise<string> {
   }
 }
 
-export default async function McqSessionPage({ params }: Params) {
+export default async function McqSessionPage({
+  params,
+  searchParams,
+}: Params & { searchParams: SearchParams }) {
   const { mechanism: id } = await params;
+  const resolvedSearch = await searchParams;
   const mechanism = await readMechanismById(id);
   if (!mechanism) notFound();
 
   const profileId = await getProfileId(`/test/${id}/mcq`);
 
   const allCards = extractCards(mechanism);
-  const cards = filterByFormat(filterPublished(allCards), "mcq");
+  const formatCards = filterByFormat(filterPublished(allCards), "mcq");
+
+  const priorityFilter = parsePriorityFilter(resolvedSearch.priority);
+  const difficultyFilter = parseDifficultyFilter(resolvedSearch.difficulty);
+  const filtered =
+    priorityFilter || difficultyFilter
+      ? applyCardFilters(formatCards, {
+          priority: priorityFilter,
+          difficulty: difficultyFilter,
+        })
+      : formatCards;
+  const cards = filtered.length > 0 ? filtered : formatCards;
 
   // Build MCQs server-side so the client component receives the
   // already-shuffled options. Time + crypto entropy keeps the order

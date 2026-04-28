@@ -2,7 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { extractCards } from "@/lib/content/cards";
-import { filterByFormat, filterPublished } from "@/lib/content/card-filters";
+import {
+  applyCardFilters,
+  filterByFormat,
+  filterPublished,
+  parseDifficultyFilter,
+  parsePriorityFilter,
+} from "@/lib/content/card-filters";
 import { readMechanismById } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +19,7 @@ export const metadata = {
 };
 
 type Params = { params: Promise<{ mechanism: string }> };
+type SearchParams = Promise<{ priority?: string | string[]; difficulty?: string | string[] }>;
 
 async function getProfileId(nextPath: string): Promise<string> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return "preview";
@@ -26,15 +33,30 @@ async function getProfileId(nextPath: string): Promise<string> {
   }
 }
 
-export default async function DescriptiveSessionPage({ params }: Params) {
+export default async function DescriptiveSessionPage({
+  params,
+  searchParams,
+}: Params & { searchParams: SearchParams }) {
   const { mechanism: id } = await params;
+  const resolvedSearch = await searchParams;
   const mechanism = await readMechanismById(id);
   if (!mechanism) notFound();
 
   const profileId = await getProfileId(`/test/${id}/descriptive`);
 
   const allCards = extractCards(mechanism);
-  const cards = filterByFormat(filterPublished(allCards), "descriptive");
+  const formatCards = filterByFormat(filterPublished(allCards), "descriptive");
+
+  const priorityFilter = parsePriorityFilter(resolvedSearch.priority);
+  const difficultyFilter = parseDifficultyFilter(resolvedSearch.difficulty);
+  const filtered =
+    priorityFilter || difficultyFilter
+      ? applyCardFilters(formatCards, {
+          priority: priorityFilter,
+          difficulty: difficultyFilter,
+        })
+      : formatCards;
+  const cards = filtered.length > 0 ? filtered : formatCards;
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">

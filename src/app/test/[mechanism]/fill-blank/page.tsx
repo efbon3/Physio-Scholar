@@ -2,7 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { extractCards } from "@/lib/content/cards";
-import { filterByFormat, filterPublished } from "@/lib/content/card-filters";
+import {
+  applyCardFilters,
+  filterByFormat,
+  filterPublished,
+  parseDifficultyFilter,
+  parsePriorityFilter,
+} from "@/lib/content/card-filters";
 import { readMechanismById } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +19,7 @@ export const metadata = {
 };
 
 type Params = { params: Promise<{ mechanism: string }> };
+type SearchParams = Promise<{ priority?: string | string[]; difficulty?: string | string[] }>;
 
 /** Same graceful posture as the rest of the app: skip Supabase in unconfigured envs. */
 async function getProfileId(nextPath: string): Promise<string> {
@@ -27,15 +34,35 @@ async function getProfileId(nextPath: string): Promise<string> {
   }
 }
 
-export default async function FillBlankSessionPage({ params }: Params) {
+export default async function FillBlankSessionPage({
+  params,
+  searchParams,
+}: Params & { searchParams: SearchParams }) {
   const { mechanism: id } = await params;
+  const resolvedSearch = await searchParams;
   const mechanism = await readMechanismById(id);
   if (!mechanism) notFound();
 
   const profileId = await getProfileId(`/test/${id}/fill-blank`);
 
   const allCards = extractCards(mechanism);
-  const cards = filterByFormat(filterPublished(allCards), "fill_blank");
+  const formatCards = filterByFormat(filterPublished(allCards), "fill_blank");
+
+  // Apply priority + difficulty filters from URL params (set by the
+  // mechanism page format-picker). Empty / unrecognised → null →
+  // unfiltered. If the filter combination wipes the deck we keep the
+  // unfiltered list rather than trapping the learner on an empty
+  // state — same fallback pattern as /review and /exam used to use.
+  const priorityFilter = parsePriorityFilter(resolvedSearch.priority);
+  const difficultyFilter = parseDifficultyFilter(resolvedSearch.difficulty);
+  const filtered =
+    priorityFilter || difficultyFilter
+      ? applyCardFilters(formatCards, {
+          priority: priorityFilter,
+          difficulty: difficultyFilter,
+        })
+      : formatCards;
+  const cards = filtered.length > 0 ? filtered : formatCards;
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
