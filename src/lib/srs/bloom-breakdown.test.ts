@@ -36,6 +36,7 @@ function review(card_id: string, rating: Rating, when = "2026-04-01T10:00:00Z"):
     time_spent_seconds: 30,
     session_id: null,
     self_explanation: null,
+    engagement_method: null,
     created_at: when,
     pending_sync: 0,
   };

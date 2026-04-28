@@ -13,6 +13,7 @@ function review(created_at: string): StoredReview {
     time_spent_seconds: 30,
     session_id: null,
     self_explanation: null,
+    engagement_method: null,
     created_at,
     pending_sync: 0,
   };

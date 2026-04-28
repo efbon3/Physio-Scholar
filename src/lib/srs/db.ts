@@ -49,6 +49,18 @@ export type StoredReview = {
    * in the real Claude-backed implementation.
    */
   self_explanation: string | null;
+  /**
+   * How the learner engaged with this descriptive question (build
+   * spec §2.3). One of:
+   *   - "written_peer" — wrote and checked with a peer
+   *   - "written_self" — wrote and self-checked against the model
+   *   - "mental"        — worked it out mentally without writing
+   * `null` for non-descriptive cards or when the learner skipped the
+   * prompt. Logged as analytics metadata only — does not affect SRS
+   * scheduling. Sync to Supabase ships in Phase 6 alongside an
+   * `engagement_method` column added in a follow-up migration.
+   */
+  engagement_method: "written_peer" | "written_self" | "mental" | null;
   created_at: string;
   /** 1 = waiting to push to Supabase; 0 = already pushed. */
   pending_sync: 0 | 1;

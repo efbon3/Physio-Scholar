@@ -16,14 +16,35 @@ type Props = {
   profileId: string;
 };
 
-type SessionStatus = "answering" | "revealed" | "complete";
+type SessionStatus = "answering" | "revealed" | "method" | "complete";
 
 type Outcome = {
   cardId: string;
   band: GradingBand;
 };
 
+type EngagementMethod = "written_peer" | "written_self" | "mental";
+
 const REVEAL_DELAY_SECONDS = 5;
+const ENGAGEMENT_DEFAULT_KEY = "physio.descriptive.engagementMethodDefault";
+
+/**
+ * Lazy initializer for the engagement-method default. Reads
+ * localStorage on first render so a returning learner sees their
+ * habitual method pre-selected. SSR-safe — returns null when window
+ * is unavailable (server render); the client-side render runs again
+ * and may resolve to a stored value. The defaultMethod only affects
+ * the method-prompt UI which is never on initial render, so no
+ * hydration mismatch.
+ */
+function readEngagementDefault(): EngagementMethod | null {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(ENGAGEMENT_DEFAULT_KEY);
+  if (stored === "written_peer" || stored === "written_self" || stored === "mental") {
+    return stored;
+  }
+  return null;
+}
 
 /**
  * Chapter-centric descriptive session.
@@ -61,6 +82,15 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
   const [activeCards, setActiveCards] = useState<readonly Card[]>(cards);
   const effectivePracticeMode = practiceMode || practiceMissedActive;
   const practiceLocked = outcomes.length > 0;
+  // Engagement-method prompt state. The pending band is the rating the
+  // student just picked; the prompt UI renders next, asking how they
+  // engaged. The student's last pick is remembered in localStorage so
+  // it pre-selects on the next card. Skip is silent — no method
+  // recorded for that card.
+  const [pendingBand, setPendingBand] = useState<GradingBand | null>(null);
+  const [defaultMethod, setDefaultMethod] = useState<EngagementMethod | null>(
+    readEngagementDefault,
+  );
 
   const sessionId = useMemo(() => crypto.randomUUID(), []);
   const card = activeCards[index];
@@ -81,6 +111,7 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
     setStudentAnswer("");
     setDontKnow(false);
     setRevealTime(null);
+    setPendingBand(null);
     setOutcomes([]);
     setStartTime(Date.now());
     setStatus("answering");
@@ -144,7 +175,7 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
     setNow(t);
   }
 
-  async function recordAndAdvance(band: GradingBand) {
+  async function recordAndAdvance(band: GradingBand, method: EngagementMethod | null) {
     if (!card) return;
     const rating = bandToRating(band);
     const elapsedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
@@ -158,6 +189,7 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
         sessionId,
         selfExplanation: studentAnswer,
         practiceMode: effectivePracticeMode,
+        engagementMethod: method,
       });
     } catch (err) {
       console.error("Failed to record descriptive review locally", err);
@@ -171,19 +203,42 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
       setStudentAnswer("");
       setDontKnow(false);
       setRevealTime(null);
+      setPendingBand(null);
       setStatus("answering");
       setStartTime(Date.now());
     }
   }
 
-  async function handleRate(band: GradingBand) {
+  function handleRate(band: GradingBand) {
     if (!card || !ratingUnlocked) return;
-    await recordAndAdvance(band);
+    // Stage the rating and transition to the method-prompt step. The
+    // review row is recorded once the prompt is answered or skipped
+    // (one IndexedDB write per card, including the engagement_method
+    // metadata).
+    setPendingBand(band);
+    setStatus("method");
+  }
+
+  async function handleMethodPick(method: EngagementMethod) {
+    if (!card || !pendingBand) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ENGAGEMENT_DEFAULT_KEY, method);
+    }
+    setDefaultMethod(method);
+    await recordAndAdvance(pendingBand, method);
+  }
+
+  async function handleMethodSkip() {
+    if (!card || !pendingBand) return;
+    await recordAndAdvance(pendingBand, null);
   }
 
   async function handleDontKnowContinue() {
     if (!card || !ratingUnlocked) return;
-    await recordAndAdvance("dont_know");
+    // Don't-know skips the engagement-method prompt — the student
+    // didn't engage at all, so the prompt is meaningless. Record
+    // directly with no method.
+    await recordAndAdvance("dont_know", null);
   }
 
   return (
@@ -249,7 +304,7 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
         ) : null}
       </form>
 
-      {status === "revealed" ? (
+      {status === "revealed" || status === "method" ? (
         <div className="border-border bg-muted/40 flex flex-col gap-4 rounded-md border p-4 text-sm leading-relaxed">
           {dontKnow ? (
             <p className="text-muted-foreground text-xs">
@@ -283,54 +338,115 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
               <p className="whitespace-pre-wrap">{card.common_misconceptions}</p>
             </div>
           ) : null}
-          <div className="flex flex-col gap-2">
-            <p className="text-muted-foreground text-xs">
-              {ratingUnlocked
-                ? dontKnow
-                  ? "Continue when you've read the model answer."
-                  : "Rate yourself against the model answer:"
-                : `Reading time… ${secondsUntilUnlock}s remaining before ${dontKnow ? "Continue" : "rating"} unlocks.`}
-            </p>
-            {dontKnow ? (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleDontKnowContinue}
-                  disabled={!ratingUnlocked}
-                  className={cn(
-                    buttonVariants({ size: "default" }),
-                    !ratingUnlocked && "opacity-50",
-                  )}
-                >
-                  {isLastCard ? "Finish" : "Continue"}
-                </button>
+          {status === "revealed" ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-muted-foreground text-xs">
+                {ratingUnlocked
+                  ? dontKnow
+                    ? "Continue when you've read the model answer."
+                    : "Rate yourself against the model answer:"
+                  : `Reading time… ${secondsUntilUnlock}s remaining before ${dontKnow ? "Continue" : "rating"} unlocks.`}
+              </p>
+              {dontKnow ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleDontKnowContinue}
+                    disabled={!ratingUnlocked}
+                    className={cn(
+                      buttonVariants({ size: "default" }),
+                      !ratingUnlocked && "opacity-50",
+                    )}
+                  >
+                    {isLastCard ? "Finish" : "Continue"}
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  <RatingButton
+                    band="green"
+                    label="Green — got it"
+                    disabled={!ratingUnlocked}
+                    onClick={() => handleRate("green")}
+                  />
+                  <RatingButton
+                    band="yellow"
+                    label="Yellow — partially"
+                    disabled={!ratingUnlocked}
+                    onClick={() => handleRate("yellow")}
+                  />
+                  <RatingButton
+                    band="red"
+                    label="Red — missed it"
+                    disabled={!ratingUnlocked}
+                    onClick={() => handleRate("red")}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-muted-foreground text-xs">
+                How did you engage with this question?{" "}
+                <span className="text-muted-foreground/70">(optional — analytics only)</span>
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <MethodButton
+                  label="Wrote & self-checked"
+                  highlighted={defaultMethod === "written_self"}
+                  onClick={() => handleMethodPick("written_self")}
+                />
+                <MethodButton
+                  label="Wrote & peer-checked"
+                  highlighted={defaultMethod === "written_peer"}
+                  onClick={() => handleMethodPick("written_peer")}
+                />
+                <MethodButton
+                  label="Worked it mentally"
+                  highlighted={defaultMethod === "mental"}
+                  onClick={() => handleMethodPick("mental")}
+                />
               </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
-                <RatingButton
-                  band="green"
-                  label="Green — got it"
-                  disabled={!ratingUnlocked}
-                  onClick={() => handleRate("green")}
-                />
-                <RatingButton
-                  band="yellow"
-                  label="Yellow — partially"
-                  disabled={!ratingUnlocked}
-                  onClick={() => handleRate("yellow")}
-                />
-                <RatingButton
-                  band="red"
-                  label="Red — missed it"
-                  disabled={!ratingUnlocked}
-                  onClick={() => handleRate("red")}
-                />
-              </div>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={handleMethodSkip}
+                className="text-muted-foreground hover:bg-muted self-end rounded-md px-3 py-1.5 text-xs underline-offset-2 hover:underline"
+              >
+                Skip
+              </button>
+            </div>
+          )}
         </div>
       ) : null}
     </article>
+  );
+}
+
+/**
+ * Engagement-method picker button. The student's last pick is
+ * highlighted (a thin primary border) so a returning learner sees their
+ * habitual choice pre-suggested without it being auto-committed.
+ */
+function MethodButton({
+  label,
+  highlighted,
+  onClick,
+}: {
+  label: string;
+  highlighted: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "border-input rounded-md border px-3 py-2 text-xs font-medium transition-colors",
+        highlighted ? "border-primary bg-primary/5 text-foreground" : "hover:bg-muted",
+      )}
+    >
+      {label}
+    </button>
   );
 }
 

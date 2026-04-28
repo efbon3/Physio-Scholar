@@ -21,6 +21,7 @@ function review(
     time_spent_seconds: overrides.time_spent_seconds ?? 30,
     session_id: overrides.session_id ?? null,
     self_explanation: overrides.self_explanation ?? null,
+    engagement_method: null,
     created_at: overrides.created_at,
     pending_sync: overrides.pending_sync ?? 0,
   };

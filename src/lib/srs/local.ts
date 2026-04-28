@@ -84,6 +84,13 @@ export type RecordReviewInput = {
    * logging the review.
    */
   practiceMode?: boolean;
+  /**
+   * Descriptive only: how the learner engaged with the question. One
+   * of "written_peer", "written_self", "mental". Undefined means the
+   * learner skipped the prompt or this isn't a descriptive card.
+   * Persisted on the review row; analytics-only, never affects SRS.
+   */
+  engagementMethod?: "written_peer" | "written_self" | "mental" | null;
   /** Optional clock override for tests. Defaults to `new Date()`. */
   now?: Date;
 };
@@ -143,6 +150,7 @@ export async function recordReviewLocally(input: RecordReviewInput): Promise<Rec
     time_spent_seconds: input.timeSpentSeconds,
     session_id: input.sessionId ?? null,
     self_explanation: selfExplanation,
+    engagement_method: input.engagementMethod ?? null,
     created_at: nowIso,
     pending_sync: 1,
   };
