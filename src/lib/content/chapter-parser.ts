@@ -398,6 +398,7 @@ function transformDescriptiveBlock(block: string, number: string): string {
   const model = extractMultilineField(block, "Model answer");
   const explanation = extractMultilineField(block, "Elaborative explanation");
   const checklist = extractMultilineField(block, "Self-grading checklist");
+  const misconceptions = extractMultilineField(block, "Common misconceptions");
   const hints = extractListField(block, "Hints");
 
   if (stem) lines.push(`**Stem:** ${stem}`);
@@ -421,10 +422,18 @@ function transformDescriptiveBlock(block: string, number: string): string {
     lines.push(checklist);
   }
 
-  // `Common misconceptions:` is intentionally dropped for now — only
-  // a handful of questions carry it, and the descriptive UI doesn't
-  // surface them yet. Re-introduce as a `### Common Pitfalls`
-  // section if/when there's UI to display them.
+  // Common misconceptions: a list of "wrong-mental-model" → correction
+  // pairs the author identified. Surfaced in the descriptive reveal
+  // screen so a learner can spot a misalignment in their own answer
+  // even when their self-rating is correct. Multi-line markup, so use
+  // the `### Common Misconceptions` subsection treatment for the same
+  // reason as the checklist.
+  if (misconceptions) {
+    lines.push("");
+    lines.push("### Common Misconceptions");
+    lines.push(misconceptions);
+  }
+
   return lines.join("\n");
 }
 

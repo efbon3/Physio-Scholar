@@ -155,6 +155,14 @@ export const cardSchema = z.object({
    * as markdown.
    */
   self_grading_checklist: z.string().min(1).optional(),
+  /**
+   * Descriptive only: a bulleted list of common student misconceptions
+   * with corrections. Surfaced in the reveal screen alongside the
+   * self-grading checklist so a learner can spot a misalignment in
+   * their own answer even when they self-rate it correct. Same
+   * `### Common Misconceptions` subsection treatment as the checklist.
+   */
+  common_misconceptions: z.string().min(1).optional(),
 });
 export type Card = z.infer<typeof cardSchema>;
 
@@ -222,6 +230,7 @@ function parseCardBody(
     unit: extractLabeledField(body, "Unit") ?? undefined,
     tolerance_pct: parseTolerance(extractLabeledField(body, "Tolerance")),
     self_grading_checklist: extractSelfGradingChecklist(body),
+    common_misconceptions: extractCommonMisconceptions(body),
   };
 }
 
@@ -231,6 +240,15 @@ function extractSelfGradingChecklist(body: string): string | undefined {
   // or end of body. Returns undefined when absent so the optional
   // schema field stays out rather than being explicitly empty.
   const match = body.match(/###\s+Self-Grading\s+Checklist\s*\n([\s\S]+?)(?=\n\s*###\s|$)/i);
+  if (!match) return undefined;
+  const trimmed = match[1].trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function extractCommonMisconceptions(body: string): string | undefined {
+  // Section heading `### Common Misconceptions`. Same section-based
+  // extraction as the self-grading checklist.
+  const match = body.match(/###\s+Common\s+Misconceptions\s*\n([\s\S]+?)(?=\n\s*###\s|$)/i);
   if (!match) return undefined;
   const trimmed = match[1].trim();
   return trimmed.length > 0 ? trimmed : undefined;

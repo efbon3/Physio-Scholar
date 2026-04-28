@@ -47,6 +47,7 @@ const REVEAL_DELAY_SECONDS = 5;
 export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileId }: Props) {
   const [index, setIndex] = useState(0);
   const [studentAnswer, setStudentAnswer] = useState("");
+  const [dontKnow, setDontKnow] = useState(false);
   const [status, setStatus] = useState<SessionStatus>("answering");
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [startTime, setStartTime] = useState<number>(() => Date.now());
@@ -67,7 +68,9 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
 
   function handlePracticeMissed() {
     const missedIds = new Set(
-      outcomes.filter((o) => o.band === "red" || o.band === "yellow").map((o) => o.cardId),
+      outcomes
+        .filter((o) => o.band === "red" || o.band === "yellow" || o.band === "dont_know")
+        .map((o) => o.cardId),
     );
     if (missedIds.size === 0) return;
     const missed = activeCards.filter((c) => missedIds.has(c.id));
@@ -76,6 +79,7 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
     setPracticeMissedActive(true);
     setIndex(0);
     setStudentAnswer("");
+    setDontKnow(false);
     setRevealTime(null);
     setOutcomes([]);
     setStartTime(Date.now());
@@ -123,8 +127,25 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
     setNow(t);
   }
 
-  async function handleRate(band: GradingBand) {
-    if (!card || !ratingUnlocked) return;
+  /**
+   * "I don't know" path — student opts out of writing, jumps straight
+   * to the model answer, and the card auto-rates as `dont_know`. Same
+   * pattern as MCQ/fill-blank: same next-interval as Again but no ease
+   * drop, no lapse increment. The 5s reading delay still applies so
+   * the learner spends time with the model answer.
+   */
+  function handleDontKnow() {
+    if (status !== "answering") return;
+    setDontKnow(true);
+    setStudentAnswer("");
+    setStatus("revealed");
+    const t = Date.now();
+    setRevealTime(t);
+    setNow(t);
+  }
+
+  async function recordAndAdvance(band: GradingBand) {
+    if (!card) return;
     const rating = bandToRating(band);
     const elapsedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
     try {
@@ -148,10 +169,21 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
     } else {
       setIndex((i) => i + 1);
       setStudentAnswer("");
+      setDontKnow(false);
       setRevealTime(null);
       setStatus("answering");
       setStartTime(Date.now());
     }
+  }
+
+  async function handleRate(band: GradingBand) {
+    if (!card || !ratingUnlocked) return;
+    await recordAndAdvance(band);
+  }
+
+  async function handleDontKnowContinue() {
+    if (!card || !ratingUnlocked) return;
+    await recordAndAdvance("dont_know");
   }
 
   return (
@@ -198,7 +230,14 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
           />
         </label>
         {status === "answering" ? (
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={handleDontKnow}
+              className="border-input text-muted-foreground hover:bg-muted self-start rounded-md border border-dashed px-3 py-1.5 text-xs transition-colors"
+            >
+              I don&apos;t know
+            </button>
             <button
               type="submit"
               className={cn(buttonVariants({ size: "default" }))}
@@ -212,6 +251,12 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
 
       {status === "revealed" ? (
         <div className="border-border bg-muted/40 flex flex-col gap-4 rounded-md border p-4 text-sm leading-relaxed">
+          {dontKnow ? (
+            <p className="text-muted-foreground text-xs">
+              You opted out — read the model answer carefully. The card returns tomorrow without an
+              ease change.
+            </p>
+          ) : null}
           <div>
             <p className="text-muted-foreground text-xs tracking-widest uppercase">Model answer</p>
             <p className="whitespace-pre-wrap">{card.correct_answer}</p>
@@ -230,32 +275,58 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
               <p className="whitespace-pre-wrap">{card.self_grading_checklist}</p>
             </div>
           ) : null}
+          {card.common_misconceptions ? (
+            <div>
+              <p className="text-muted-foreground text-xs tracking-widest uppercase">
+                Common misconceptions
+              </p>
+              <p className="whitespace-pre-wrap">{card.common_misconceptions}</p>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-2">
             <p className="text-muted-foreground text-xs">
               {ratingUnlocked
-                ? "Rate yourself against the model answer:"
-                : `Reading time… ${secondsUntilUnlock}s remaining before rating unlocks.`}
+                ? dontKnow
+                  ? "Continue when you've read the model answer."
+                  : "Rate yourself against the model answer:"
+                : `Reading time… ${secondsUntilUnlock}s remaining before ${dontKnow ? "Continue" : "rating"} unlocks.`}
             </p>
-            <div className="grid grid-cols-3 gap-2">
-              <RatingButton
-                band="green"
-                label="Green — got it"
-                disabled={!ratingUnlocked}
-                onClick={() => handleRate("green")}
-              />
-              <RatingButton
-                band="yellow"
-                label="Yellow — partially"
-                disabled={!ratingUnlocked}
-                onClick={() => handleRate("yellow")}
-              />
-              <RatingButton
-                band="red"
-                label="Red — missed it"
-                disabled={!ratingUnlocked}
-                onClick={() => handleRate("red")}
-              />
-            </div>
+            {dontKnow ? (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleDontKnowContinue}
+                  disabled={!ratingUnlocked}
+                  className={cn(
+                    buttonVariants({ size: "default" }),
+                    !ratingUnlocked && "opacity-50",
+                  )}
+                >
+                  {isLastCard ? "Finish" : "Continue"}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <RatingButton
+                  band="green"
+                  label="Green — got it"
+                  disabled={!ratingUnlocked}
+                  onClick={() => handleRate("green")}
+                />
+                <RatingButton
+                  band="yellow"
+                  label="Yellow — partially"
+                  disabled={!ratingUnlocked}
+                  onClick={() => handleRate("yellow")}
+                />
+                <RatingButton
+                  band="red"
+                  label="Red — missed it"
+                  disabled={!ratingUnlocked}
+                  onClick={() => handleRate("red")}
+                />
+              </div>
+            )}
           </div>
         </div>
       ) : null}
