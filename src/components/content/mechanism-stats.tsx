@@ -16,6 +16,10 @@ type Stats = {
   total: number;
   seen: number;
   dueNow: number;
+  /** Oldest `due_at` among the cards that are currently due. Null when nothing is due. */
+  oldestDueAt: Date | null;
+  /** Count of cards due in the (now, now+24h] window. */
+  nextDue24h: number;
   learned: number;
   averageEase: number | null;
   lastReviewedAt: Date | null;
@@ -45,6 +49,37 @@ function formatRelative(target: Date | null, now: Date): string {
 }
 
 /**
+ * One-line subtitle under the "Due now" count, summarising *when*
+ * cards became due and *when* more are coming. Returns null when
+ * there's nothing useful to say (no due, no upcoming, never studied)
+ * so the caller can render-or-skip without an empty string lingering.
+ *
+ * Branches:
+ *   - currently due → "oldest 3 hr ago" plus "· +5 in next 24h" when applicable
+ *   - none due, but a next-due exists → "next 4 hr from now"
+ *   - else → null (caller renders nothing)
+ */
+export function formatDueSubtitle(args: {
+  dueNow: number;
+  oldestDueAt: Date | null;
+  nextDue24h: number;
+  nextDueAt: Date | null;
+  now: Date;
+}): string | null {
+  const { dueNow, oldestDueAt, nextDue24h, nextDueAt, now } = args;
+  if (dueNow > 0) {
+    const parts: string[] = [];
+    if (oldestDueAt) parts.push(`oldest ${formatRelative(oldestDueAt, now)}`);
+    if (nextDue24h > 0) parts.push(`+${nextDue24h} in next 24h`);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  }
+  if (nextDueAt && nextDueAt.getTime() > now.getTime()) {
+    return `next ${formatRelative(nextDueAt, now)}`;
+  }
+  return null;
+}
+
+/**
  * Per-mechanism study stats — shown on the mechanism detail page so the
  * learner has a concrete sense of "how well have I learned this?" before
  * they click "Study this mechanism."
@@ -69,16 +104,26 @@ export function MechanismStats({ cardIds, profileId }: Props) {
         const now = new Date();
 
         let dueNow = 0;
+        let nextDue24h = 0;
         let learned = 0;
         let easeSum = 0;
         let lastReviewedAt: Date | null = null;
         let nextDueAt: Date | null = null;
+        let oldestDueAt: Date | null = null;
+        const nowMs = now.getTime();
+        const in24hMs = nowMs + 24 * 60 * 60 * 1000;
 
         for (const row of relevant) {
           const dueAt = row.due_at ? new Date(row.due_at) : null;
-          if (dueAt && dueAt.getTime() <= now.getTime()) dueNow += 1;
           if (dueAt) {
-            if (!nextDueAt || dueAt.getTime() < nextDueAt.getTime()) nextDueAt = dueAt;
+            const t = dueAt.getTime();
+            if (t <= nowMs) {
+              dueNow += 1;
+              if (!oldestDueAt || t < oldestDueAt.getTime()) oldestDueAt = dueAt;
+            } else if (t <= in24hMs) {
+              nextDue24h += 1;
+            }
+            if (!nextDueAt || t < nextDueAt.getTime()) nextDueAt = dueAt;
           }
           if (row.status === "review" || row.interval_days >= 21) learned += 1;
           easeSum += row.ease;
@@ -96,6 +141,8 @@ export function MechanismStats({ cardIds, profileId }: Props) {
             total: cardIds.length,
             seen: relevant.length,
             dueNow,
+            oldestDueAt,
+            nextDue24h,
             learned,
             averageEase,
             lastReviewedAt,
@@ -108,6 +155,8 @@ export function MechanismStats({ cardIds, profileId }: Props) {
             total: cardIds.length,
             seen: 0,
             dueNow: 0,
+            oldestDueAt: null,
+            nextDue24h: 0,
             learned: 0,
             averageEase: null,
             lastReviewedAt: null,
@@ -138,6 +187,13 @@ export function MechanismStats({ cardIds, profileId }: Props) {
   const masteryPct =
     stats.averageEase !== null ? Math.round(((stats.averageEase - 2.5) / 1.0) * 100) : null;
   const masteryLabel = masteryPct === null ? "—" : `${Math.max(0, Math.min(100, masteryPct))}%`;
+  const dueSubtitle = formatDueSubtitle({
+    dueNow: stats.dueNow,
+    oldestDueAt: stats.oldestDueAt,
+    nextDue24h: stats.nextDue24h,
+    nextDueAt: stats.nextDueAt,
+    now,
+  });
 
   return (
     <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
@@ -150,6 +206,9 @@ export function MechanismStats({ cardIds, profileId }: Props) {
       <div className="flex flex-col gap-0.5">
         <dt className="text-muted-foreground text-xs tracking-widest uppercase">Due now</dt>
         <dd className="text-base font-medium">{stats.dueNow}</dd>
+        {dueSubtitle ? (
+          <p className="text-muted-foreground text-xs leading-tight">{dueSubtitle}</p>
+        ) : null}
       </div>
       <div className="flex flex-col gap-0.5">
         <dt className="text-muted-foreground text-xs tracking-widest uppercase">Mastery</dt>
