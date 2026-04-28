@@ -25,6 +25,19 @@ type Outcome = {
 
 type EngagementMethod = "written_peer" | "written_self" | "mental";
 
+/**
+ * What the learner did on a single card. Captured the moment a rating
+ * is finalised so the back-navigation history can replay the reveal
+ * screen for any prior question without re-running grading or
+ * re-recording the review.
+ */
+type CardSnapshot = {
+  studentAnswer: string;
+  dontKnow: boolean;
+  band: GradingBand;
+  method: EngagementMethod | null;
+};
+
 const REVEAL_DELAY_SECONDS = 5;
 const ENGAGEMENT_DEFAULT_KEY = "physio.descriptive.engagementMethodDefault";
 
@@ -91,10 +104,21 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
   const [defaultMethod, setDefaultMethod] = useState<EngagementMethod | null>(
     readEngagementDefault,
   );
+  // Back-navigation: viewIndex is what's currently rendered;
+  // viewIndex < index means "looking at a past question"
+  // (read-only reveal). Snapshots store the per-card state needed to
+  // re-render the reveal — typed answer, opt-out flag, rating, method.
+  // First rating per card is canonical and locked; revisiting can't
+  // change SRS state.
+  const [viewIndex, setViewIndex] = useState(0);
+  const [snapshots, setSnapshots] = useState<Record<string, CardSnapshot>>({});
 
   const sessionId = useMemo(() => crypto.randomUUID(), []);
   const card = activeCards[index];
   const isLastCard = index === activeCards.length - 1;
+  const inHistory = viewIndex < index && status !== "complete";
+  const viewedCard = inHistory ? activeCards[viewIndex] : null;
+  const viewedSnapshot = viewedCard ? snapshots[viewedCard.id] : undefined;
 
   function handlePracticeMissed() {
     const missedIds = new Set(
@@ -108,6 +132,8 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
     setActiveCards(shuffled);
     setPracticeMissedActive(true);
     setIndex(0);
+    setViewIndex(0);
+    setSnapshots({});
     setStudentAnswer("");
     setDontKnow(false);
     setRevealTime(null);
@@ -127,6 +153,20 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [status, revealTime]);
+
+  if (inHistory && viewedCard && viewedSnapshot) {
+    return (
+      <HistoryView
+        card={viewedCard}
+        snapshot={viewedSnapshot}
+        viewIndex={viewIndex}
+        totalCards={activeCards.length}
+        liveIndex={index}
+        onPrevious={handleViewPrevious}
+        onForward={handleViewForward}
+      />
+    );
+  }
 
   if (status === "complete") {
     return (
@@ -204,11 +244,19 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
       console.error("Failed to record descriptive review locally", err);
     }
     setOutcomes((prior) => [...prior, { cardId: card.id, band }]);
+    // Lock the per-card state into the history map before the next
+    // question's state machine reuses these refs. Back-navigation
+    // replays the reveal screen from these snapshots.
+    setSnapshots((prior) => ({
+      ...prior,
+      [card.id]: { studentAnswer, dontKnow, band, method },
+    }));
 
     if (isLastCard) {
       setStatus("complete");
     } else {
       setIndex((i) => i + 1);
+      setViewIndex((v) => v + 1);
       setStudentAnswer("");
       setDontKnow(false);
       setRevealTime(null);
@@ -216,6 +264,14 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
       setStatus("answering");
       setStartTime(Date.now());
     }
+  }
+
+  function handleViewPrevious() {
+    if (viewIndex > 0) setViewIndex((v) => v - 1);
+  }
+
+  function handleViewForward() {
+    if (viewIndex < index) setViewIndex((v) => v + 1);
   }
 
   function handleRate(band: GradingBand) {
@@ -423,6 +479,18 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
           )}
         </div>
       ) : null}
+
+      {(status === "revealed" || status === "method") && index > 0 ? (
+        <div className="flex justify-start">
+          <button
+            type="button"
+            onClick={handleViewPrevious}
+            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-md px-2 py-1 text-xs underline-offset-2 hover:underline"
+          >
+            ← Previous question
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -578,5 +646,137 @@ function SummaryStat({ label, count, band }: { label: string; count: number; ban
       <dt className="text-[11px] tracking-widest uppercase">{label}</dt>
       <dd className="text-2xl font-semibold">{count}</dd>
     </div>
+  );
+}
+
+/**
+ * Read-only replay of a previously-rated question. Shows the stem,
+ * the student's answer (or opt-out), the model answer + checklist +
+ * common misconceptions, and the rating they assigned. No buttons
+ * are interactive — first rating is canonical, you can't re-rate
+ * from history. ← Previous walks further back; → Forward (or
+ * "Back to current") returns toward the live question.
+ */
+function HistoryView({
+  card,
+  snapshot,
+  viewIndex,
+  totalCards,
+  liveIndex,
+  onPrevious,
+  onForward,
+}: {
+  card: Card;
+  snapshot: CardSnapshot;
+  viewIndex: number;
+  totalCards: number;
+  liveIndex: number;
+  onPrevious: () => void;
+  onForward: () => void;
+}) {
+  const bandLabel: Record<GradingBand, string> = {
+    green: "Green — got it",
+    yellow: "Yellow — partially",
+    red: "Red — missed it",
+    dont_know: "Don't know",
+  };
+  const bandClass: Record<GradingBand, string> = {
+    green: "bg-emerald-100 text-emerald-900",
+    yellow: "bg-amber-100 text-amber-900",
+    red: "bg-red-100 text-red-900",
+    dont_know: "bg-slate-100 text-slate-700",
+  };
+  const methodLabel: Record<EngagementMethod, string> = {
+    written_self: "Wrote & self-checked",
+    written_peer: "Wrote & peer-checked",
+    mental: "Worked it mentally",
+  };
+  const onLastHistory = viewIndex === liveIndex - 1;
+  return (
+    <article className="border-border flex flex-col gap-5 rounded-md border p-5">
+      <header className="flex items-center justify-between gap-2">
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">
+          Reviewing question {viewIndex + 1} of {totalCards}
+        </p>
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+            bandClass[snapshot.band],
+          )}
+        >
+          {bandLabel[snapshot.band]}
+        </span>
+      </header>
+
+      <p className="text-base leading-relaxed">{card.stem}</p>
+
+      <div>
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">Your answer</p>
+        {snapshot.dontKnow ? (
+          <p className="text-muted-foreground italic">
+            (Opted out — &ldquo;I don&apos;t know&rdquo;)
+          </p>
+        ) : snapshot.studentAnswer.trim().length > 0 ? (
+          <p className="whitespace-pre-wrap">{snapshot.studentAnswer}</p>
+        ) : (
+          <p className="text-muted-foreground italic">
+            (No typed answer — answered mentally or on paper)
+          </p>
+        )}
+      </div>
+
+      <div className="border-border bg-muted/40 flex flex-col gap-4 rounded-md border p-4 text-sm leading-relaxed">
+        <div>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">Model answer</p>
+          <p className="whitespace-pre-wrap">{card.correct_answer}</p>
+        </div>
+        {card.elaborative_explanation ? (
+          <div>
+            <p className="text-muted-foreground text-xs tracking-widest uppercase">Why</p>
+            <p className="whitespace-pre-wrap">{card.elaborative_explanation}</p>
+          </div>
+        ) : null}
+        {card.self_grading_checklist ? (
+          <div>
+            <p className="text-muted-foreground text-xs tracking-widest uppercase">
+              Self-grading checklist
+            </p>
+            <p className="whitespace-pre-wrap">{card.self_grading_checklist}</p>
+          </div>
+        ) : null}
+        {card.common_misconceptions ? (
+          <div>
+            <p className="text-muted-foreground text-xs tracking-widest uppercase">
+              Common misconceptions
+            </p>
+            <p className="whitespace-pre-wrap">{card.common_misconceptions}</p>
+          </div>
+        ) : null}
+        {snapshot.method ? (
+          <p className="text-muted-foreground text-xs">
+            Engagement method:{" "}
+            <span className="text-foreground font-medium">{methodLabel[snapshot.method]}</span>
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <button
+          type="button"
+          onClick={onPrevious}
+          disabled={viewIndex === 0}
+          className="border-input hover:bg-muted text-foreground rounded-md border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ← Previous
+        </button>
+        <button
+          type="button"
+          onClick={onForward}
+          className="border-input hover:bg-muted text-foreground rounded-md border px-3 py-1.5"
+        >
+          {onLastHistory ? "Back to current →" : "Forward →"}
+        </button>
+      </div>
+    </article>
   );
 }

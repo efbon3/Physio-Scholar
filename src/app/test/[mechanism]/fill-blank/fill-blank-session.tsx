@@ -26,6 +26,18 @@ type CardOutcome = {
 };
 
 /**
+ * What the learner did on a single fill-blank card. Captured the
+ * moment Submit fires so back-navigation can replay the reveal screen
+ * (typed answer, opt-out flag, grade band) without re-running the
+ * grader. First answer per card is canonical and locked.
+ */
+type CardSnapshot = {
+  studentAnswer: string;
+  dontKnow: boolean;
+  band: GradingBand;
+};
+
+/**
  * Per-question fill-blank session.
  *
  * Walks through the supplied cards one at a time:
@@ -65,10 +77,16 @@ export function FillBlankSession({ cards, chapterId, mechanismSystem, profileId 
   const [activeCards, setActiveCards] = useState<readonly Card[]>(cards);
   const effectivePracticeMode = practiceMode || practiceMissedActive;
   const practiceLocked = outcomes.length > 0;
+  // Back-navigation state — see DescriptiveSession for the design.
+  const [viewIndex, setViewIndex] = useState(0);
+  const [snapshots, setSnapshots] = useState<Record<string, CardSnapshot>>({});
 
   const sessionId = useMemo(() => crypto.randomUUID(), []);
   const card = activeCards[index];
   const isLastCard = index === activeCards.length - 1;
+  const inHistory = viewIndex < index && status !== "complete";
+  const viewedCard = inHistory ? activeCards[viewIndex] : null;
+  const viewedSnapshot = viewedCard ? snapshots[viewedCard.id] : undefined;
 
   function handlePracticeMissed() {
     const missedIds = new Set(
@@ -82,11 +100,35 @@ export function FillBlankSession({ cards, chapterId, mechanismSystem, profileId 
     setActiveCards(shuffled);
     setPracticeMissedActive(true);
     setIndex(0);
+    setViewIndex(0);
+    setSnapshots({});
     setStudentAnswer("");
     setDontKnow(false);
     setOutcomes([]);
     setStartTime(Date.now());
     setStatus("answering");
+  }
+
+  function handleViewPrevious() {
+    if (viewIndex > 0) setViewIndex((v) => v - 1);
+  }
+
+  function handleViewForward() {
+    if (viewIndex < index) setViewIndex((v) => v + 1);
+  }
+
+  if (inHistory && viewedCard && viewedSnapshot) {
+    return (
+      <FillBlankHistoryView
+        card={viewedCard}
+        snapshot={viewedSnapshot}
+        viewIndex={viewIndex}
+        totalCards={activeCards.length}
+        liveIndex={index}
+        onPrevious={handleViewPrevious}
+        onForward={handleViewForward}
+      />
+    );
   }
 
   if (status === "complete") {
@@ -151,6 +193,10 @@ export function FillBlankSession({ cards, chapterId, mechanismSystem, profileId 
     }
 
     setOutcomes((prior) => [...prior, { cardId: card.id, band, studentAnswer }]);
+    setSnapshots((prior) => ({
+      ...prior,
+      [card.id]: { studentAnswer, dontKnow, band },
+    }));
     setStatus("feedback");
   }
 
@@ -160,6 +206,7 @@ export function FillBlankSession({ cards, chapterId, mechanismSystem, profileId 
       return;
     }
     setIndex((i) => i + 1);
+    setViewIndex((v) => v + 1);
     setStudentAnswer("");
     setDontKnow(false);
     setStatus("answering");
@@ -287,7 +334,18 @@ export function FillBlankSession({ cards, chapterId, mechanismSystem, profileId 
               <p>{card.elaborative_explanation}</p>
             </div>
           ) : null}
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between">
+            {index > 0 ? (
+              <button
+                type="button"
+                onClick={handleViewPrevious}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-md px-2 py-1 text-xs underline-offset-2 hover:underline"
+              >
+                ← Previous question
+              </button>
+            ) : (
+              <span />
+            )}
             <button onClick={handleContinue} className={cn(buttonVariants({ size: "default" }))}>
               {isLastCard ? "Finish" : "Continue"}
             </button>
@@ -410,5 +468,106 @@ function SummaryStat({ label, count, band }: { label: string; count: number; ban
       <dt className="text-[11px] tracking-widest uppercase">{label}</dt>
       <dd className="text-2xl font-semibold">{count}</dd>
     </div>
+  );
+}
+
+/**
+ * Read-only replay of a previously-answered fill-blank card. Shows
+ * the stem, the student's typed answer (or opt-out), the correct
+ * answer, the elaborative explanation, and the band they got.
+ * Buttons are inert — first answer per card is canonical and locked.
+ */
+function FillBlankHistoryView({
+  card,
+  snapshot,
+  viewIndex,
+  totalCards,
+  liveIndex,
+  onPrevious,
+  onForward,
+}: {
+  card: Card;
+  snapshot: CardSnapshot;
+  viewIndex: number;
+  totalCards: number;
+  liveIndex: number;
+  onPrevious: () => void;
+  onForward: () => void;
+}) {
+  const onLastHistory = viewIndex === liveIndex - 1;
+  const bandLabel: Record<GradingBand, string> = {
+    green: "Green",
+    yellow: "Yellow",
+    red: "Red",
+    dont_know: "Don't know",
+  };
+  const bandClass: Record<GradingBand, string> = {
+    green: "bg-emerald-100 text-emerald-900",
+    yellow: "bg-amber-100 text-amber-900",
+    red: "bg-red-100 text-red-900",
+    dont_know: "bg-slate-100 text-slate-700",
+  };
+  return (
+    <article className="border-border flex flex-col gap-5 rounded-md border p-5">
+      <header className="flex items-center justify-between gap-2">
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">
+          Reviewing question {viewIndex + 1} of {totalCards}
+        </p>
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+            bandClass[snapshot.band],
+          )}
+        >
+          {bandLabel[snapshot.band]}
+        </span>
+      </header>
+
+      <p className="text-base leading-relaxed">{card.stem}</p>
+
+      <div>
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">Your answer</p>
+        {snapshot.dontKnow ? (
+          <p className="text-muted-foreground italic">
+            (Opted out — &ldquo;I don&apos;t know&rdquo;)
+          </p>
+        ) : snapshot.studentAnswer.trim().length > 0 ? (
+          <p className="font-mono">{snapshot.studentAnswer}</p>
+        ) : (
+          <p className="text-muted-foreground italic">(No typed answer)</p>
+        )}
+      </div>
+
+      <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-md border p-4 text-sm leading-relaxed">
+        <div>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">Correct answer</p>
+          <p>{card.correct_answer}</p>
+        </div>
+        {card.elaborative_explanation ? (
+          <div>
+            <p className="text-muted-foreground text-xs tracking-widest uppercase">Why</p>
+            <p>{card.elaborative_explanation}</p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <button
+          type="button"
+          onClick={onPrevious}
+          disabled={viewIndex === 0}
+          className="border-input hover:bg-muted text-foreground rounded-md border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ← Previous
+        </button>
+        <button
+          type="button"
+          onClick={onForward}
+          className="border-input hover:bg-muted text-foreground rounded-md border px-3 py-1.5"
+        >
+          {onLastHistory ? "Back to current →" : "Forward →"}
+        </button>
+      </div>
+    </article>
   );
 }
