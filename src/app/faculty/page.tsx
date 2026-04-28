@@ -81,10 +81,9 @@ export default async function FacultyHubPage() {
         />
         <FacultyCard
           title="Per-student progress"
-          description="Drill into a single student's history — their last activity, weakest mechanisms, and unanswered must-knows. (Phase 2 — coming.)"
-          href="#"
-          cta="Coming soon"
-          disabled
+          description="Drill into a single student — their mechanism-by-mechanism mastery, recent activity, and which topics they're slipping on. The struggler-first sort surfaces who needs your attention."
+          href="/faculty/students"
+          cta="Open students"
         />
       </section>
     </main>

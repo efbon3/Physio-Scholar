@@ -671,6 +671,40 @@ export type Database = {
           unique_learners: number
         }[]
       }
+      student_profile_summary: {
+        Args: { p_institution_id: string; p_student_id: string }
+        Returns: {
+          profile_id: string
+          full_name: string | null
+          nickname: string | null
+          year_of_study: number | null
+          reviews_total: number
+          reviews_last_7d: number
+          retention_pct_30d: number | null
+          last_review_at: string | null
+        }[]
+      }
+      student_card_aggregates: {
+        Args: { p_institution_id: string; p_student_id: string }
+        Returns: {
+          card_id: string
+          reviews_total: number
+          reviews_last_30d: number
+          retention_pct_30d: number | null
+          last_review_at: string | null
+        }[]
+      }
+      student_recent_reviews: {
+        Args: { p_institution_id: string; p_student_id: string; p_limit?: number }
+        Returns: {
+          id: string
+          card_id: string
+          rating: Database["public"]["Enums"]["srs_rating"]
+          hints_used: number
+          time_spent_seconds: number
+          created_at: string
+        }[]
+      }
     }
     Enums: {
       content_flag_status: "open" | "resolved" | "rejected"
