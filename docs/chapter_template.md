@@ -3,12 +3,12 @@
 # Field order is informational; YAML keys can appear in any order.
 
 # id: kebab-case (lowercase, digits, hyphens). Must equal the filename
-# without `.md`. This is the slug, the inter-mechanism reference, and
+# without `.md`. This is the slug, the inter-chapter reference, and
 # the prefix of every card id. Do not change after publishing.
-id: example-mechanism
+id: example-chapter
 
 # title: human-readable, used in the UI everywhere.
-title: Example Mechanism — Replace With Real Title
+title: Example Chapter — Replace With Real Title
 
 # organ_system: one of these eleven exact tokens. Anything else fails
 # validation. Pick the most central system; cross-system topics go
@@ -29,14 +29,14 @@ exam_patterns:
   - mbbs
   - pre-pg
 
-# prerequisites: list of mechanism ids the learner should already have
+# prerequisites: list of chapter ids the learner should already have
 # completed. Empty array is fine for foundational topics.
 prerequisites: []
 
-# related_mechanisms: cross-links shown on the mechanism page. Each
-# entry must be the id of an actual mechanism file that exists today
+# related_chapters: cross-links shown on the chapter page. Each
+# entry must be the id of an actual chapter file that exists today
 # (not a placeholder for future content). Empty array if none.
-related_mechanisms: []
+related_chapters: []
 
 # blooms_distribution: percentages per Bloom's level. All four keys
 # are required and the four values must sum to exactly 100.
@@ -113,7 +113,7 @@ The two-zone redesign introduces three new per-question fields:
   Default when omitted: `published`.
 
 - **ID** — a stable per-question UUID intended to survive renumbering,
-  mechanism file renames, and retire-and-replace flows. Optional during
+  chapter file renames, and retire-and-replace flows. Optional during
   the transition from `{mechanism}:{index}` ids; once the SRS keys
   migrate to UUID this becomes the canonical id. When present, must be
   a valid UUID v4 (e.g. generated via `crypto.randomUUID()` or any

@@ -847,7 +847,7 @@ last_reviewed: 2026-05-15
 Each question declares **Format**, **Status**, and an **ID** (UUID). The
 two-zone redesign expects these on every published question; the
 parser tolerates omissions for backwards-compatibility but CI rejects
-published content that's missing them. See `mechanism_template.md`
+published content that's missing them. See `chapter_template.md`
 and `question_type_templates.md` for the full author-facing shape.
 
 ## Question 1
