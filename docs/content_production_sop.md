@@ -24,6 +24,8 @@ This document defines:
 - How the content workflow scales from single-author pilot to multi-author operation.
 - What gets measured and tracked.
 
+**Canonical curriculum.** Scope decisions reference `docs/syllabus.md` — the master physiology table of contents (11 parts / 64 chapters / 255 sections / 723 sub-topics). Every authored mechanism must map to a section in the syllabus; mechanisms outside the syllabus are not authored for the platform. The syllabus is the long-term curriculum and the catalogue against which "what to author next" decisions are made; v1 is the cardiovascular slice (Part V) shipped to the pilot batch.
+
 ### 1.2 What This SOP Does Not Cover
 
 - Technical implementation of content storage (covered in V1 Build Spec).

@@ -63,7 +63,9 @@ The team structure is: author plus Claude Code for engineering, author alone for
 
 ### 2.2 Content
 
-**Scope:** 10–15 mechanisms covering cardiovascular system fundamentals. Specific mechanisms selected by the author based on pedagogical priority and the batch's curriculum position.
+**Canonical curriculum.** `docs/syllabus.md` is the master physiology table of contents — 11 parts, 64 chapters, 255 sections, 723 sub-topics, drawn from Guyton, Boron, Berne & Levy, Costanzo, Sherwood, Ganong, and the relevant subspecialty volumes (West, Brodal, Knobil & Neill, Johnson). Every mechanism authored for the platform must map to a section of the syllabus; mechanisms outside the syllabus are out of scope. The 14 organ-system tokens in `organSystemSchema` align with the syllabus's Parts (foundations → Part I, excitable tissues → Part II, etc.) so an author can route a syllabus topic to the right `organ_system` tag without ambiguity.
+
+**v1 scope:** 10–15 mechanisms covering cardiovascular system fundamentals (drawn from Part V — *The Cardiovascular System*). The syllabus is the long-term curriculum; v1 is the cardiovascular slice the pilot ships with. Specific mechanisms selected by the author based on pedagogical priority and the batch's curriculum position.
 
 Examples (actual selection by author):
 - Cardiac cycle phases
