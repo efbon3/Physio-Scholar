@@ -18,7 +18,7 @@ export const metadata = {
   title: "Fill in the blank",
 };
 
-type Params = { params: Promise<{ Chapter: string }> };
+type Params = { params: Promise<{ mechanism: string }> };
 type SearchParams = Promise<{ priority?: string | string[]; difficulty?: string | string[] }>;
 
 /** Same graceful posture as the rest of the app: skip Supabase in unconfigured envs. */
@@ -38,14 +38,14 @@ export default async function FillBlankSessionPage({
   params,
   searchParams,
 }: Params & { searchParams: SearchParams }) {
-  const { Chapter: id } = await params;
+  const { mechanism: id } = await params;
   const resolvedSearch = await searchParams;
-  const Chapter = await readChapterById(id);
-  if (!Chapter) notFound();
+  const chapter = await readChapterById(id);
+  if (!chapter) notFound();
 
   const profileId = await getProfileId(`/test/${id}/fill-blank`);
 
-  const allCards = extractCards(Chapter);
+  const allCards = extractCards(chapter);
   const formatCards = filterByFormat(filterPublished(allCards), "fill_blank");
 
   // Apply priority + difficulty filters from URL params (set by the
@@ -68,7 +68,7 @@ export default async function FillBlankSessionPage({
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
       <nav className="text-muted-foreground text-xs">
         <Link
-          href={`/systems/${Chapter.frontmatter.organ_system}/${id}`}
+          href={`/systems/${chapter.frontmatter.organ_system}/${id}`}
           className="underline-offset-2 hover:underline"
         >
           ← Back to chapter
@@ -77,7 +77,7 @@ export default async function FillBlankSessionPage({
       <header className="flex flex-col gap-2">
         <p className="text-muted-foreground text-sm tracking-widest uppercase">Fill in the blank</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
-          {Chapter.frontmatter.title}
+          {chapter.frontmatter.title}
         </h1>
       </header>
 
@@ -90,7 +90,7 @@ export default async function FillBlankSessionPage({
         <FillBlankSession
           cards={cards}
           chapterId={id}
-          mechanismSystem={Chapter.frontmatter.organ_system}
+          mechanismSystem={chapter.frontmatter.organ_system}
           profileId={profileId}
         />
       )}

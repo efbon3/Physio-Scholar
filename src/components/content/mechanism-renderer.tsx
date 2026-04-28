@@ -9,7 +9,7 @@ import { ChapterStats } from "./mechanism-stats";
 import { ChapterTabs, type MechanismTabKey } from "./mechanism-tabs";
 
 type Props = {
-  Chapter: Chapter;
+  chapter: Chapter;
   /**
    * Signed-in learner id. Passed in from the server page (falls back to
    * "preview" in CI / unconfigured previews, same sentinel the review
@@ -30,8 +30,8 @@ type Props = {
  * client component receives the already-rendered ReactNodes as panels
  * and only owns the show/hide state + keyboard interactions.
  */
-export function ChapterRenderer({ Chapter, profileId }: Props) {
-  const { layers, frontmatter } = Chapter;
+export function ChapterRenderer({ chapter, profileId }: Props) {
+  const { layers, frontmatter } = chapter;
 
   const panels: Partial<Record<MechanismTabKey, React.ReactNode>> = {};
   if (layers.core) {
@@ -49,7 +49,7 @@ export function ChapterRenderer({ Chapter, profileId }: Props) {
     );
   }
 
-  const cards = extractCards(Chapter);
+  const cards = extractCards(chapter);
   const cardIds = cards.map((c) => c.id);
   const hasCards = cardIds.length > 0;
 
