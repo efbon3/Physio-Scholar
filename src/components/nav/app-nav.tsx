@@ -13,24 +13,24 @@ import { SyncIndicator } from "./sync-indicator";
  * Global app nav.
  *
  * Two layouts behind the same data:
- *   - md: and up — horizontal tab strip across the top, the way it
- *     used to be. The screen is wide enough for ten-ish links.
- *   - below md: — hamburger button toggles a left-side vertical
- *     drawer. The horizontal tab list collapses out of the bar so a
- *     phone screen doesn't wrap into multiple lines of pill buttons.
+ *   - md: and up — permanent left sidebar with a vertical link list.
+ *     Same shape as the smartphone drawer, just always on screen.
+ *   - below md: — slim top bar with a hamburger button. Tapping it
+ *     opens the same vertical link list as a drawer overlay.
+ *
+ * The desktop sidebar and the mobile drawer share the same
+ * `<NavList>` rendering so adding / removing tabs only needs one
+ * source of truth.
  *
  * The drawer auto-closes when the path changes (link tap) or when the
  * backdrop / Escape is hit. Body scroll is locked while it's open so
  * the page underneath doesn't drift behind the overlay.
  */
 
-// "Dashboard" intentionally not listed — it's the / and /today landing
-// surface, the brand link in the header already takes the user back
-// there, so a separate tab would just be a duplicate. The two-zone
-// redesign retired Topics / Facts / Values / Self-test / Exam as
-// standalone surfaces; the equivalent affordances now live on the
-// per-mechanism page (format-picker for tests, layer tabs for facts
-// + values content, daily SRS queue via Review).
+// Two-zone redesign retired Topics / Facts / Values / Self-test / Exam
+// as standalone surfaces; per-mechanism format-picker covers the test
+// affordances and Review handles the daily SRS queue. "Dashboard" is
+// the brand link.
 const TABS = [
   { label: "Systems", href: "/systems" },
   { label: "Review", href: "/review" },
@@ -76,94 +76,67 @@ export function AppNav({ profileId }: { profileId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
 
-  // Tabs split for the desktop layout: primary tabs in the center
-  // group, account tabs (Profile / Settings) flush to the right. On
-  // mobile the drawer renders all of them as one vertical list.
-  const primaryTabs = TABS.filter((t) => t.href !== "/profile" && t.href !== "/settings");
-  const accountTabs = TABS.filter((t) => t.href === "/profile" || t.href === "/settings");
-
   return (
     <>
+      {/* Mobile-only top bar — hamburger + brand + sync indicator. */}
       <nav
         aria-label="App sections"
-        className="border-border bg-background sticky top-0 z-10 border-b"
+        className="border-border bg-background sticky top-0 z-10 flex items-center gap-2 border-b px-4 py-2 md:hidden"
       >
-        <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-4 py-2">
-          {/* Mobile-only hamburger */}
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open navigation"
-            aria-expanded={drawerOpen}
-            aria-controls="app-nav-drawer"
-            className="hover:bg-muted rounded-md p-2 md:hidden"
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open navigation"
+          aria-expanded={drawerOpen}
+          aria-controls="app-nav-drawer"
+          className="hover:bg-muted rounded-md p-2"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5"
+            aria-hidden
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-5 w-5"
-              aria-hidden
-            >
-              <line x1="4" y1="6" x2="20" y2="6" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="18" x2="20" y2="18" />
-            </svg>
-          </button>
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="20" y2="18" />
+          </svg>
+        </button>
+        <Link href="/" className="mr-auto text-sm font-medium tracking-tight hover:underline">
+          Physio-Scholar
+        </Link>
+        <SyncIndicator profileId={profileId} />
+      </nav>
 
-          <Link href="/" className="mr-auto text-sm font-medium tracking-tight hover:underline">
+      {/* Desktop permanent left sidebar — same vertical layout as the
+          mobile drawer, just always rendered. */}
+      <aside
+        aria-label="App sections"
+        className="bg-background border-border sticky top-0 hidden h-screen w-56 shrink-0 flex-col gap-1 border-r p-4 md:flex"
+      >
+        <header className="mb-2 flex items-center justify-between">
+          <Link href="/" className="text-sm font-medium tracking-tight hover:underline">
             Physio-Scholar
           </Link>
-
-          {/* Desktop horizontal tabs (hidden on mobile) */}
-          <ul className="hidden items-center gap-1 md:flex">
-            {primaryTabs.map((t) => {
-              const active = matches(pathname, t.href);
-              return (
-                <li key={t.href}>
-                  <Link
-                    href={t.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-sm transition-colors",
-                      active ? "bg-secondary text-secondary-foreground" : "hover:bg-muted",
-                    )}
-                  >
-                    {t.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-
-          {/* Right cluster — sync indicator always visible; account tabs
-              and sign-out only on desktop (drawer covers them on mobile). */}
           <SyncIndicator profileId={profileId} />
-          <div className="hidden items-center gap-1 md:flex">
-            {accountTabs.map((t) => {
-              const active = matches(pathname, t.href);
-              return (
-                <Link
-                  key={t.href}
-                  href={t.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm transition-colors",
-                    active ? "bg-secondary text-secondary-foreground" : "hover:bg-muted",
-                  )}
-                >
-                  {t.label}
-                </Link>
-              );
-            })}
-            <SignOutButton />
-          </div>
+        </header>
+
+        <NavList
+          tabs={TABS}
+          pathname={pathname}
+          onLinkClick={undefined}
+          activeBgClass="bg-secondary text-secondary-foreground font-medium"
+        />
+
+        <div className="border-border mt-auto border-t pt-3">
+          <SignOutButton />
         </div>
-      </nav>
+      </aside>
 
       {/* Mobile drawer overlay */}
       {drawerOpen ? (
@@ -209,28 +182,12 @@ export function AppNav({ profileId }: { profileId: string }) {
               </button>
             </header>
 
-            <ul className="flex flex-col gap-0.5">
-              {TABS.map((t) => {
-                const active = matches(pathname, t.href);
-                return (
-                  <li key={t.href}>
-                    <Link
-                      href={t.href}
-                      aria-current={active ? "page" : undefined}
-                      onClick={closeDrawer}
-                      className={cn(
-                        "block rounded-md px-3 py-2.5 text-sm transition-colors",
-                        active
-                          ? "bg-secondary text-secondary-foreground font-medium"
-                          : "hover:bg-muted",
-                      )}
-                    >
-                      {t.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <NavList
+              tabs={TABS}
+              pathname={pathname}
+              onLinkClick={closeDrawer}
+              activeBgClass="bg-secondary text-secondary-foreground font-medium"
+            />
 
             <div className="border-border mt-auto border-t pt-3">
               <SignOutButton />
@@ -239,5 +196,45 @@ export function AppNav({ profileId }: { profileId: string }) {
         </div>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Shared vertical link list used by both the desktop sidebar and the
+ * mobile drawer. Single source of truth for the active-state styling
+ * so a tab change touches one place.
+ */
+function NavList({
+  tabs,
+  pathname,
+  onLinkClick,
+  activeBgClass,
+}: {
+  tabs: ReadonlyArray<{ label: string; href: string }>;
+  pathname: string;
+  onLinkClick: (() => void) | undefined;
+  activeBgClass: string;
+}) {
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {tabs.map((t) => {
+        const active = matches(pathname, t.href);
+        return (
+          <li key={t.href}>
+            <Link
+              href={t.href}
+              aria-current={active ? "page" : undefined}
+              onClick={onLinkClick}
+              className={cn(
+                "block rounded-md px-3 py-2.5 text-sm transition-colors",
+                active ? activeBgClass : "hover:bg-muted",
+              )}
+            >
+              {t.label}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

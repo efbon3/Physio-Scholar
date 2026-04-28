@@ -38,10 +38,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // bypass; CI / preview envs without Supabase env vars also bypass.
   await requireApprovedUser();
   const profileId = await resolveProfileId();
+  // Mobile (<md) stacks vertically: AppNav renders a top bar and the
+  // page content sits below. Desktop (md+) splits horizontally:
+  // AppNav becomes a permanent left sidebar and the page fills the
+  // rest of the row.
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <AppNav profileId={profileId} />
-      <div className="flex-1">{children}</div>
+      <div className="min-w-0 flex-1">{children}</div>
       <InstallPrompt />
       <Watermark userId={profileId === "preview" ? null : profileId} />
     </div>
