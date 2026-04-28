@@ -21,14 +21,35 @@ import { createClient } from "@/lib/supabase/server";
  * (CI / unconfigured previews) we fall back to the "preview" sentinel
  * which disables the indicator gracefully.
  */
-async function resolveProfileId(): Promise<string> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return "preview";
+type ResolvedIdentity = {
+  profileId: string;
+  isAdmin: boolean;
+  isFaculty: boolean;
+};
+
+async function resolveIdentity(): Promise<ResolvedIdentity> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { profileId: "preview", isAdmin: false, isFaculty: false };
+  }
   try {
     const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    return data.user?.id ?? "preview";
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      return { profileId: "preview", isAdmin: false, isFaculty: false };
+    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_admin, is_faculty")
+      .eq("id", userId)
+      .single();
+    return {
+      profileId: userId,
+      isAdmin: profile?.is_admin === true,
+      isFaculty: profile?.is_faculty === true,
+    };
   } catch {
-    return "preview";
+    return { profileId: "preview", isAdmin: false, isFaculty: false };
   }
 }
 
@@ -37,14 +58,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // /pending-approval before any learner surface renders. Admins
   // bypass; CI / preview envs without Supabase env vars also bypass.
   await requireApprovedUser();
-  const profileId = await resolveProfileId();
+  const { profileId, isAdmin, isFaculty } = await resolveIdentity();
   // Mobile (<md) stacks vertically: AppNav renders a top bar and the
   // page content sits below. Desktop (md+) splits horizontally:
   // AppNav becomes a permanent left sidebar and the page fills the
   // rest of the row.
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <AppNav profileId={profileId} />
+      <AppNav profileId={profileId} isAdmin={isAdmin} isFaculty={isFaculty} />
       <div className="min-w-0 flex-1">{children}</div>
       <InstallPrompt />
       <Watermark userId={profileId === "preview" ? null : profileId} />

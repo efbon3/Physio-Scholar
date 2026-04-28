@@ -31,7 +31,7 @@ import { SyncIndicator } from "./sync-indicator";
 // as standalone surfaces; per-mechanism format-picker covers the test
 // affordances and Review handles the daily SRS queue. "Dashboard" is
 // the brand link.
-const TABS = [
+const STUDENT_TABS = [
   { label: "Systems", href: "/systems" },
   { label: "Review", href: "/review" },
   { label: "Calendar", href: "/calendar" },
@@ -40,11 +40,27 @@ const TABS = [
   { label: "Settings", href: "/settings" },
 ] as const;
 
+// Faculty / admin tabs render below a divider in the sidebar so the
+// elevated affordances are visibly distinct from the everyday learner
+// surfaces. A faculty profile (is_faculty = true) sees the Faculty
+// tab; an admin profile (is_admin = true) sees the Admin tab; a
+// faculty-and-admin combo sees both. Plain students see neither.
+const FACULTY_TAB = { label: "Faculty", href: "/faculty" } as const;
+const ADMIN_TAB = { label: "Admin", href: "/admin" } as const;
+
 function matches(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppNav({ profileId }: { profileId: string }) {
+export function AppNav({
+  profileId,
+  isAdmin = false,
+  isFaculty = false,
+}: {
+  profileId: string;
+  isAdmin?: boolean;
+  isFaculty?: boolean;
+}) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -75,6 +91,11 @@ export function AppNav({ profileId }: { profileId: string }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
+
+  // Elevated tabs surface only when the caller has the matching
+  // role flag. Empty array on plain student profiles → NavList skips
+  // the divider rendering entirely.
+  const elevatedTabs = [...(isFaculty ? [FACULTY_TAB] : []), ...(isAdmin ? [ADMIN_TAB] : [])];
 
   return (
     <>
@@ -127,7 +148,8 @@ export function AppNav({ profileId }: { profileId: string }) {
         </header>
 
         <NavList
-          tabs={TABS}
+          tabs={STUDENT_TABS}
+          elevatedTabs={elevatedTabs}
           pathname={pathname}
           onLinkClick={undefined}
           activeBgClass="bg-secondary text-secondary-foreground font-medium"
@@ -183,7 +205,8 @@ export function AppNav({ profileId }: { profileId: string }) {
             </header>
 
             <NavList
-              tabs={TABS}
+              tabs={STUDENT_TABS}
+              elevatedTabs={elevatedTabs}
               pathname={pathname}
               onLinkClick={closeDrawer}
               activeBgClass="bg-secondary text-secondary-foreground font-medium"
@@ -203,38 +226,85 @@ export function AppNav({ profileId }: { profileId: string }) {
  * Shared vertical link list used by both the desktop sidebar and the
  * mobile drawer. Single source of truth for the active-state styling
  * so a tab change touches one place.
+ *
+ * `elevatedTabs` (faculty + admin) render in their own list below a
+ * thin divider so the role-gated affordances are visibly separate
+ * from the everyday learner tabs. The list is empty for plain
+ * students, in which case the divider is omitted entirely.
  */
 function NavList({
   tabs,
+  elevatedTabs = [],
   pathname,
   onLinkClick,
   activeBgClass,
 }: {
   tabs: ReadonlyArray<{ label: string; href: string }>;
+  elevatedTabs?: ReadonlyArray<{ label: string; href: string }>;
   pathname: string;
   onLinkClick: (() => void) | undefined;
   activeBgClass: string;
 }) {
   return (
-    <ul className="flex flex-col gap-0.5">
-      {tabs.map((t) => {
-        const active = matches(pathname, t.href);
-        return (
-          <li key={t.href}>
-            <Link
-              href={t.href}
-              aria-current={active ? "page" : undefined}
-              onClick={onLinkClick}
-              className={cn(
-                "block rounded-md px-3 py-2.5 text-sm transition-colors",
-                active ? activeBgClass : "hover:bg-muted",
-              )}
-            >
-              {t.label}
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <ul className="flex flex-col gap-0.5">
+        {tabs.map((t) => (
+          <NavLinkItem
+            key={t.href}
+            tab={t}
+            active={matches(pathname, t.href)}
+            onLinkClick={onLinkClick}
+            activeBgClass={activeBgClass}
+          />
+        ))}
+      </ul>
+      {elevatedTabs.length > 0 ? (
+        <>
+          <div className="border-border my-2 border-t" aria-hidden />
+          <p className="text-muted-foreground px-3 pb-1 text-[11px] tracking-widest uppercase">
+            Staff
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            {elevatedTabs.map((t) => (
+              <NavLinkItem
+                key={t.href}
+                tab={t}
+                active={matches(pathname, t.href)}
+                onLinkClick={onLinkClick}
+                activeBgClass={activeBgClass}
+              />
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function NavLinkItem({
+  tab,
+  active,
+  onLinkClick,
+  activeBgClass,
+}: {
+  tab: { label: string; href: string };
+  active: boolean;
+  onLinkClick: (() => void) | undefined;
+  activeBgClass: string;
+}) {
+  return (
+    <li>
+      <Link
+        href={tab.href}
+        aria-current={active ? "page" : undefined}
+        onClick={onLinkClick}
+        className={cn(
+          "block rounded-md px-3 py-2.5 text-sm transition-colors",
+          active ? activeBgClass : "hover:bg-muted",
+        )}
+      >
+        {tab.label}
+      </Link>
+    </li>
   );
 }
