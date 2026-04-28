@@ -31,21 +31,21 @@ Priority (M / S / G): s
 
 Stem: Which physiologist coined the term "homeostasis" to describe the maintenance of nearly constant conditions in the internal environment?
 
-Correct answer: Walter Cannon (in 1929).
+Correct answer: Walter Cannon (in 1926).
 
 Distractors:
 
-- "Claude Bernard" — Reveals misconception: student conflates Bernard's _milieu intérieur_ concept (introduced in the 19th century) with the term homeostasis itself. Correction: Bernard introduced the concept of an internal environment (_milieu intérieur_), but Cannon coined the word "homeostasis" later, in 1929 [Guyton ch.1].
+- "Claude Bernard" — Reveals misconception: student conflates Bernard's _milieu intérieur_ concept (introduced in the 19th century) with the term homeostasis itself. Correction: Bernard introduced the concept of an internal environment (_milieu intérieur_), but Cannon coined the word "homeostasis" later, in 1926 [Guyton ch.1].
 - "Andreas Vesalius" — Plausible but does not reveal a specific misconception (Vesalius is associated with anatomy rather than physiology).
 - "William Harvey" — Reveals misconception: student associates any historical physiology figure with the central concept of homeostasis. Correction: Harvey discovered the systemic circulation in the 17th century; he had no role in framing homeostasis.
 
-Explanation: Walter Cannon, an American physiologist, introduced the term "homeostasis" in 1929 to describe the maintenance of nearly constant conditions in the body's internal environment [Guyton ch.1]. The concept itself — that cells require a constant fluid environment for life — was first articulated by Claude Bernard as the _milieu intérieur_. Cannon's contribution was naming and formalising the regulatory framework that keeps that internal environment within narrow limits [Guyton ch.1; Sherwood ch.1].
+Explanation: Walter Cannon, an American physiologist, introduced the term "homeostasis" in 1926 to describe the maintenance of nearly constant conditions in the body's internal environment [Guyton ch.1]. The concept itself — that cells require a constant fluid environment for life — was first articulated by Claude Bernard as the _milieu intérieur_. Cannon's contribution was naming and formalising the regulatory framework that keeps that internal environment within narrow limits [Guyton ch.1; Sherwood ch.1].
 
 Hints:
 
 1. The term was introduced in the 20th century, after the underlying concept of an "internal environment" had already been articulated.
 2. The physiologist worked in the United States in the early 1900s.
-3. He coined the term in a paper published in 1929.
+3. He coined the term in a paper published in 1926.
 
 ---
 
