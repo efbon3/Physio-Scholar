@@ -324,7 +324,14 @@ function transformMcqBlock(block: string, number: string): string {
   const explanation = extractMultilineField(block, "Explanation");
   const distractors = extractListField(block, "Distractors");
   const hints = extractListField(block, "Hints");
+  // Optional Pre-PG metadata. Authored on past-exam MCQs as
+  // `**Year:** 2018` and `**Exam:** NEET-PG`. Pass through to
+  // cards.ts which lands them on the Card schema as optional fields.
+  const year = extractLineField(block, "Year");
+  const exam = extractLineField(block, "Exam");
 
+  if (year) lines.push(`**Year:** ${year}`);
+  if (exam) lines.push(`**Exam:** ${exam}`);
   if (stem) lines.push(`**Stem:** ${stem}`);
   if (correct) lines.push(`**Correct answer:** ${correct}`);
   if (explanation) lines.push(`**Elaborative explanation:** ${explanation}`);
@@ -534,7 +541,7 @@ function extractMultilineField(block: string, label: string): string | null {
   // line break. Use `(?![\s\S])` instead — a negative lookahead for
   // any character, true only at the end of input.
   const re = new RegExp(
-    `^${escaped}:\\s*([\\s\\S]+?)(?=\\n\\s*(?:Type|Bloom's level|Bloom's Level|Stem|Correct answer|Canonical answer|Accepted variants|Tolerance|Yellow conditions|Distractors|Model answer|Elaborative explanation|Self-grading checklist|Common misconceptions|Explanation|Hints):|(?![\\s\\S]))`,
+    `^${escaped}:\\s*([\\s\\S]+?)(?=\\n\\s*(?:Type|Bloom's level|Bloom's Level|Stem|Correct answer|Canonical answer|Accepted variants|Tolerance|Yellow conditions|Distractors|Model answer|Elaborative explanation|Self-grading checklist|Common misconceptions|Explanation|Hints|Year|Exam):|(?![\\s\\S]))`,
     "im",
   );
   const m = block.match(re);

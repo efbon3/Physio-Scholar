@@ -34,6 +34,7 @@ import { SyncIndicator } from "./sync-indicator";
 const STUDENT_TABS = [
   { label: "Assessment", href: "/systems" },
   { label: "Review", href: "/review" },
+  { label: "Pre-PG", href: "/prepg" },
   { label: "Calendar", href: "/calendar" },
   { label: "Progress", href: "/progress" },
   { label: "Profile", href: "/profile" },

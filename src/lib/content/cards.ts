@@ -163,6 +163,20 @@ export const cardSchema = z.object({
    * `### Common Misconceptions` subsection treatment as the checklist.
    */
   common_misconceptions: z.string().min(1).optional(),
+  /**
+   * Pre-PG only: the year the question was asked in the original past
+   * exam (e.g. 2018). Stored as an integer when authored as `**Year:**
+   * 2018`. Optional informational metadata — does not affect SRS or
+   * grading. Surfaces alongside the question stem in the Pre-PG drill
+   * UI so a learner can see "this is a NEET-PG 2018 question."
+   */
+  year: z.number().int().min(1900).max(2200).optional(),
+  /**
+   * Pre-PG only: the exam the question was sourced from (e.g.
+   * "NEET-PG", "INI-CET", "AIIMS"). Free-form string authored as
+   * `**Exam:** NEET-PG`. Surfaced alongside `year` in the Pre-PG UI.
+   */
+  exam: z.string().min(1).optional(),
 });
 export type Card = z.infer<typeof cardSchema>;
 
@@ -231,7 +245,22 @@ function parseCardBody(
     tolerance_pct: parseTolerance(extractLabeledField(body, "Tolerance")),
     self_grading_checklist: extractSelfGradingChecklist(body),
     common_misconceptions: extractCommonMisconceptions(body),
+    year: parseYear(extractLabeledField(body, "Year")),
+    exam: extractLabeledField(body, "Exam") ?? undefined,
   };
+}
+
+/**
+ * Coerce a `**Year:**` value to a 4-digit integer. Returns undefined
+ * when the field is missing or unparseable so the optional schema
+ * field stays out rather than holding NaN.
+ */
+function parseYear(raw: string | null): number | undefined {
+  if (!raw) return undefined;
+  const m = raw.match(/\d{4}/);
+  if (!m) return undefined;
+  const n = Number.parseInt(m[0], 10);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 function extractSelfGradingChecklist(body: string): string | undefined {
