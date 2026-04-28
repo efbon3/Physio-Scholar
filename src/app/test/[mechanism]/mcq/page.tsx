@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { extractCards } from "@/lib/content/cards";
 import { filterByFormat, filterPublished } from "@/lib/content/card-filters";
-import { buildMcqFromCard, type McqQuestion } from "@/lib/content/exam";
+import { buildMcqFromCard, seedFromString, type McqQuestion } from "@/lib/content/exam";
 import { readMechanismById } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
@@ -39,13 +39,12 @@ export default async function McqSessionPage({ params }: Params) {
 
   // Build MCQs server-side so the client component receives the
   // already-shuffled options. Time + crypto entropy keeps the order
-  // deterministic per request but different across page loads — same
-  // pattern the existing /exam/session uses.
+  // deterministic per request but different across page loads.
   // eslint-disable-next-line react-hooks/purity
   const sessionSalt = `${Date.now()}-${crypto.randomUUID()}`;
   const questions: McqQuestion[] = [];
   for (const card of cards) {
-    const q = buildMcqFromCard(card, hashString(`${card.id}:${sessionSalt}`));
+    const q = buildMcqFromCard(card, seedFromString(`${card.id}:${sessionSalt}`));
     if (q) questions.push(q);
   }
 
@@ -84,13 +83,4 @@ export default async function McqSessionPage({ params }: Params) {
       )}
     </main>
   );
-}
-
-function hashString(input: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
 }

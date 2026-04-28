@@ -22,22 +22,6 @@ export type MechanismLayers = {
   deepDive?: string;
   clinicalIntegration?: string;
   questions?: string;
-  /**
-   * Optional `# Facts` section — short factual recall items grouped
-   * by category (definitions, normal values, functions, etc). Parsed
-   * by extractFacts() in src/lib/content/facts.ts. Independent of
-   * `# Questions`; mechanisms can have one, the other, both, or neither.
-   */
-  facts?: string;
-  /**
-   * Optional `# Values` section — numeric quantity recall items
-   * (cardiac output, stroke volume, ranges, etc). Parsed by
-   * extractValues() in src/lib/content/values.ts. Authored separately
-   * from `# Facts` even though there's overlap with the
-   * "normal-value" fact category — values are a dedicated module
-   * surfaced at /values for focused numeric drill.
-   */
-  values?: string;
   sources?: string;
 };
 
@@ -85,8 +69,6 @@ const LAYER_HEADINGS = {
     "i",
   ),
   questions: /^#\s+Questions\s*$/i,
-  facts: /^#\s+Facts\s*$/i,
-  values: /^#\s+Values\s*$/i,
   sources: /^#\s+Sources\s*$/i,
 } as const;
 

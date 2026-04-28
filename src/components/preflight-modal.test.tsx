@@ -133,11 +133,11 @@ describe("PreflightModal", () => {
         kind="Review session"
         questionCount={3}
         estimatedMinutes={5}
-        cancelHref="/exam"
+        cancelHref="/systems"
         onAccept={() => {}}
       />,
     );
-    expect(screen.getByTestId("preflight-cancel")).toHaveAttribute("href", "/exam");
+    expect(screen.getByTestId("preflight-cancel")).toHaveAttribute("href", "/systems");
   });
 
   it("opens via showModal when open transitions to true", () => {

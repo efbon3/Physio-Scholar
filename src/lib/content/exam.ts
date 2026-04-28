@@ -1,20 +1,19 @@
 import type { Card } from "./cards";
 
 /**
- * Exam-mode helpers.
+ * MCQ-assembly helpers used by the mechanism-page MCQ session
+ * (`/test/[mechanism]/mcq`).
  *
- * The question bank is the same `Card[]` the review loop consumes;
- * exam mode just adds two things on top:
+ * Pure and deterministic given a seed. The /exam timed-drill route
+ * that originally drove this module was retired in the two-zone
+ * redesign; the session-assembly utilities (`assembleExamSession`,
+ * `filterByExamPattern`, `EXAM_PATTERNS`) went with it. What remains
+ * is the per-card `Card` → MCQ transform plus the Fisher-Yates
+ * shuffle infrastructure the new MCQ session uses to randomise
+ * option order without pulling in a non-deterministic RNG.
  *
- *   1. A filter by `exam_patterns` (cards authored as `mbbs` vs `pre-pg`).
- *   2. A transform from Card → MCQ with four options, where the wrong
- *      answers come from the card's `misconceptions` array. Cards
- *      without at least one misconception can't become MCQs and are
- *      skipped.
- *
- * Everything here is pure and deterministic (given a seed), so it's
- * unit-testable without jsdom and reproducible across a student's
- * retake of the same exam session.
+ * Filename kept (`exam.ts`) only to avoid churning every import in
+ * the existing test fixture set; conceptually this is "MCQ assembly".
  */
 
 export type McqOption = {
@@ -34,42 +33,11 @@ export type McqQuestion = {
   elaborativeExplanation: string;
 };
 
-export type ExamPattern = "mbbs" | "pre-pg";
-
-export const EXAM_PATTERNS: ReadonlyArray<{ key: ExamPattern; label: string }> = [
-  { key: "mbbs", label: "MBBS Exams" },
-  { key: "pre-pg", label: "Pre-PG (NEET-PG / INI-CET)" },
-];
-
-/**
- * Synonyms accepted for each canonical bucket. Older / historically-
- * authored content used `neet-pg`, `ini-cet`, `fmge`, `usmle` for
- * pre-PG and `university` / `mbbs-exam` for undergraduate; keeping
- * those as aliases means existing files continue to flow through the
- * filter without a content migration.
- *
- * Canonical values for new content are the keys of EXAM_PATTERNS
- * above (`mbbs` / `pre-pg`); aliases are only a backwards-compat
- * layer. The CMS starter template should use the canonical values.
- */
-const PATTERN_ALIASES: Record<ExamPattern, ReadonlyArray<string>> = {
-  mbbs: ["mbbs", "university", "mbbs-exam", "final-mbbs", "ug"],
-  "pre-pg": ["pre-pg", "prepg", "neet-pg", "ini-cet", "fmge", "usmle"],
-};
-
-function tokenMatchesPattern(token: string, pattern: ExamPattern): boolean {
-  return PATTERN_ALIASES[pattern].includes(token);
-}
-
-/** Filter a deck to cards tagged for the requested exam pattern. */
-export function filterByExamPattern(cards: readonly Card[], pattern: ExamPattern): Card[] {
-  return cards.filter((c) => c.exam_patterns.some((token) => tokenMatchesPattern(token, pattern)));
-}
-
 /**
  * A card can be rendered as a 4-option MCQ only if we have at least
- * one misconception to use as a distractor. Zero misconceptions → skip
- * for exam mode; those cards still work in regular review.
+ * one misconception to use as a distractor. Zero misconceptions →
+ * skip; those cards still work in descriptive / fill-blank formats
+ * but won't appear in an MCQ session.
  */
 export function canRenderAsMcq(card: Card): boolean {
   return card.misconceptions.length >= 1;
@@ -77,9 +45,9 @@ export function canRenderAsMcq(card: Card): boolean {
 
 /**
  * Deterministic mulberry32 PRNG — seeded from the card id so the same
- * student retaking the same exam gets the same shuffle, but different
- * cards get different shuffles. Works without a Math.random dependency,
- * which makes the transform testable.
+ * student retaking the same session gets the same shuffle, but
+ * different cards get different shuffles. Works without a Math.random
+ * dependency, which makes the transform testable.
  */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -132,47 +100,4 @@ export function buildMcqFromCard(card: Card, seed: number): McqQuestion | null {
     options,
     elaborativeExplanation: card.elaborative_explanation,
   };
-}
-
-/**
- * Build an exam session: filter by pattern, drop cards that can't be
- * rendered as MCQs, deterministically shuffle, slice to `count`.
- *
- * The `sessionSalt` argument lets the /exam/session page mix in a
- * per-load value so a student who retakes a 20-question drill gets a
- * different subset (not the same 20 cards they saw last time). Default
- * is an empty string — tests use fixed salts to verify determinism.
- */
-export function assembleExamSession({
-  cards,
-  pattern,
-  count,
-  sessionSalt = "",
-}: {
-  cards: readonly Card[];
-  pattern: ExamPattern;
-  count: number;
-  sessionSalt?: string;
-}): McqQuestion[] {
-  // Retired questions stay in markdown for audit history but are never
-  // surfaced in a live test session — see content_production_sop.md
-  // §6.3.
-  const live = cards.filter((c) => c.status === "published");
-  const eligible = filterByExamPattern(live, pattern).filter(canRenderAsMcq);
-  if (eligible.length === 0) return [];
-
-  const deck = [...eligible];
-  const rng = mulberry32(seedFromString(`session:${pattern}:${sessionSalt}`));
-  for (let i = deck.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-
-  const slice = deck.slice(0, Math.max(1, count));
-  const questions: McqQuestion[] = [];
-  for (const card of slice) {
-    const q = buildMcqFromCard(card, seedFromString(`${card.id}:${sessionSalt}`));
-    if (q) questions.push(q);
-  }
-  return questions;
 }
