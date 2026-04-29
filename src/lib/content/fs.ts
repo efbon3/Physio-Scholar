@@ -148,5 +148,10 @@ function mergeOneGroup(group: readonly Chapter[]): Chapter {
     frontmatter: primary.frontmatter,
     body: mergedBody,
     layers: splitLayers(mergedBody),
+    // Take the primary's topics (the unsuffixed MCQ file's `## Pass`
+    // groupings). Fillblank / descriptive variants have their own pass
+    // groupings that describe question shape rather than chapter
+    // content, so they're discarded during merge.
+    topics: primary.topics,
   };
 }

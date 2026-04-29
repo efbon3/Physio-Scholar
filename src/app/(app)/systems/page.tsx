@@ -7,9 +7,15 @@ export const metadata = {
   title: "Assessment",
 };
 
+type ChapterRow = {
+  id: string;
+  title: string;
+  topics: { title: string; questionCount: number }[];
+};
+
 type SystemGroup = {
   system: string;
-  mechanisms: { id: string; title: string }[];
+  mechanisms: ChapterRow[];
 };
 
 export default async function SystemsPage() {
@@ -23,6 +29,7 @@ export default async function SystemsPage() {
     grouped.get(key)!.mechanisms.push({
       id: m.frontmatter.id,
       title: m.frontmatter.title,
+      topics: m.topics ?? [],
     });
   }
   const groups = [...grouped.values()].sort((a, b) => a.system.localeCompare(b.system));
@@ -46,17 +53,24 @@ export default async function SystemsPage() {
           {groups.map((g) => (
             <li key={g.system} className="flex flex-col gap-3">
               <h2 className="font-heading text-xl font-medium capitalize">{g.system}</h2>
-              <ul className="flex flex-col gap-1">
+              <ul className="flex flex-col gap-4">
                 {g.mechanisms
                   .sort((a, b) => a.title.localeCompare(b.title))
                   .map((m) => (
-                    <li key={m.id}>
+                    <li key={m.id} className="flex flex-col gap-1">
                       <Link
-                        className="underline underline-offset-2"
+                        className="font-medium hover:underline"
                         href={`/systems/${g.system}/${m.id}`}
                       >
                         {m.title}
                       </Link>
+                      {m.topics.length > 0 ? (
+                        <ul className="text-muted-foreground ml-4 list-disc text-sm">
+                          {m.topics.map((t) => (
+                            <li key={t.title}>{t.title}</li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </li>
                   ))}
               </ul>
