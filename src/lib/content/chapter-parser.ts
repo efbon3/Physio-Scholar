@@ -106,18 +106,6 @@ const authorChapterFrontmatterSchema = z.object({
 export type AuthorChapterFrontmatter = z.infer<typeof authorChapterFrontmatterSchema>;
 
 /**
- * One topic group inside a chapter — derived from the `## Pass N — TITLE`
- * headings the author writes to organise questions thematically. The
- * `title` is what comes after "Pass N — " in the heading; the
- * `questionCount` is how many `QUESTION` blocks fall under that pass
- * before the next pass heading starts.
- */
-export type AuthorChapterTopic = {
-  title: string;
-  questionCount: number;
-};
-
-/**
  * Detect chapter-format frontmatter. Heuristic: has `chapter` and
  * `part` keys, and no `id` (id presence is the signal for the
  * canonical Chapter format).
@@ -145,12 +133,11 @@ export function parseAuthorChapter(
   data: unknown,
   body: string,
   filenameHint?: string,
-): { frontmatter: ChapterFrontmatter; body: string; topics: AuthorChapterTopic[] } {
+): { frontmatter: ChapterFrontmatter; body: string } {
   const cf = authorChapterFrontmatterSchema.parse(data);
   const id = pickId(filenameHint, cf.chapter);
   const organ_system = mapPartToOrganSystem(cf.part);
   const transformedBody = transformBody(body);
-  const topics = extractAuthorChapterTopics(body);
 
   const frontmatter: ChapterFrontmatter = chapterFrontmatterSchema.parse({
     id,
@@ -169,49 +156,7 @@ export function parseAuthorChapter(
     last_reviewed: new Date(),
   });
 
-  return { frontmatter, body: transformedBody, topics };
-}
-
-/**
- * Walk the chapter body and return one `AuthorChapterTopic` per
- * `## Pass N — TITLE` heading, in the order they appear. The order
- * matters because the first time a learner sees the chapter list,
- * passes correspond to the author's pedagogical sequence (e.g. "the
- * internal environment" before "feedback architecture" before "failure
- * modes"). Returns an empty array when the body has no pass headings —
- * canonical Chapter format files fall through to that case.
- */
-export function extractAuthorChapterTopics(raw: string): AuthorChapterTopic[] {
-  const normalised = raw.replace(/^﻿/, "").replace(/\r\n/g, "\n");
-  const stripped = stripFinalSummary(normalised);
-  const blocks = stripped.split(/\n-{3,}\n/);
-
-  const order: string[] = [];
-  const counts = new Map<string, number>();
-  let current: string | null = null;
-
-  for (const block of blocks) {
-    const trimmed = block.trim();
-    if (trimmed.length === 0) continue;
-
-    const passMatch = trimmed.match(/^##\s+Pass\s+\d+\s*[—–-]\s*(.+?)\s*$/m);
-    if (passMatch) {
-      const title = passMatch[1].trim();
-      if (title.length > 0) {
-        current = title;
-        if (!counts.has(title)) {
-          counts.set(title, 0);
-          order.push(title);
-        }
-      }
-    }
-
-    if (current !== null && /^QUESTION\s+\d+\s*$/im.test(trimmed)) {
-      counts.set(current, (counts.get(current) ?? 0) + 1);
-    }
-  }
-
-  return order.map((title) => ({ title, questionCount: counts.get(title) ?? 0 }));
+  return { frontmatter, body: transformedBody };
 }
 
 /**

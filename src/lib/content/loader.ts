@@ -1,10 +1,6 @@
 import matter from "gray-matter";
 
-import {
-  parseAuthorChapter,
-  isAuthorChapterFrontmatter,
-  type AuthorChapterTopic,
-} from "./chapter-parser";
+import { parseAuthorChapter, isAuthorChapterFrontmatter } from "./chapter-parser";
 import { chapterFrontmatterSchema, type ChapterFrontmatter } from "./schema";
 
 /**
@@ -30,20 +26,10 @@ export type ChapterLayers = {
   sources?: string;
 };
 
-/**
- * Topic group inside a chapter — one per `## Pass N — TITLE` heading
- * the author wrote. Surfaced on the Assessment list page so learners
- * can see at a glance what each chapter covers without having to open
- * it. Undefined for canonical Chapter format files (which don't carry
- * pass groupings).
- */
-export type ChapterTopic = AuthorChapterTopic;
-
 export type Chapter = {
   frontmatter: ChapterFrontmatter;
   body: string;
   layers: ChapterLayers;
-  topics?: ChapterTopic[];
 };
 
 /**
@@ -85,7 +71,6 @@ export function parseChapter(raw: string, filenameHint?: string): Chapter {
       frontmatter: transformed.frontmatter,
       body: transformed.body,
       layers: splitLayers(transformed.body),
-      topics: transformed.topics.length > 0 ? transformed.topics : undefined,
     };
   }
 

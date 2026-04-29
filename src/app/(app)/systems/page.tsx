@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
 import { readAllChapters } from "@/lib/content/source";
+import { chapterNumberFromId, readSyllabusTopics } from "@/lib/content/syllabus";
 
 export const metadata = {
   title: "Assessment",
@@ -10,7 +11,7 @@ export const metadata = {
 type ChapterRow = {
   id: string;
   title: string;
-  topics: { title: string; questionCount: number }[];
+  topics: string[];
 };
 
 type SystemGroup = {
@@ -19,17 +20,19 @@ type SystemGroup = {
 };
 
 export default async function SystemsPage() {
-  const mechanisms = await readAllChapters();
+  const [mechanisms, syllabus] = await Promise.all([readAllChapters(), readSyllabusTopics()]);
 
   // Group by organ_system; sort systems alphabetically, mechanisms alphabetically.
   const grouped = new Map<string, SystemGroup>();
   for (const m of mechanisms) {
     const key = m.frontmatter.organ_system;
     if (!grouped.has(key)) grouped.set(key, { system: key, mechanisms: [] });
+    const chapterNum = chapterNumberFromId(m.frontmatter.id);
+    const topics = chapterNum !== null ? (syllabus.get(chapterNum) ?? []) : [];
     grouped.get(key)!.mechanisms.push({
       id: m.frontmatter.id,
       title: m.frontmatter.title,
-      topics: m.topics ?? [],
+      topics,
     });
   }
   const groups = [...grouped.values()].sort((a, b) => a.system.localeCompare(b.system));
@@ -67,7 +70,7 @@ export default async function SystemsPage() {
                       {m.topics.length > 0 ? (
                         <ul className="text-muted-foreground ml-4 list-disc text-sm">
                           {m.topics.map((t) => (
-                            <li key={t.title}>{t.title}</li>
+                            <li key={t}>{t}</li>
                           ))}
                         </ul>
                       ) : null}
