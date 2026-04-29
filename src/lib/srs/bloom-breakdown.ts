@@ -7,8 +7,8 @@ import type { StoredReview } from "./db";
  * across the four cognitive levels v1 supports (remember, understand,
  * apply, analyze).
  *
- * The shape mirrors `MechanismProgress` deliberately: the Progress tab
- * renders a small four-row table next to the per-mechanism list, so a
+ * The shape mirrors `ChapterProgress` deliberately: the Progress tab
+ * renders a small four-row table next to the per-Chapter list, so a
  * learner can see "you're 92% on remember-level questions but 51% on
  * analyze-level — that's the gap to close before the exam."
  *

@@ -4,7 +4,7 @@
  * can be reused from edge runtimes that don't have filesystem access
  * (middleware, route handlers) without pulling in `fs`.
  *
- * The kebab-case regex is the same contract `readMechanismById` uses
+ * The kebab-case regex is the same contract `readChapterById` uses
  * before touching disk — duplicating it here means a malicious URL
  * segment is rejected before it can become a filesystem traversal or
  * a surprise render path.
@@ -15,7 +15,7 @@ const MECHANISM_ID_RE = /^[a-z0-9-]+$/;
 export type MechanismParam = string | string[] | undefined | null;
 
 /**
- * Normalise a `?mechanism=<id>` search-param value into a kebab-case id
+ * Normalise a `?Chapter=<id>` search-param value into a kebab-case id
  * or null. Rejects:
  *   - empty / whitespace-only values
  *   - arrays beyond the first element

@@ -34,7 +34,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   const { data, error } = await supabase
-    .from("content_mechanisms")
+    .from("content_chapters")
     .select("markdown")
     .eq("id", id)
     .maybeSingle();
@@ -44,7 +44,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   // Force a download with the canonical filename so the admin can drop
-  // the file straight into `content/mechanisms/` and commit.
+  // the file straight into `content/chapters/` and commit.
   return new NextResponse(data.markdown, {
     status: 200,
     headers: {

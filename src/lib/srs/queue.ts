@@ -62,6 +62,13 @@ export function assembleQueue(opts: AssembleQueueOptions): QueuedCard[] {
   const newOnes: QueuedCard[] = [];
 
   for (const card of cards) {
+    // Retired questions are tombstones — kept in markdown for audit
+    // history, but never assembled into a live review queue. Existing
+    // card_states for retired UUIDs go dormant per
+    // content_production_sop.md §6.3 and resume only if the question
+    // is revived.
+    if (card.status === "retired") continue;
+
     const state = cardStates.get(card.id);
 
     if (state) {

@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: "%s · Physio-Scholar",
   },
   description:
-    "Mechanism-based active-recall learning for MBBS physiology. V1 pilot for cardiovascular fundamentals.",
+    "Chapter-based active-recall learning for MBBS physiology. V1 pilot for cardiovascular fundamentals.",
   applicationName: "Physio-Scholar",
   robots: { index: false, follow: false },
 };

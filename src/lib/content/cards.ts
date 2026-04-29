@@ -1,15 +1,15 @@
 import { z } from "zod";
 
-import type { Mechanism } from "./loader";
+import type { Chapter } from "./loader";
 
 /**
  * Card extraction — pulls the structured question bank out of the
- * `# Questions` section of a mechanism markdown. Matches SOP Appendix A
+ * `# Questions` section of a Chapter markdown. Matches SOP Appendix A
  * exactly; a mismatch means the content is malformed and we surface a
  * clear error rather than silently skip.
  *
  * A Card is the unit the SRS schedules and the review UI displays.
- * Its id is `{mechanism_id}:{index}` (index is 1-based from
+ * Its id is `{chapter_id}:{index}` (index is 1-based from
  * "## Question N"), deterministic across rebuilds so SRS history
  * survives content edits that don't reorder the question bank.
  */
@@ -19,8 +19,41 @@ export const bloomsLevelSchema = z.enum(["remember", "understand", "apply", "ana
 export type BloomsLevel = z.infer<typeof bloomsLevelSchema>;
 
 /**
+ * How a question is rendered and graded.
+ *
+ *   - mcq:         four-option multiple choice; deterministic grading;
+ *                  misconception-keyed feedback on wrong choices.
+ *   - descriptive: free-text answer; student self-rates Green/Yellow/Red
+ *                  against the model answer after a 5s reveal delay.
+ *   - fill_blank:  short answer (value, term, phrase); deterministic
+ *                  grading via acceptable_answers + tolerance + unit;
+ *                  partial-credit feedback for unit-error and near-miss.
+ *
+ * Default when omitted: "descriptive". Authored per question via
+ * `**Format:** mcq` (or `descriptive` / `fill_blank`).
+ */
+export const questionFormatSchema = z.enum(["mcq", "descriptive", "fill_blank"]);
+export type QuestionFormat = z.infer<typeof questionFormatSchema>;
+
+/**
+ * Question lifecycle.
+ *
+ *   - published: live in test sessions, contributing to SRS state.
+ *   - retired:   tombstoned — kept in markdown for audit and review
+ *                history, excluded from new test sessions. Retire is
+ *                the SRS-safe alternative to deletion when a question
+ *                is wrong, replaced, or otherwise out of circulation.
+ *                See content_production_sop.md §6.3 for the cosmetic-
+ *                vs-material edit rule that drives retirement.
+ *
+ * Default when omitted: "published".
+ */
+export const questionStatusSchema = z.enum(["published", "retired"]);
+export type QuestionStatus = z.infer<typeof questionStatusSchema>;
+
+/**
  * Pedagogic priority — how essential the question is to mastery of the
- * mechanism. Drives adaptive ordering (must-know surfaces first, then
+ * Chapter. Drives adaptive ordering (must-know surfaces first, then
  * should-know, then good-to-know) and curriculum-coverage analytics.
  *
  *   - must:   foundational facts the learner cannot omit
@@ -60,8 +93,20 @@ export type Misconception = z.infer<typeof misconceptionSchema>;
 
 export const cardSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+:\d+$/),
-  mechanism_id: z.string().min(1),
+  chapter_id: z.string().min(1),
   index: z.number().int().min(1),
+  /**
+   * Stable per-question identifier intended to survive renumbering,
+   * Chapter file renames, and retire-and-replace flows. Optional
+   * during the transition from `{Chapter}:{index}` ids — once the
+   * SRS keys migrate to UUID this field becomes the canonical id.
+   * Authored per question via `**ID:** <uuid>`.
+   */
+  uuid: z.string().uuid().optional(),
+  /** Render and grading mode — see `questionFormatSchema`. Defaults to "descriptive". */
+  format: questionFormatSchema,
+  /** Lifecycle — see `questionStatusSchema`. Defaults to "published". */
+  status: questionStatusSchema,
   type: z.string().min(1),
   blooms_level: bloomsLevelSchema,
   /** Pedagogic priority — see `priorityLevelSchema`. Defaults to "should". */
@@ -78,30 +123,81 @@ export const cardSchema = z.object({
    * Exam patterns a card is appropriate for — drives the exam-mode
    * filter (MBBS vs pre-PG per build spec §2.11). Authored either
    * per-card via `**Exam patterns:** mbbs, pre-pg` or inherited from
-   * the mechanism frontmatter. Stored lowercased + trimmed here.
+   * the Chapter frontmatter. Stored lowercased + trimmed here.
    */
   exam_patterns: z.array(z.string().min(1)),
+  /**
+   * Fill-blank only: alternative strings the grader accepts as
+   * Green-grade. Authored as `**Acceptable answers:** "form A" | "form B"`.
+   * Quotes around each variant disambiguate values containing pipes.
+   */
+  acceptable_answers: z.array(z.string().min(1)).optional(),
+  /**
+   * Fill-blank only: the expected unit (e.g. "L/min", "mmHg"). Used to
+   * separate Yellow (right value, wrong unit) from Red (wrong value).
+   * Authored as `**Unit:** L/min`.
+   */
+  unit: z.string().min(1).optional(),
+  /**
+   * Fill-blank only: numeric tolerance band as a fraction (0.05 = ±5%).
+   * Anything within tolerance is Green; outside but on the right
+   * order of magnitude is Yellow. Authored as `**Tolerance:** ±5%`
+   * or `**Tolerance:** 0.05`.
+   */
+  tolerance_pct: z.number().min(0).max(1).optional(),
+  /**
+   * Descriptive only: the multi-paragraph rubric the student uses to
+   * self-rate Green / Yellow / Red after seeing the model answer.
+   * Authored as a `### Self-Grading Checklist` subsection (rather
+   * than a `**Label:**` line) so the rubric can span paragraphs and
+   * include bullet lists without the field extractor terminating at
+   * the first blank line. Stored verbatim — the renderer treats it
+   * as markdown.
+   */
+  self_grading_checklist: z.string().min(1).optional(),
+  /**
+   * Descriptive only: a bulleted list of common student misconceptions
+   * with corrections. Surfaced in the reveal screen alongside the
+   * self-grading checklist so a learner can spot a misalignment in
+   * their own answer even when they self-rate it correct. Same
+   * `### Common Misconceptions` subsection treatment as the checklist.
+   */
+  common_misconceptions: z.string().min(1).optional(),
+  /**
+   * Pre-PG only: the year the question was asked in the original past
+   * exam (e.g. 2018). Stored as an integer when authored as `**Year:**
+   * 2018`. Optional informational metadata — does not affect SRS or
+   * grading. Surfaces alongside the question stem in the Pre-PG drill
+   * UI so a learner can see "this is a NEET-PG 2018 question."
+   */
+  year: z.number().int().min(1900).max(2200).optional(),
+  /**
+   * Pre-PG only: the exam the question was sourced from (e.g.
+   * "NEET-PG", "INI-CET", "AIIMS"). Free-form string authored as
+   * `**Exam:** NEET-PG`. Surfaced alongside `year` in the Pre-PG UI.
+   */
+  exam: z.string().min(1).optional(),
 });
 export type Card = z.infer<typeof cardSchema>;
 
 /**
- * Extract all cards from a mechanism. Returns [] for a mechanism
+ * Extract all cards from a Chapter. Returns [] for a Chapter
  * without a Questions section (drafts) rather than throwing.
  */
-export function extractCards(mechanism: Mechanism): Card[] {
-  if (!mechanism.layers.questions) return [];
-  const mechanismExamPatterns = mechanism.frontmatter.exam_patterns ?? [];
+export function extractCards(chapter: Chapter): Card[] {
+  if (!chapter.layers.questions) return [];
+  const chapterExamPatterns = chapter.frontmatter.exam_patterns ?? [];
   return parseQuestionsSection(
-    mechanism.frontmatter.id,
-    mechanism.layers.questions,
-    mechanismExamPatterns,
+    chapter.frontmatter.id,
+    chapter.layers.questions,
+    chapterExamPatterns,
   );
 }
 
 function parseQuestionsSection(
-  mechanismId: string,
+  chapterId: string,
   section: string,
-  mechanismExamPatterns: readonly string[],
+  chapterExamPatterns: readonly string[],
 ): Card[] {
   // Split the section on `## Question N` headings. The regex keeps the
   // heading with the block so we can recover the index.
@@ -114,22 +210,26 @@ function parseQuestionsSection(
     const indexStr = parts[i];
     const body = parts[i + 1] ?? "";
     const index = Number.parseInt(indexStr, 10);
-    const card = parseCardBody(mechanismId, index, body, mechanismExamPatterns);
+    const card = parseCardBody(chapterId, index, body, chapterExamPatterns);
     cards.push(cardSchema.parse(card));
   }
   return cards;
 }
 
 function parseCardBody(
-  mechanismId: string,
+  chapterId: string,
   index: number,
   body: string,
   fallbackExamPatterns: readonly string[],
 ) {
+  const rawId = extractLabeledField(body, "ID");
   return {
-    id: `${mechanismId}:${index}`,
-    mechanism_id: mechanismId,
+    id: `${chapterId}:${index}`,
+    chapter_id: chapterId,
     index,
+    uuid: rawId && isUuid(rawId) ? rawId.toLowerCase() : undefined,
+    format: normaliseQuestionFormat(extractLabeledField(body, "Format")),
+    status: normaliseQuestionStatus(extractLabeledField(body, "Status")),
     type: extractLabeledField(body, "Type") ?? "unspecified",
     blooms_level: normaliseBloomsLevel(extractLabeledField(body, "Bloom's level") ?? ""),
     priority: normalisePriorityLevel(extractLabeledField(body, "Priority")),
@@ -140,13 +240,150 @@ function parseCardBody(
     hints: extractHintLadder(body),
     misconceptions: extractMisconceptions(body),
     exam_patterns: extractCardExamPatterns(body, fallbackExamPatterns),
+    acceptable_answers: extractAcceptableAnswers(body),
+    unit: extractLabeledField(body, "Unit") ?? undefined,
+    tolerance_pct: parseTolerance(extractLabeledField(body, "Tolerance")),
+    self_grading_checklist: extractSelfGradingChecklist(body),
+    common_misconceptions: extractCommonMisconceptions(body),
+    year: parseYear(extractLabeledField(body, "Year")),
+    exam: extractLabeledField(body, "Exam") ?? undefined,
   };
 }
 
 /**
+ * Coerce a `**Year:**` value to a 4-digit integer. Returns undefined
+ * when the field is missing or unparseable so the optional schema
+ * field stays out rather than holding NaN.
+ */
+function parseYear(raw: string | null): number | undefined {
+  if (!raw) return undefined;
+  const m = raw.match(/\d{4}/);
+  if (!m) return undefined;
+  const n = Number.parseInt(m[0], 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function extractSelfGradingChecklist(body: string): string | undefined {
+  // Section heading is `### Self-Grading Checklist`. Mirrors
+  // `extractHintLadder`'s shape: stops at the next `###` subheading
+  // or end of body. Returns undefined when absent so the optional
+  // schema field stays out rather than being explicitly empty.
+  const match = body.match(/###\s+Self-Grading\s+Checklist\s*\n([\s\S]+?)(?=\n\s*###\s|$)/i);
+  if (!match) return undefined;
+  const trimmed = match[1].trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function extractCommonMisconceptions(body: string): string | undefined {
+  // Section heading `### Common Misconceptions`. Same section-based
+  // extraction as the self-grading checklist.
+  const match = body.match(/###\s+Common\s+Misconceptions\s*\n([\s\S]+?)(?=\n\s*###\s|$)/i);
+  if (!match) return undefined;
+  const trimmed = match[1].trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value.trim());
+}
+
+/**
+ * Coerce a `**Format:**` value to one of the canonical tokens. Accepts
+ * a few near-synonyms ("multiple choice" → mcq, "free text" →
+ * descriptive, "fill in the blank" → fill_blank) so author phrasing
+ * doesn't break the parse. Falls back to "descriptive" when omitted —
+ * matches the pre-redesign default behaviour for legacy questions.
+ */
+function normaliseQuestionFormat(raw: string | null): QuestionFormat {
+  if (!raw) return "descriptive";
+  const lower = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (lower === "mcq" || lower === "multiple_choice" || lower === "multiple_choice_question") {
+    return "mcq";
+  }
+  if (
+    lower === "fill_blank" ||
+    lower === "fill_in_blank" ||
+    lower === "fill_in_the_blank" ||
+    lower === "fillin" ||
+    lower === "fillinblank" ||
+    lower === "fillintheblank"
+  ) {
+    return "fill_blank";
+  }
+  if (
+    lower === "descriptive" ||
+    lower === "free_text" ||
+    lower === "free_recall" ||
+    lower === "essay" ||
+    lower === "short_answer"
+  ) {
+    return "descriptive";
+  }
+  return "descriptive";
+}
+
+/**
+ * Coerce a `**Status:**` value to one of the canonical tokens. Anything
+ * not "retired" treats the question as live — failing safe by leaving
+ * the question in circulation if the status label is malformed.
+ */
+function normaliseQuestionStatus(raw: string | null): QuestionStatus {
+  if (!raw) return "published";
+  const lower = raw.trim().toLowerCase();
+  if (lower === "retired" || lower === "tombstoned") return "retired";
+  return "published";
+}
+
+/**
+ * Parse a `**Tolerance:**` value to a fraction. Accepts:
+ *   - `5%`, `±5%`, `+/-5%`  → 0.05
+ *   - `0.05`, `±0.05`        → 0.05
+ *   - `5` (bare number > 1)  → 0.05 (treated as percent)
+ * Returns undefined for unparseable input rather than throwing — keeps
+ * the question loadable; downstream graders can fall back to exact match.
+ */
+function parseTolerance(raw: string | null): number | undefined {
+  if (!raw) return undefined;
+  const cleaned = raw.replace(/[±\s]|\+\/-/g, "");
+  const pctMatch = cleaned.match(/^([\d.]+)%$/);
+  if (pctMatch) {
+    const v = Number.parseFloat(pctMatch[1]);
+    if (Number.isFinite(v)) return v / 100;
+  }
+  const numMatch = cleaned.match(/^([\d.]+)$/);
+  if (numMatch) {
+    const v = Number.parseFloat(numMatch[1]);
+    if (Number.isFinite(v)) return v <= 1 ? v : v / 100;
+  }
+  return undefined;
+}
+
+/**
+ * Parse a `**Acceptable answers:**` value. Recognises two shapes:
+ *   - quoted, pipe-separated: `"5.6 L/min" | "5.6 liters per minute"`
+ *   - bare pipe-separated:    `5.6 L/min | 5.6 liters per minute`
+ * Quoted form is preferred — it disambiguates values containing pipes.
+ */
+function extractAcceptableAnswers(body: string): string[] | undefined {
+  const raw = extractLabeledField(body, "Acceptable answers");
+  if (!raw) return undefined;
+  const quoted = [...raw.matchAll(/["“]([^"”]+)["”]/g)].map((m) => m[1].trim());
+  if (quoted.length > 0) return quoted;
+  const piped = raw
+    .split("|")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return piped.length > 0 ? piped : undefined;
+}
+
+/**
  * Parse the optional `**Exam patterns:** mbbs, pre-pg` line from a
- * question body. If absent, inherit the mechanism-level list (Option
- * Y per the plan — questions default to the mechanism's tagging,
+ * question body. If absent, inherit the Chapter-level list (Option
+ * Y per the plan — questions default to the Chapter's tagging,
  * but can override).
  *
  * Values are lower-cased and trimmed so downstream filters don't need

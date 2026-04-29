@@ -3,10 +3,10 @@ import Link from "next/link";
 import {
   buildCohortHeatmap,
   type CohortCardAggregate,
-  type MechanismMeta,
+  type ChapterMeta,
 } from "@/lib/cohort/heatmap";
 import { extractCards } from "@/lib/content/cards";
-import { readAllMechanisms } from "@/lib/content/source";
+import { readAllChapters } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -93,12 +93,12 @@ export default async function AdminCohortPage({
   }
 
   // Build the topic heatmap from authored mechanisms + the per-card aggregates.
-  const mechanisms = await readAllMechanisms();
+  const mechanisms = await readAllChapters();
   const cards = mechanisms.flatMap(extractCards);
-  const mechanismMeta = new Map<string, MechanismMeta>();
+  const ChapterMeta = new Map<string, ChapterMeta>();
   for (const m of mechanisms) {
-    mechanismMeta.set(m.frontmatter.id, {
-      mechanismId: m.frontmatter.id,
+    ChapterMeta.set(m.frontmatter.id, {
+      chapterId: m.frontmatter.id,
       title: m.frontmatter.title,
       organSystem: m.frontmatter.organ_system,
     });
@@ -106,7 +106,7 @@ export default async function AdminCohortPage({
   const heatmap = buildCohortHeatmap({
     aggregates: aggregates as CohortCardAggregate[],
     cards,
-    mechanismMeta,
+    ChapterMeta,
   });
 
   const totalLearners = roster.length;
@@ -217,15 +217,15 @@ export default async function AdminCohortPage({
           <section aria-label="Topic heatmap" className="flex flex-col gap-3">
             <h2 className="font-heading text-xl font-medium">Topic heatmap</h2>
             <p className="text-muted-foreground text-xs">
-              Per-mechanism retention rolled up by organ system. Weakest topics surface first within
+              Per-Chapter retention rolled up by organ system. Weakest topics surface first within
               each system — that&apos;s where intervention has the most leverage.
             </p>
             {aggregatesError ? (
               <p className="text-destructive text-sm">Aggregates failed: {aggregatesError}</p>
             ) : !heatmap.hasAnyReviews ? (
               <p className="text-muted-foreground text-sm">
-                No cohort review data yet. Mechanisms appear here as soon as the cohort starts
-                rating cards (Phase 6 syncs reviews to Supabase).
+                No cohort review data yet. Chapters appear here as soon as the cohort starts rating
+                cards (Phase 6 syncs reviews to Supabase).
               </p>
             ) : (
               <ul className="flex flex-col gap-3">
@@ -246,11 +246,11 @@ export default async function AdminCohortPage({
                     <ul className="flex flex-col gap-1">
                       {sys.mechanisms.map((m) => (
                         <li
-                          key={m.mechanismId}
+                          key={m.chapterId}
                           className="bg-muted/30 flex flex-wrap items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm"
                         >
                           <Link
-                            href={`/mechanisms/${encodeURIComponent(m.mechanismId)}`}
+                            href={`/mechanisms/${encodeURIComponent(m.chapterId)}`}
                             className="font-medium underline-offset-2 hover:underline"
                           >
                             {m.title}

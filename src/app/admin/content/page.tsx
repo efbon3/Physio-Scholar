@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { readAllMechanisms as readFromFs } from "@/lib/content/fs";
+import { readAllChapters as readFromFs } from "@/lib/content/fs";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -18,7 +18,7 @@ type Row = {
 /**
  * Admin → content list.
  *
- * Shows every mechanism visible to the app — both DB rows (CMS-authored)
+ * Shows every Chapter visible to the app — both DB rows (CMS-authored)
  * and filesystem `.md` files. DB rows take precedence per id (the
  * dual-source loader in src/lib/content/source.ts works the same way).
  *
@@ -32,7 +32,7 @@ export default async function AdminContentPage() {
 
   const [dbResult, fsMechanisms] = await Promise.all([
     supabase
-      .from("content_mechanisms")
+      .from("content_chapters")
       .select("id, markdown, status, updated_at")
       .order("updated_at", { ascending: false }),
     readFromFs(),
@@ -76,14 +76,14 @@ export default async function AdminContentPage() {
           <p className="text-muted-foreground text-sm tracking-widest uppercase">Admin</p>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">Content</h1>
           <p className="text-muted-foreground text-sm">
-            CMS-authored mechanisms and filesystem fallbacks, in one place.
+            CMS-authored chapters and filesystem fallbacks, in one place.
           </p>
         </div>
         <Link
           href="/admin/content/new"
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium"
         >
-          New mechanism
+          New chapter
         </Link>
       </header>
 
@@ -95,7 +95,7 @@ export default async function AdminContentPage() {
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No mechanisms yet. Click &ldquo;New mechanism&rdquo; to start.
+          No chapters yet. Click &ldquo;New chapter&rdquo; to start.
         </p>
       ) : (
         <table className="w-full text-sm">
@@ -151,8 +151,8 @@ export default async function AdminContentPage() {
       )}
 
       <p className="text-muted-foreground border-t pt-4 text-xs">
-        Filesystem fallbacks come from <code>content/mechanisms/*.md</code>. Any DB row with the
-        same id overrides the file for rendering.
+        Filesystem fallbacks come from <code>content/chapters/*.md</code>. Any DB row with the same
+        id overrides the file for rendering.
       </p>
     </main>
   );

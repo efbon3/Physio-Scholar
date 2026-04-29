@@ -49,6 +49,18 @@ export type StoredReview = {
    * in the real Claude-backed implementation.
    */
   self_explanation: string | null;
+  /**
+   * How the learner engaged with this descriptive question (build
+   * spec §2.3). One of:
+   *   - "written_peer" — wrote and checked with a peer
+   *   - "written_self" — wrote and self-checked against the model
+   *   - "mental"        — worked it out mentally without writing
+   * `null` for non-descriptive cards or when the learner skipped the
+   * prompt. Logged as analytics metadata only — does not affect SRS
+   * scheduling. Sync to Supabase ships in Phase 6 alongside an
+   * `engagement_method` column added in a follow-up migration.
+   */
+  engagement_method: "written_peer" | "written_self" | "mental" | null;
   created_at: string;
   /** 1 = waiting to push to Supabase; 0 = already pushed. */
   pending_sync: 0 | 1;
@@ -67,10 +79,30 @@ export type PendingStatePush = {
   requested_at: string;
 };
 
+/**
+ * Pre-PG SRS state — same shape as `StoredCardState` but lives in a
+ * separate row pool so a learner can see how they're doing on past
+ * exam questions independently of their curriculum calibration. The
+ * scheduler (`scheduleNext`) is a pure function and runs against
+ * either pool unchanged.
+ */
+export type StoredPrepgCardState = StoredCardState;
+export type StoredPrepgReview = StoredReview;
+export type PendingPrepgStatePush = PendingStatePush;
+
 export class PhysioLearningDB extends Dexie {
   card_states!: Table<StoredCardState, string>;
   reviews!: Table<StoredReview, string>;
   pending_state_pushes!: Table<PendingStatePush, string>;
+  /**
+   * Pre-PG SRS — three tables mirroring the regular curriculum tables
+   * but holding an isolated row pool. A card_id `ch01-foo:5` can have
+   * different ease/interval/due_at across the two pools, which is
+   * exactly the point: Pre-PG calibration is its own number.
+   */
+  prepg_card_states!: Table<StoredPrepgCardState, string>;
+  prepg_reviews!: Table<StoredPrepgReview, string>;
+  pending_prepg_state_pushes!: Table<PendingPrepgStatePush, string>;
 
   constructor(databaseName = "physio-scholar-learning") {
     super(databaseName);
@@ -88,6 +120,14 @@ export class PhysioLearningDB extends Dexie {
       // Push queue for card_states. Keyed by card_id (one pending push
       // per card at a time; the latest state wins).
       pending_state_pushes: "card_id, profile_id, requested_at",
+    });
+    // v2: add the Pre-PG SRS tables. Existing curriculum tables stay
+    // untouched. Dexie handles the version upgrade automatically — no
+    // data migration required since these are net-new tables.
+    this.version(2).stores({
+      prepg_card_states: "card_id, profile_id, [profile_id+due_at], status, updated_at",
+      prepg_reviews: "id, [profile_id+created_at], pending_sync, card_id",
+      pending_prepg_state_pushes: "card_id, profile_id, requested_at",
     });
   }
 }

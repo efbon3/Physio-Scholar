@@ -107,7 +107,13 @@ export default async function FacultyAssignmentsPage() {
                 {a.description ? (
                   <p className="text-sm whitespace-pre-wrap">{a.description}</p>
                 ) : null}
-                <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+                <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
+                  <Link
+                    href={`/faculty/assignments/${a.id}/engagement`}
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    View engagement →
+                  </Link>
                   {a.faculty_id === user.id ? (
                     <DeleteAssignmentButton id={a.id} />
                   ) : (

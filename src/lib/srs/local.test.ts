@@ -234,6 +234,74 @@ describe("self_explanation normalisation", () => {
   });
 });
 
+describe("practice mode — review logged, schedule untouched", () => {
+  it("records the review row but does not write card_state or pending push", async () => {
+    const result = await recordReviewLocally({
+      profileId: ALICE,
+      cardId: "frank-starling:1",
+      rating: "good",
+      hintsUsed: 0,
+      timeSpentSeconds: 30,
+      practiceMode: true,
+      now: NOW,
+    });
+
+    expect(result.scheduleUpdated).toBe(false);
+
+    const db = getLearningDB();
+    expect(await db.reviews.toArray()).toHaveLength(1);
+    expect(await db.card_states.toArray()).toEqual([]);
+    expect(await db.pending_state_pushes.toArray()).toEqual([]);
+  });
+
+  it("does not perturb an existing card_state when practiceMode is true", async () => {
+    // Establish a card_state from a regular session.
+    const baseline = await recordReviewLocally({
+      profileId: ALICE,
+      cardId: "frank-starling:1",
+      rating: "good",
+      hintsUsed: 0,
+      timeSpentSeconds: 30,
+      now: new Date("2026-04-25T10:00:00Z"),
+    });
+    expect(baseline.scheduleUpdated).toBe(true);
+    const baselineState = await getLocalCardState(ALICE, "frank-starling:1");
+    expect(baselineState).not.toBeNull();
+
+    // Now do a practice rating — it shouldn't change the schedule.
+    await recordReviewLocally({
+      profileId: ALICE,
+      cardId: "frank-starling:1",
+      rating: "again",
+      hintsUsed: 0,
+      timeSpentSeconds: 12,
+      practiceMode: true,
+      now: NOW,
+    });
+
+    const afterPractice = await getLocalCardState(ALICE, "frank-starling:1");
+    // The previous "good" rating's interval / ease / due_at must remain.
+    expect(afterPractice?.interval_days).toBeCloseTo(baselineState!.interval_days, 6);
+    expect(afterPractice?.ease).toBeCloseTo(baselineState!.ease, 6);
+    expect(afterPractice?.due_at).toBe(baselineState!.due_at);
+    expect(afterPractice?.status).toBe(baselineState!.status);
+    // But the review row is recorded — practice contributes to analytics.
+    expect(await countPendingReviews(ALICE)).toBe(2);
+  });
+
+  it("scheduleUpdated is true for regular sessions", async () => {
+    const result = await recordReviewLocally({
+      profileId: ALICE,
+      cardId: "frank-starling:1",
+      rating: "good",
+      hintsUsed: 0,
+      timeSpentSeconds: 30,
+      now: NOW,
+    });
+    expect(result.scheduleUpdated).toBe(true);
+  });
+});
+
 describe("clearAllLocalState", () => {
   it("wipes every table in the learning DB", async () => {
     await recordReviewLocally({

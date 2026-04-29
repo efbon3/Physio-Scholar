@@ -1,23 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Mechanism } from "./loader";
+import type { Chapter } from "./loader";
 
 const fromDbMock = vi.hoisted(() => ({
-  readPublishedMechanismsFromDb: vi.fn<() => Promise<Mechanism[]>>(),
-  readPublishedMechanismByIdFromDb: vi.fn<(id: string) => Promise<Mechanism | null>>(),
+  readPublishedChaptersFromDb: vi.fn<() => Promise<Chapter[]>>(),
+  readPublishedChapterByIdFromDb: vi.fn<(id: string) => Promise<Chapter | null>>(),
 }));
 const fromFsMock = vi.hoisted(() => ({
-  readAllMechanisms: vi.fn<() => Promise<Mechanism[]>>(),
-  readMechanismById: vi.fn<(id: string) => Promise<Mechanism | null>>(),
+  readAllChapters: vi.fn<() => Promise<Chapter[]>>(),
+  readChapterById: vi.fn<(id: string) => Promise<Chapter | null>>(),
 }));
 
 vi.mock("./db-source", () => fromDbMock);
 vi.mock("./fs", () => fromFsMock);
 
 // Dynamically import after mocks are set so vi.mock takes effect.
-const { readAllMechanisms, readMechanismById } = await import("./source");
+const { readAllChapters, readChapterById } = await import("./source");
 
-function fakeMechanism(id: string, title = id): Mechanism {
+function fakeMechanism(id: string, title = id): Chapter {
   return {
     frontmatter: {
       id,
@@ -26,7 +26,7 @@ function fakeMechanism(id: string, title = id): Mechanism {
       nmc_competencies: ["PY-CV-1.1"],
       exam_patterns: ["neet-pg"],
       prerequisites: [],
-      related_mechanisms: [],
+      related_chapters: [],
       blooms_distribution: { remember: 25, understand: 25, apply: 25, analyze: 25 },
       author: "test",
       reviewer: "pending",
@@ -41,21 +41,21 @@ function fakeMechanism(id: string, title = id): Mechanism {
 }
 
 beforeEach(() => {
-  fromDbMock.readPublishedMechanismsFromDb.mockReset();
-  fromDbMock.readPublishedMechanismByIdFromDb.mockReset();
-  fromFsMock.readAllMechanisms.mockReset();
-  fromFsMock.readMechanismById.mockReset();
+  fromDbMock.readPublishedChaptersFromDb.mockReset();
+  fromDbMock.readPublishedChapterByIdFromDb.mockReset();
+  fromFsMock.readAllChapters.mockReset();
+  fromFsMock.readChapterById.mockReset();
 });
 
-describe("readAllMechanisms — merge semantics", () => {
+describe("readAllChapters — merge semantics", () => {
   it("returns the union when DB and fs sets are disjoint", async () => {
-    fromDbMock.readPublishedMechanismsFromDb.mockResolvedValue([
+    fromDbMock.readPublishedChaptersFromDb.mockResolvedValue([
       fakeMechanism("baroreceptor-reflex", "Baroreceptor Reflex"),
     ]);
-    fromFsMock.readAllMechanisms.mockResolvedValue([
-      fakeMechanism("frank-starling", "Frank-Starling Mechanism"),
+    fromFsMock.readAllChapters.mockResolvedValue([
+      fakeMechanism("frank-starling", "Frank-Starling Chapter"),
     ]);
-    const result = await readAllMechanisms();
+    const result = await readAllChapters();
     expect(result.map((m) => m.frontmatter.id).sort()).toEqual([
       "baroreceptor-reflex",
       "frank-starling",
@@ -63,68 +63,66 @@ describe("readAllMechanisms — merge semantics", () => {
   });
 
   it("DB row wins when both sources have the same id", async () => {
-    fromDbMock.readPublishedMechanismsFromDb.mockResolvedValue([
+    fromDbMock.readPublishedChaptersFromDb.mockResolvedValue([
       fakeMechanism("frank-starling", "Frank-Starling (DB)"),
     ]);
-    fromFsMock.readAllMechanisms.mockResolvedValue([
+    fromFsMock.readAllChapters.mockResolvedValue([
       fakeMechanism("frank-starling", "Frank-Starling (FS)"),
     ]);
-    const result = await readAllMechanisms();
+    const result = await readAllChapters();
     expect(result).toHaveLength(1);
     expect(result[0].frontmatter.title).toBe("Frank-Starling (DB)");
   });
 
   it("sorts the merged result by title", async () => {
-    fromDbMock.readPublishedMechanismsFromDb.mockResolvedValue([
-      fakeMechanism("zzz-last", "Zebra"),
-    ]);
-    fromFsMock.readAllMechanisms.mockResolvedValue([
+    fromDbMock.readPublishedChaptersFromDb.mockResolvedValue([fakeMechanism("zzz-last", "Zebra")]);
+    fromFsMock.readAllChapters.mockResolvedValue([
       fakeMechanism("aaa-first", "Apple"),
       fakeMechanism("mmm-middle", "Mango"),
     ]);
-    const result = await readAllMechanisms();
+    const result = await readAllChapters();
     expect(result.map((m) => m.frontmatter.title)).toEqual(["Apple", "Mango", "Zebra"]);
   });
 
   it("returns fs-only when DB is empty", async () => {
-    fromDbMock.readPublishedMechanismsFromDb.mockResolvedValue([]);
-    fromFsMock.readAllMechanisms.mockResolvedValue([fakeMechanism("frank-starling")]);
-    const result = await readAllMechanisms();
+    fromDbMock.readPublishedChaptersFromDb.mockResolvedValue([]);
+    fromFsMock.readAllChapters.mockResolvedValue([fakeMechanism("frank-starling")]);
+    const result = await readAllChapters();
     expect(result).toHaveLength(1);
   });
 
   it("returns DB-only when fs is empty", async () => {
-    fromDbMock.readPublishedMechanismsFromDb.mockResolvedValue([
+    fromDbMock.readPublishedChaptersFromDb.mockResolvedValue([
       fakeMechanism("baroreceptor-reflex"),
     ]);
-    fromFsMock.readAllMechanisms.mockResolvedValue([]);
-    const result = await readAllMechanisms();
+    fromFsMock.readAllChapters.mockResolvedValue([]);
+    const result = await readAllChapters();
     expect(result).toHaveLength(1);
   });
 });
 
-describe("readMechanismById — DB-first lookup", () => {
+describe("readChapterById — DB-first lookup", () => {
   it("returns the DB row when published", async () => {
-    fromDbMock.readPublishedMechanismByIdFromDb.mockResolvedValue(
+    fromDbMock.readPublishedChapterByIdFromDb.mockResolvedValue(
       fakeMechanism("frank-starling", "DB version"),
     );
-    fromFsMock.readMechanismById.mockResolvedValue(fakeMechanism("frank-starling", "FS version"));
-    const result = await readMechanismById("frank-starling");
+    fromFsMock.readChapterById.mockResolvedValue(fakeMechanism("frank-starling", "FS version"));
+    const result = await readChapterById("frank-starling");
     expect(result?.frontmatter.title).toBe("DB version");
-    expect(fromFsMock.readMechanismById).not.toHaveBeenCalled();
+    expect(fromFsMock.readChapterById).not.toHaveBeenCalled();
   });
 
   it("falls back to fs when DB has no published row", async () => {
-    fromDbMock.readPublishedMechanismByIdFromDb.mockResolvedValue(null);
-    fromFsMock.readMechanismById.mockResolvedValue(fakeMechanism("frank-starling", "FS version"));
-    const result = await readMechanismById("frank-starling");
+    fromDbMock.readPublishedChapterByIdFromDb.mockResolvedValue(null);
+    fromFsMock.readChapterById.mockResolvedValue(fakeMechanism("frank-starling", "FS version"));
+    const result = await readChapterById("frank-starling");
     expect(result?.frontmatter.title).toBe("FS version");
   });
 
   it("returns null when neither source has the id", async () => {
-    fromDbMock.readPublishedMechanismByIdFromDb.mockResolvedValue(null);
-    fromFsMock.readMechanismById.mockResolvedValue(null);
-    const result = await readMechanismById("does-not-exist");
+    fromDbMock.readPublishedChapterByIdFromDb.mockResolvedValue(null);
+    fromFsMock.readChapterById.mockResolvedValue(null);
+    const result = await readChapterById("does-not-exist");
     expect(result).toBeNull();
   });
 });

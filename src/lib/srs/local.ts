@@ -74,13 +74,33 @@ export type RecordReviewInput = {
    * on the review row; the grader consumes it asynchronously.
    */
   selfExplanation?: string | null;
+  /**
+   * When true, record the review row (so analytics, retention curves,
+   * and time-studied counters all see the activity) but do NOT update
+   * the card's SRS state. The card's interval, ease, and due_at stay
+   * exactly where they were before this review. Build spec §2.3.
+   *
+   * Default false — regular sessions update SRS state as well as
+   * logging the review.
+   */
+  practiceMode?: boolean;
+  /**
+   * Descriptive only: how the learner engaged with the question. One
+   * of "written_peer", "written_self", "mental". Undefined means the
+   * learner skipped the prompt or this isn't a descriptive card.
+   * Persisted on the review row; analytics-only, never affects SRS.
+   */
+  engagementMethod?: "written_peer" | "written_self" | "mental" | null;
   /** Optional clock override for tests. Defaults to `new Date()`. */
   now?: Date;
 };
 
 export type RecordReviewResult = {
   review: StoredReview;
+  /** The card's state after the review. In practice mode this equals the prior state (no scheduling change). */
   cardState: StoredCardState;
+  /** Whether the SRS schedule was updated. False in practice-only sessions. */
+  scheduleUpdated: boolean;
 };
 
 export async function recordReviewLocally(input: RecordReviewInput): Promise<RecordReviewResult> {
@@ -98,13 +118,22 @@ export async function recordReviewLocally(input: RecordReviewInput): Promise<Rec
     last_reviewed_at: null,
     due_at: nowIso,
   };
-  const nextState = scheduleNext(priorState, input.rating, now);
+  const practiceMode = input.practiceMode === true;
+  // In practice mode the schedule isn't touched; cardState reflects the
+  // prior state so the UI can still show the unchanged due-at to the
+  // learner. In regular mode the scheduler advances the card.
+  const nextState = practiceMode ? priorState : scheduleNext(priorState, input.rating, now);
 
   const storedState: StoredCardState = {
     ...nextState,
     card_id: input.cardId,
     profile_id: input.profileId,
-    updated_at: nowIso,
+    // updated_at only advances on a real schedule update; practice
+    // sessions don't bump it because nothing scheduling-relevant
+    // changed about the row.
+    updated_at: practiceMode
+      ? (existing?.updated_at ?? priorState.last_reviewed_at ?? nowIso)
+      : nowIso,
   };
 
   // Normalise self_explanation: empty strings are "skipped", not empty
@@ -121,22 +150,25 @@ export async function recordReviewLocally(input: RecordReviewInput): Promise<Rec
     time_spent_seconds: input.timeSpentSeconds,
     session_id: input.sessionId ?? null,
     self_explanation: selfExplanation,
+    engagement_method: input.engagementMethod ?? null,
     created_at: nowIso,
     pending_sync: 1,
   };
 
   await db.transaction("rw", db.card_states, db.reviews, db.pending_state_pushes, async () => {
-    await db.card_states.put(storedState);
     await db.reviews.put(review);
-    await db.pending_state_pushes.put({
-      card_id: input.cardId,
-      profile_id: input.profileId,
-      state: storedState,
-      requested_at: nowIso,
-    });
+    if (!practiceMode) {
+      await db.card_states.put(storedState);
+      await db.pending_state_pushes.put({
+        card_id: input.cardId,
+        profile_id: input.profileId,
+        state: storedState,
+        requested_at: nowIso,
+      });
+    }
   });
 
-  return { review, cardState: storedState };
+  return { review, cardState: storedState, scheduleUpdated: !practiceMode };
 }
 
 /** Count unsynced reviews — surfaces "queued for sync" counters in UI. */

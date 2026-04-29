@@ -9,8 +9,8 @@ import { uploadDiagramAction } from "./upload-action";
 type Props = {
   /** Called with the ready-to-paste markdown image snippet `![alt](url)`. */
   onInsert: (snippet: string) => void;
-  /** Mechanism id for the storage path. Falls back to "unfiled". */
-  mechanismId: string;
+  /** Chapter id for the storage path. Falls back to "unfiled". */
+  chapterId: string;
 };
 
 /**
@@ -25,7 +25,7 @@ type Props = {
  * markdown snippet. The admin has to have set the Drive file to
  * "Anyone with the link can view," but no OAuth is required.
  */
-export function DiagramInserter({ onInsert, mechanismId }: Props) {
+export function DiagramInserter({ onInsert, chapterId }: Props) {
   const [altText, setAltText] = useState("");
   const [driveUrl, setDriveUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function DiagramInserter({ onInsert, mechanismId }: Props) {
   function handleUpload(formData: FormData) {
     setError(null);
     setOk(null);
-    formData.set("mechanism_id", mechanismId);
+    formData.set("chapter_id", chapterId);
     // Client-side pre-flight so a 10 MB file doesn't round-trip only
     // to fail the server's 2 MB guard. Server re-checks anyway — this
     // just shortens the feedback loop for the admin.

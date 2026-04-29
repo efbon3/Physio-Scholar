@@ -1,12 +1,12 @@
 import type { Card } from "@/lib/content/cards";
 
-import type { MechanismProgress } from "./progress";
+import type { ChapterProgress } from "./progress";
 
 /**
  * Helpers for the Today dashboard's three follow-on widgets:
  * streak, weak-area callout, daily clinical challenge. They take
- * computed inputs (a `ProgressSnapshot.byMechanism` slice and a
- * mechanism universe respectively) and return pure picks. Living
+ * computed inputs (a `ProgressSnapshot.byChapter` slice and a
+ * Chapter universe respectively) and return pure picks. Living
  * outside the dashboard component keeps them unit-testable without
  * mounting React.
  */
@@ -14,17 +14,17 @@ import type { MechanismProgress } from "./progress";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type WeakArea = {
-  mechanismId: string;
+  chapterId: string;
   title: string;
   masteryPct: number;
   seen: number;
 };
 
 /**
- * Pick the mechanism the learner is weakest at: lowest mastery
+ * Pick the Chapter the learner is weakest at: lowest mastery
  * percentage among mechanisms with at least one reviewed card.
  *
- * Why "at least one reviewed card": surfacing a mechanism the learner
+ * Why "at least one reviewed card": surfacing a Chapter the learner
  * has never opened isn't a "weak area" — it's just unstarted content.
  * The Today dashboard's queue summary already nudges them to start
  * something new; this widget exists to flag where they're slipping
@@ -33,14 +33,14 @@ export type WeakArea = {
  * Returns null if the learner has no reviewed cards at all (handled
  * by the widget as a "review more to unlock this" empty state).
  */
-export function pickWeakestMechanism(byMechanism: readonly MechanismProgress[]): WeakArea | null {
+export function pickWeakestMechanism(byChapter: readonly ChapterProgress[]): WeakArea | null {
   let weakest: WeakArea | null = null;
-  for (const m of byMechanism) {
+  for (const m of byChapter) {
     if (m.seen === 0) continue;
     if (m.masteryPct === null) continue;
     if (weakest === null || m.masteryPct < weakest.masteryPct) {
       weakest = {
-        mechanismId: m.mechanismId,
+        chapterId: m.chapterId,
         title: m.title,
         masteryPct: m.masteryPct,
         seen: m.seen,
@@ -51,13 +51,13 @@ export function pickWeakestMechanism(byMechanism: readonly MechanismProgress[]):
 }
 
 export type DailyChallenge = {
-  mechanismId: string;
+  chapterId: string;
   title: string;
 };
 
 /**
  * Pick a "challenge of the day" deterministically from a list of
- * mechanism candidates. Same date + same input list → same result,
+ * Chapter candidates. Same date + same input list → same result,
  * so a refresh in the same day doesn't shuffle the surface (which
  * would feel arbitrary).
  *
@@ -74,12 +74,12 @@ export function pickDailyChallenge(
   const dayIndex = Math.floor(now.getTime() / DAY_MS);
   const sorted = [...mechanisms].sort((a, b) => a.id.localeCompare(b.id));
   const pick = sorted[dayIndex % sorted.length]!;
-  return { mechanismId: pick.id, title: pick.title };
+  return { chapterId: pick.id, title: pick.title };
 }
 
 /**
- * Convenience: derive the unique mechanism set from the card universe.
- * Cards array already carries `mechanism_id` — collapse it to a
+ * Convenience: derive the unique Chapter set from the card universe.
+ * Cards array already carries `chapter_id` — collapse it to a
  * deduplicated list with titles. The `mechanismTitles` map is what the
  * Progress dashboard already builds, so we accept the same shape.
  */
@@ -90,9 +90,9 @@ export function uniqueMechanisms(
   const seen = new Set<string>();
   const out: { id: string; title: string }[] = [];
   for (const card of cards) {
-    if (seen.has(card.mechanism_id)) continue;
-    seen.add(card.mechanism_id);
-    out.push({ id: card.mechanism_id, title: titles.get(card.mechanism_id) ?? card.mechanism_id });
+    if (seen.has(card.chapter_id)) continue;
+    seen.add(card.chapter_id);
+    out.push({ id: card.chapter_id, title: titles.get(card.chapter_id) ?? card.chapter_id });
   }
   return out;
 }

@@ -1,6 +1,8 @@
 # Physiology PWA — Content Production Standard Operating Procedures
 
-**Version 1.0**
+**Version 1.1** — Edit and correction ruleset revised in §6.3 to align with the UUID-based content architecture introduced by the two-zone build-spec redesign. New per-question fields documented in Appendix A: Format (mcq / descriptive / fill_blank), Status (published / retired), and an ID UUID. Cosmetic / material edit distinction codified, with a retire-and-replace flow for material edits and explicit rules against renumbering, UUID reuse, and hard deletion. AI-grading prompt template and dispute-rate metrics deferred to v2 alongside the AI grader itself.
+
+**Version 1.0** (superseded)
 
 This document defines how content gets made, reviewed, published, and maintained. It is the operational reference for the content workflow, separate from the product design and build specification because content production is its own discipline with its own sustainable rhythm.
 
@@ -21,6 +23,8 @@ This document defines:
 - How errors and student feedback get handled.
 - How the content workflow scales from single-author pilot to multi-author operation.
 - What gets measured and tracked.
+
+**Canonical curriculum.** Scope decisions reference `docs/syllabus.md` — the master physiology table of contents (11 parts / 64 chapters / 255 sections / 723 sub-topics). Every authored mechanism must map to a section in the syllabus; mechanisms outside the syllabus are not authored for the platform. The syllabus is the long-term curriculum and the catalogue against which "what to author next" decisions are made; v1 is the cardiovascular slice (Part V) shipped to the pilot batch.
 
 ### 1.2 What This SOP Does Not Cover
 
@@ -364,27 +368,84 @@ After publication:
 - Automated quarterly AI audits flag anomalies.
 - Author and reviewers may flag issues from their own ongoing use.
 
-### 6.3 Corrections
+### 6.3 Edits and Corrections
 
-**Minor corrections (typos, clarity improvements).**
-- Author edits in place.
-- Version number incremented.
-- Students encountering the card next see the fix silently (no notification).
-- No student notification.
+Every published question has a UUID that the spaced-repetition system uses to track each student's performance history against that specific question. Edits to a question therefore fall into one of two categories, distinguished by whether the edit changes what the question *means*:
 
-**Substantive corrections (factual errors, question logic fixes).**
-- Author drafts correction.
-- If two-reviewer workflow active, reviewer confirms correction is appropriate.
-- New version published.
-- Students who have encountered the card see notice in weekly correction digest.
-- For corrections that change the correct answer itself, immediate notification appears on next card encounter.
+- A **cosmetic edit** changes presentation, labels, or scaffolding without changing the question's pedagogical content. Edits in this category happen in place. The UUID stays. Every student's accumulated review history for that question stays attached and stays accurate.
+- A **material edit** changes the question's pedagogical content — what the question asks, what the correct answer is, or what physiology the explanation is teaching. Edits in this category are not performed in place. Instead, the existing question is retired and a new question with a fresh UUID is created. Students who had been reviewing the old question encounter the new one as fresh content.
 
-**Major corrections (mechanism fundamentally misrepresented).**
-- Rare but important.
-- Mechanism retired (status change).
-- Corrected version published as new.
-- All affected students notified via in-app notification.
-- Author documents what happened and lessons learned.
+This distinction protects student learning data. A student's interval and ease factor on a question are only meaningful if the question they were performing against has stayed the same. Editing meaning in place silently invalidates that data. Retiring and replacing keeps history honest: old reviews stay joined to the old question, new reviews accumulate against the new one.
+
+#### What counts as cosmetic
+
+The following edits are cosmetic. They are made in place, with the UUID preserved.
+
+- Typos, grammar fixes, formatting changes.
+- Re-labeling difficulty (`foundational` / `standard` / `advanced`).
+- Re-labeling priority (`must` / `should` / `good`).
+- Tag changes — NMC competency, exam pattern, organ system, Bloom's level.
+- Prerequisite and related-mechanism updates.
+- Hint text refinements, when the question itself is unchanged.
+- Misconception correction-text refinements, when the wrong-answer string the misconception is keyed to is unchanged.
+- Typographic fixes to a correct answer that don't change its meaning — for example, `5.6 L/mn` to `5.6 L/min`. The intended answer was correct; the rendering was wrong.
+
+The test for whether a correct-answer edit is cosmetic: would a careful student reading the original have understood the intended right answer despite the error? If yes, cosmetic. If they would have walked away believing something wrong about physiology, the edit is material.
+
+#### What counts as material
+
+The following edits are material. They require retiring the existing question and creating a new one.
+
+- Changes to what the stem is asking.
+- Changes to the correct answer where the recorded answer was actually wrong — students who memorized it learned wrong physiology.
+- Changes to the elaborative explanation that alter the physiology being taught (not merely how it's worded).
+- Changes to a wrong-answer string in a misconception mapping. The wrong-answer string is the join key between a student's incorrect choice and the misconception coaching they receive; changing it breaks that join for historical analytics.
+
+#### How a material edit is performed
+
+1. Mark the existing question retired in the markdown. The question heading gains a `[retired]` annotation; the body of the question records `**Status:** retired` and a brief reason. The full question text remains in the file so that the gap is visibly intentional, removing any temptation to renumber surrounding questions.
+2. Author a new question as the next-numbered question in the file. The new question receives a fresh UUID at the next CI run.
+3. Commit both changes together in a single PR. The CI check verifies that the retired question's UUID is preserved and that the new question's UUID is genuinely new.
+
+From the student's perspective: the retired question simply stops appearing in their review queue. The new question appears as a fresh card the next time they encounter the mechanism. Their existing card_state for the retired UUID stays in the database, dormant, available for any future audit of how students performed on that version of the question.
+
+#### Never
+
+Three operations are never performed, under any circumstances.
+
+- **Never renumber question headings.** When a question is retired, its heading number stays. Subsequent questions keep their existing numbers. Gaps from earlier retirements remain as gaps. Renumbering causes silent SRS data corruption — every student's history for the renumbered questions becomes misattached to different content.
+- **Never reuse a UUID.** A UUID is a permanent label for a specific historical question. Reusing one means historical reviews join to today's content, which is dishonest and breaks every audit trail.
+- **Never hard-delete a UUID.** Questions are retired, not deleted. Retirement preserves every student's review history; deletion destroys it and orphans every joined record (disputes, content flags, audit data, sync state on offline devices).
+
+#### Reviving a retired question
+
+A question that was retired (for example, because it was thought to be wrong but later determined to be correct, or because it was set aside while a curriculum change was being considered) can be revived. Status flips from `retired` back to `published`. The UUID stays the same throughout. Students whose card_state had gone dormant during the retirement period resume normal scheduling with their prior interval and ease intact. Historical reviews remain joined to the same UUID, producing a continuous record across the retirement period.
+
+Reviving a question is appropriate only when the question's content is unchanged from when it was retired. If the question's content needs to change, the correct path is to leave the original retired and create a new question — same as any other material edit.
+
+#### Notification
+
+For cosmetic edits, students are not notified. The fix appears the next time the card surfaces. Cosmetic edits accumulate silently in the version history of the markdown file.
+
+For material edits, students who had been reviewing the retired question are not notified that it was retired specifically — that level of meta-information is noise. They simply stop seeing it. The new replacement question appears in their queue as a fresh card and they encounter it through normal review and learn flows.
+
+For material edits where the retired question was teaching wrong physiology — the case where the recorded correct answer was actually incorrect — affected students should be notified directly. Not because the system mechanically requires it, but because students who learned wrong physiology deserve to know they did, so they can deliberately re-encounter the corrected version with appropriate attention. The notification is a single in-app message naming the mechanism and the nature of the correction. This is rare and should be treated as a content-quality incident worth recording in the change log.
+
+#### Quick reference
+
+| Edit | UUID | Student data | Markdown action |
+|---|---|---|---|
+| Typo, grammar, formatting | preserved | preserved | edit in place |
+| Difficulty re-label | preserved | preserved | edit in place |
+| Priority re-label | preserved | preserved | edit in place |
+| Tag change | preserved | preserved | edit in place |
+| Hint refinement | preserved | preserved | edit in place |
+| Stem meaning change | retire old, new UUID for replacement | preserved on old UUID, fresh on new | tombstone + append new |
+| Correct answer change (was wrong) | retire old, new UUID for replacement | preserved on old UUID, fresh on new | tombstone + append new |
+| Explanation physiology change | retire old, new UUID for replacement | preserved on old UUID, fresh on new | tombstone + append new |
+| Misconception wrong-answer string change | retire old, new UUID for replacement | preserved on old UUID, fresh on new | tombstone + append new |
+| Question removed from circulation | preserved | preserved (dormant) | status → retired |
+| Question brought back into circulation | preserved | preserved (resumes) | status → published |
 
 ### 6.4 Retirement
 
@@ -393,11 +454,13 @@ Content is retired when:
 - Curriculum changes make content irrelevant.
 - Content is fundamentally wrong in ways that cannot be fixed.
 
-Retirement process:
-- Status changes to "retired."
+Retirement process for whole mechanisms:
+- Frontmatter status changes to "retired."
 - Content hidden from new students.
 - Students currently learning it finish their SRS cycle (up to 30 days), then the card drops from their queue.
 - Content remains in database for audit purposes (not truly deleted).
+
+Question-level retirement follows the same pattern as mechanism retirement and is the standard mechanism for removing a single question from circulation, whether because the question is being replaced as part of a material edit (§6.3) or because the question is no longer wanted in the bank. A retired question's UUID is preserved indefinitely. The question's content stays in the markdown file with a `[retired]` annotation on its heading and `**Status:** retired` in its body, both for human readability and to fill the position that would otherwise tempt renumbering. Retired questions can be revived (§6.3); they cannot be deleted.
 
 ### 6.5 Updates for Curriculum Changes
 
@@ -481,7 +544,11 @@ Check each source individually — not all NCBI Bookshelf content is open access
 - Total questions.
 - Content flag rate (flags per 1000 student interactions).
 - Correction rate (corrections per mechanism per month).
-- AI grading dispute rate (flagged grades per 100 graded explanations).
+<!--
+  AI grading dispute rate moved to v2 alongside the AI grader itself
+  (see build_spec.md §2.6). v1 has no AI-graded responses and
+  therefore no dispute traffic to monitor.
+-->
 
 ### 8.2 Review Queue Management
 
@@ -557,7 +624,12 @@ All AI authoring prompts stored in repository at `/content/prompts/`. Version-co
 
 **Periodic content audit.** Given the full content bank, identify consistency issues, pedagogical problems, and performance anomalies.
 
-**Grading prompt (self-explanation).** Given the correct answer and mechanism, grade student's self-explanation per Green/Yellow/Red rubric.
+<!--
+  Grading prompt (self-explanation) — deferred to v2 alongside the
+  AI grader itself (see build_spec.md §2.6). v1 grades MCQ and fill-
+  blank deterministically and has students self-rate descriptive
+  answers, so no LLM-grading prompt template is required for v1.
+-->
 
 Each prompt is refined through testing. Initial versions are approximations; refinement based on observed quality of output.
 
@@ -632,7 +704,10 @@ As content volume grows, quality control becomes more complex:
 - Mechanisms in review.
 - Content flags received.
 - Flags resolved.
-- Dispute rate on AI grades.
+<!--
+  Dispute rate on AI grades — deferred to v2. See build_spec.md §2.6
+  and SOP §8.1 (aggregate metrics) for the corresponding deferral.
+-->
 
 ### 11.2 Monthly Metrics
 
@@ -769,9 +844,20 @@ last_reviewed: 2026-05-15
 
 # Questions
 
+Each question declares **Format**, **Status**, and an **ID** (UUID). The
+two-zone redesign expects these on every published question; the
+parser tolerates omissions for backwards-compatibility but CI rejects
+published content that's missing them. See `chapter_template.md`
+and `question_type_templates.md` for the full author-facing shape.
+
 ## Question 1
+**ID:** 8f3c8e72-2a14-4c2c-8c8f-9e4a3b1d2c3a
+**Format:** mcq
+**Status:** published
 **Type:** prediction
 **Bloom's level:** apply
+**Priority:** must
+**Difficulty:** standard
 **Stem:** [Question text]
 **Correct answer:** [Answer]
 **Elaborative explanation:** [Why the answer is correct and how the mechanism works]
@@ -784,6 +870,38 @@ last_reviewed: 2026-05-15
 ### Misconception Mappings
 - Wrong answer: "Heart rate increases" → Misconception: conflating SV and HR changes
 - Wrong answer: "No change in CO" → Misconception: assuming compensation is complete
+
+## Question 2
+**ID:** a1b2c3d4-e5f6-4789-9abc-def012345678
+**Format:** fill_blank
+**Status:** published
+**Type:** recall
+**Bloom's level:** remember
+**Priority:** must
+**Difficulty:** foundational
+**Stem:** Normal resting cardiac output is approximately ____ L/min.
+**Correct answer:** 5 L/min
+**Acceptable answers:** "5 L/min" | "5 l/min" | "5 liters per minute"
+**Unit:** L/min
+**Tolerance:** ±10%
+**Elaborative explanation:** [Why this value is the anchor for downstream comparisons]
+
+## Question 3 [retired]
+**ID:** 9c4d2e8f-1a2b-4c3d-8e9f-0a1b2c3d4e5f
+**Format:** mcq
+**Status:** retired
+**Type:** prediction
+**Bloom's level:** apply
+**Stem:** [Original stem stays — file is the audit record]
+**Correct answer:** [Original answer stays]
+**Elaborative explanation:** [Original explanation stays]
+
+<!--
+  A retired question keeps its UUID, body, and heading number. The
+  gap is intentional — never renumber surrounding questions. See
+  §6.3 for cosmetic-vs-material edits and the retire-and-replace
+  flow.
+-->
 
 ---
 

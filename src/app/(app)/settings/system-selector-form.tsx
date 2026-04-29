@@ -6,6 +6,17 @@ import { useState, useTransition } from "react";
 
 import { saveStudySystemsAction } from "./actions";
 
+/**
+ * Render an organ-system slug as a learner-facing label. Replaces
+ * hyphens with spaces (so `special-senses` reads "Special senses"
+ * rather than the lazier "Special-senses" the old `capitalize` rule
+ * produced) and capitalises the first letter.
+ */
+function formatSystemLabel(system: string): string {
+  const spaced = system.replace(/-/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 type Props = {
   allSystems: string[];
   initiallyChecked: string[];
@@ -112,7 +123,7 @@ export function SystemSelectorForm({ allSystems, initiallyChecked }: Props) {
                 onChange={() => toggle(system)}
                 className="mt-0.5"
               />
-              <span className="capitalize">{system}</span>
+              <span>{formatSystemLabel(system)}</span>
             </label>
           );
         })}

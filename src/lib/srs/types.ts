@@ -6,8 +6,15 @@
  * (Dexie, Supabase) build rows matching the same shapes.
  */
 
-/** Rating a learner gives at the end of a card review. */
-export type Rating = "again" | "hard" | "good" | "easy";
+/**
+ * Rating a learner submits at the end of a card review.
+ *
+ * Five values per build spec §2.7's third modification: the standard
+ * SM-2 four (again / hard / good / easy) plus "dont_know" — used on
+ * MCQ and fill-blank to distinguish honest acknowledgment of
+ * ignorance from a confident-wrong attempt.
+ */
+export type Rating = "again" | "hard" | "good" | "easy" | "dont_know";
 
 /**
  * Per-card scheduling state.

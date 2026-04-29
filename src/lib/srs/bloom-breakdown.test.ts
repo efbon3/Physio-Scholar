@@ -9,8 +9,10 @@ import type { Rating } from "./types";
 function card(id: string, level: Card["blooms_level"]): Card {
   return {
     id,
-    mechanism_id: id.split(":")[0],
+    chapter_id: id.split(":")[0],
     index: Number.parseInt(id.split(":")[1] ?? "1", 10),
+    format: "descriptive",
+    status: "published",
     type: "prediction",
     blooms_level: level,
     priority: "should",
@@ -34,6 +36,7 @@ function review(card_id: string, rating: Rating, when = "2026-04-01T10:00:00Z"):
     time_spent_seconds: 30,
     session_id: null,
     self_explanation: null,
+    engagement_method: null,
     created_at: when,
     pending_sync: 0,
   };

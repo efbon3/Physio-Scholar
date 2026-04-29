@@ -18,7 +18,7 @@ type Props = {
 };
 
 /**
- * Single-textarea editor for a mechanism markdown file.
+ * Single-textarea editor for a Chapter markdown file.
  *
  * Left side: the markdown source (frontmatter + body). Right side: a
  * live preview of the body (we skip frontmatter because it's YAML, not
@@ -34,7 +34,7 @@ type Props = {
  * or paste a Drive link, and the resulting `![alt](url)` snippet is
  * injected at the current caret position.
  */
-export function MechanismEditor({ mode, initialMarkdown, initialStatus, expectedId }: Props) {
+export function ChapterEditor({ mode, initialMarkdown, initialStatus, expectedId }: Props) {
   const [markdown, setMarkdown] = useState(initialMarkdown);
   const [status, setStatus] = useState(initialStatus);
   const [result, setResult] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export function MechanismEditor({ mode, initialMarkdown, initialStatus, expected
 
       <DiagramInserter
         onInsert={insertAtCaret}
-        mechanismId={detectedMechanismId ?? expectedId ?? "unfiled"}
+        chapterId={detectedMechanismId ?? expectedId ?? "unfiled"}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -139,7 +139,7 @@ export function MechanismEditor({ mode, initialMarkdown, initialStatus, expected
           disabled={pending}
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
-          {pending ? "Saving…" : mode === "create" ? "Save new mechanism" : "Save changes"}
+          {pending ? "Saving…" : mode === "create" ? "Save new chapter" : "Save changes"}
         </button>
         <Link
           href="/admin/content"
@@ -167,7 +167,7 @@ function stripFrontmatter(raw: string): string {
 
 /**
  * Pull the `id:` value out of the frontmatter so the diagram uploader
- * can partition files into `<mechanism_id>/…`. Cheap regex; the parser
+ * can partition files into `<chapter_id>/…`. Cheap regex; the parser
  * validates properly server-side.
  */
 function extractMechanismId(raw: string): string | null {

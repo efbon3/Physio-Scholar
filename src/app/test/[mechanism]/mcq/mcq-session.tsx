@@ -1,0 +1,633 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState } from "react";
+
+import { buttonVariants } from "@/components/ui/button";
+import type { Card } from "@/lib/content/cards";
+import type { McqQuestion } from "@/lib/content/exam";
+import { bandToRating, mcqOutcomeToBand, type GradingBand } from "@/lib/grading/rating-mapping";
+import { recordReviewLocally } from "@/lib/srs/local";
+import { cn } from "@/lib/utils";
+
+type Props = {
+  questions: readonly McqQuestion[];
+  cards: readonly Card[];
+  chapterId: string;
+  mechanismSystem: string;
+  profileId: string;
+};
+
+type SessionStatus = "answering" | "feedback" | "complete";
+
+type Outcome = {
+  cardId: string;
+  band: GradingBand;
+  selectedIndex: number | null;
+};
+
+/**
+ * What the learner did on a single MCQ. Captured the moment Submit
+ * locks the answer so back-navigation can replay the reveal screen
+ * for any prior question. First answer per card is canonical — you
+ * cannot re-pick from history.
+ */
+type CardSnapshot = {
+  selectedIndex: number;
+  band: GradingBand;
+  dontKnow: boolean;
+};
+
+/** A symbolic value used for `selectedIndex` when the student picks
+ * "I don't know" rather than one of the four options. Distinct from
+ * `null` (no selection yet) so the lock-on-Submit logic can tell
+ * "didn't pick yet" from "explicitly opted out." */
+const DONT_KNOW = -1 as const;
+
+/**
+ * Chapter-centric MCQ session. Walks through pre-built `McqQuestion`
+ * objects (server-shuffled) one at a time:
+ *   1. Show stem + four option cards + a subordinate "I don't know"
+ *      button. Tapping any option (or "I don't know") highlights it;
+ *      the student can change their mind freely until they tap Submit.
+ *   2. Submit locks the choice and reveals the correct option, the
+ *      misconception coaching string (if the wrong-answer text matches
+ *      a misconception map entry; "I don't know" suppresses it), and
+ *      the elaborative explanation.
+ *   3. SRS rating per `mcqOutcomeToBand`: correct + no hints → Green,
+ *      correct + hints → Yellow, wrong → Red, "I don't know" →
+ *      dont_know (build spec §2.7 modification 3 — same next-interval
+ *      as Again but no ease drop, no lapse increment). v1 has no hint
+ *      ladder on this surface yet, so hintsUsed is always 0.
+ *   4. Continue → next card.
+ *   5. End-of-session summary with Correct / Partial / Incorrect /
+ *      Don't-know counts.
+ *
+ * Practice-only toggle suppresses SRS schedule writes per build spec
+ * §2.3 — review row still records (analytics), card_state stays
+ * untouched. Locked once the first answer is committed.
+ */
+export function McqSession({ questions, cards, chapterId, mechanismSystem, profileId }: Props) {
+  const [index, setIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [status, setStatus] = useState<SessionStatus>("answering");
+  const [outcomes, setOutcomes] = useState<Outcome[]>([]);
+  const [startTime, setStartTime] = useState<number>(() => Date.now());
+  const [practiceMode, setPracticeMode] = useState(false);
+  // Practice-missed sub-session: after a Session-complete summary, the
+  // student can grind just the cards they got wrong without disturbing
+  // their SM-2 schedule. We force practice mode for this sub-session
+  // regardless of the toggle, so a learner re-attempting their misses
+  // can never accidentally tank their card states by choosing badly
+  // on a tired second pass.
+  const [practiceMissedActive, setPracticeMissedActive] = useState(false);
+  const [activeQuestions, setActiveQuestions] = useState<readonly McqQuestion[]>(questions);
+  const effectivePracticeMode = practiceMode || practiceMissedActive;
+  const practiceLocked = outcomes.length > 0;
+  // Back-navigation state — see DescriptiveSession for the design.
+  const [viewIndex, setViewIndex] = useState(0);
+  const [snapshots, setSnapshots] = useState<Record<string, CardSnapshot>>({});
+
+  const sessionId = useMemo(() => crypto.randomUUID(), []);
+  // Index cards by id for O(1) misconception lookup. Same Card object
+  // we render the MCQ from also carries the misconception list keyed
+  // to wrong-answer text.
+  const cardsById = useMemo(() => {
+    const m = new Map<string, Card>();
+    for (const c of cards) m.set(c.id, c);
+    return m;
+  }, [cards]);
+
+  const question = activeQuestions[index];
+  const card = question ? cardsById.get(question.cardId) : undefined;
+  const isLastQuestion = index === activeQuestions.length - 1;
+  const inHistory = viewIndex < index && status !== "complete";
+  const viewedQuestion = inHistory ? activeQuestions[viewIndex] : null;
+  const viewedCard = viewedQuestion ? cardsById.get(viewedQuestion.cardId) : undefined;
+  const viewedSnapshot = viewedQuestion ? snapshots[viewedQuestion.cardId] : undefined;
+
+  function handlePracticeMissed() {
+    const missedIds = new Set(
+      outcomes
+        .filter((o) => o.band === "red" || o.band === "yellow" || o.band === "dont_know")
+        .map((o) => o.cardId),
+    );
+    if (missedIds.size === 0) return;
+    const missed = activeQuestions.filter((q) => missedIds.has(q.cardId));
+    // Re-shuffle so the order isn't memorised — same defence as the
+    // server-side shuffle on session start.
+    const shuffled = [...missed].sort(() => Math.random() - 0.5);
+    setActiveQuestions(shuffled);
+    setPracticeMissedActive(true);
+    setIndex(0);
+    setViewIndex(0);
+    setSnapshots({});
+    setSelectedIndex(null);
+    setOutcomes([]);
+    setStartTime(Date.now());
+    setStatus("answering");
+  }
+
+  function handleViewPrevious() {
+    if (viewIndex > 0) setViewIndex((v) => v - 1);
+  }
+
+  function handleViewForward() {
+    if (viewIndex < index) setViewIndex((v) => v + 1);
+  }
+
+  if (inHistory && viewedQuestion && viewedCard && viewedSnapshot) {
+    return (
+      <McqHistoryView
+        question={viewedQuestion}
+        card={viewedCard}
+        snapshot={viewedSnapshot}
+        viewIndex={viewIndex}
+        totalQuestions={activeQuestions.length}
+        liveIndex={index}
+        onPrevious={handleViewPrevious}
+        onForward={handleViewForward}
+      />
+    );
+  }
+
+  if (status === "complete") {
+    return (
+      <SummaryScreen
+        outcomes={outcomes}
+        chapterId={chapterId}
+        mechanismSystem={mechanismSystem}
+        practiceMode={effectivePracticeMode}
+        practiceMissedActive={practiceMissedActive}
+        onPracticeMissed={handlePracticeMissed}
+      />
+    );
+  }
+
+  if (!question || !card) return null;
+
+  const correctIndex = question.options.findIndex((o) => o.isCorrect);
+  const isDontKnow = selectedIndex === DONT_KNOW;
+  const isCorrect = selectedIndex !== null && !isDontKnow && selectedIndex === correctIndex;
+  const selectedOptionText =
+    selectedIndex !== null && selectedIndex !== DONT_KNOW
+      ? question.options[selectedIndex].text
+      : null;
+  const matchingMisconception =
+    !isDontKnow && selectedOptionText !== null && !isCorrect
+      ? card.misconceptions.find((m) => m.wrong_answer === selectedOptionText)
+      : undefined;
+
+  function handleSelect(i: number) {
+    if (status !== "answering") return;
+    setSelectedIndex(i);
+  }
+
+  function handleDontKnow() {
+    if (status !== "answering") return;
+    setSelectedIndex(DONT_KNOW);
+  }
+
+  async function handleSubmit() {
+    if (status !== "answering") return;
+    if (selectedIndex === null) return;
+
+    const dontKnow = selectedIndex === DONT_KNOW;
+    const correct = !dontKnow && selectedIndex === correctIndex;
+    const band = mcqOutcomeToBand({ correct, hintsUsed: 0, dontKnow });
+    const rating = bandToRating(band);
+    const elapsedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+
+    try {
+      await recordReviewLocally({
+        profileId,
+        cardId: question.cardId,
+        rating,
+        hintsUsed: 0,
+        timeSpentSeconds: elapsedSeconds,
+        sessionId,
+        practiceMode: effectivePracticeMode,
+      });
+    } catch (err) {
+      console.error("Failed to record MCQ review locally", err);
+    }
+
+    setSnapshots((prior) => ({
+      ...prior,
+      [question.cardId]: { selectedIndex, band, dontKnow },
+    }));
+    setOutcomes((prior) => [
+      ...prior,
+      {
+        cardId: question.cardId,
+        band,
+        selectedIndex: dontKnow ? null : selectedIndex,
+      },
+    ]);
+    setStatus("feedback");
+  }
+
+  function handleContinue() {
+    if (isLastQuestion) {
+      setStatus("complete");
+      return;
+    }
+    setIndex((i) => i + 1);
+    setViewIndex((v) => v + 1);
+    setSelectedIndex(null);
+    setStatus("answering");
+    setStartTime(Date.now());
+  }
+
+  const submitDisabled = status !== "answering" || selectedIndex === null;
+
+  return (
+    <article className="border-border flex flex-col gap-5 rounded-md border p-5">
+      <header className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between text-xs">
+          <p className="text-muted-foreground tracking-widest uppercase">
+            Question {index + 1} of {activeQuestions.length}
+          </p>
+          {status === "feedback" ? (
+            <BandPill band={isDontKnow ? "dont_know" : isCorrect ? "green" : "red"} />
+          ) : null}
+        </div>
+        {practiceMissedActive ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <strong className="font-medium">Practice round</strong> — reviewing{" "}
+            {activeQuestions.length} missed card{activeQuestions.length === 1 ? "" : "s"}. Your SRS
+            schedule won&apos;t be touched.
+          </p>
+        ) : (
+          <label className="text-muted-foreground flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={practiceMode}
+              onChange={(e) => setPracticeMode(e.target.checked)}
+              disabled={practiceLocked}
+              className="h-3.5 w-3.5"
+            />
+            <span>
+              Practice only — log this session but don&apos;t change my schedule.
+              {practiceLocked ? <em className="ml-1">(Locked after first answer.)</em> : null}
+            </span>
+          </label>
+        )}
+      </header>
+
+      <p className="text-base leading-relaxed">{question.stem}</p>
+
+      <ul className="flex flex-col gap-2">
+        {question.options.map((option, i) => {
+          const isSelected = selectedIndex === i;
+          const showCorrect = status === "feedback" && i === correctIndex;
+          const showWrong = status === "feedback" && isSelected && i !== correctIndex;
+          return (
+            <li key={`${question.cardId}-${i}`}>
+              <button
+                type="button"
+                onClick={() => handleSelect(i)}
+                disabled={status !== "answering"}
+                aria-pressed={isSelected}
+                className={cn(
+                  "border-input bg-background flex w-full items-start gap-3 rounded-md border p-3 text-left text-sm transition-colors",
+                  status === "answering" && "hover:bg-muted",
+                  status === "answering" && isSelected && "border-primary bg-primary/5",
+                  showCorrect && "border-emerald-500 bg-emerald-50 text-emerald-900",
+                  showWrong && "border-red-500 bg-red-50 text-red-900",
+                  status !== "answering" && !showCorrect && !showWrong && "opacity-70",
+                )}
+              >
+                <span className="text-muted-foreground font-mono text-xs">
+                  {String.fromCharCode(65 + i)}.
+                </span>
+                <span className="flex-1">{option.text}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* "I don't know" lives below the four options as a deliberately
+          subordinate but clearly available choice — build spec §2.3
+          ("visually subordinate but clearly available"). */}
+      <button
+        type="button"
+        onClick={handleDontKnow}
+        disabled={status !== "answering"}
+        aria-pressed={isDontKnow}
+        className={cn(
+          "border-input text-muted-foreground self-start rounded-md border border-dashed px-3 py-1.5 text-xs transition-colors",
+          status === "answering" && "hover:bg-muted",
+          status === "answering" && isDontKnow && "border-primary text-primary bg-primary/5",
+          status !== "answering" && isDontKnow && "border-amber-500 bg-amber-50 text-amber-900",
+          status !== "answering" && !isDontKnow && "opacity-50",
+        )}
+      >
+        I don&apos;t know
+      </button>
+
+      {status === "answering" ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitDisabled}
+            className={cn(buttonVariants({ size: "default" }))}
+          >
+            Submit answer
+          </button>
+        </div>
+      ) : null}
+
+      {status === "feedback" ? (
+        <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-md border p-4 text-sm leading-relaxed">
+          {isDontKnow ? (
+            <p className="text-muted-foreground text-xs">
+              You opted out — the card returns tomorrow without an ease change.
+            </p>
+          ) : null}
+          {!isCorrect && !isDontKnow && matchingMisconception ? (
+            <div>
+              <p className="text-muted-foreground text-xs tracking-widest uppercase">
+                What went wrong
+              </p>
+              <p>{matchingMisconception.description}</p>
+            </div>
+          ) : null}
+          <div>
+            <p className="text-muted-foreground text-xs tracking-widest uppercase">Why</p>
+            <p>{question.elaborativeExplanation}</p>
+          </div>
+          <div className="flex items-center justify-between">
+            {index > 0 ? (
+              <button
+                type="button"
+                onClick={handleViewPrevious}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-md px-2 py-1 text-xs underline-offset-2 hover:underline"
+              >
+                ← Previous question
+              </button>
+            ) : (
+              <span />
+            )}
+            <button onClick={handleContinue} className={cn(buttonVariants({ size: "default" }))}>
+              {isLastQuestion ? "Finish" : "Continue"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function BandPill({ band }: { band: GradingBand }) {
+  const label =
+    band === "green"
+      ? "Correct"
+      : band === "yellow"
+        ? "Partial"
+        : band === "red"
+          ? "Incorrect"
+          : "Don't know";
+  const cls =
+    band === "green"
+      ? "bg-emerald-100 text-emerald-900"
+      : band === "yellow"
+        ? "bg-amber-100 text-amber-900"
+        : band === "red"
+          ? "bg-red-100 text-red-900"
+          : "bg-slate-100 text-slate-700";
+  return (
+    <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium", cls)}>{label}</span>
+  );
+}
+
+function SummaryScreen({
+  outcomes,
+  chapterId,
+  mechanismSystem,
+  practiceMode,
+  practiceMissedActive,
+  onPracticeMissed,
+}: {
+  outcomes: readonly Outcome[];
+  chapterId: string;
+  mechanismSystem: string;
+  practiceMode: boolean;
+  practiceMissedActive: boolean;
+  onPracticeMissed: () => void;
+}) {
+  const counts = outcomes.reduce<Record<GradingBand, number>>(
+    (acc, o) => {
+      acc[o.band] += 1;
+      return acc;
+    },
+    { green: 0, yellow: 0, red: 0, dont_know: 0 },
+  );
+  const missedCount = counts.yellow + counts.red + counts.dont_know;
+  return (
+    <article className="border-border flex flex-col gap-5 rounded-md border p-5">
+      <header className="flex flex-col gap-1">
+        <h2 className="font-heading text-xl font-semibold">
+          {practiceMissedActive ? "Practice round complete" : "Session complete"}
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          You answered {outcomes.length} multiple-choice question
+          {outcomes.length === 1 ? "" : "s"}.
+        </p>
+      </header>
+      <dl className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
+        <SummaryStat label="Correct" count={counts.green} band="green" />
+        <SummaryStat label="Partial" count={counts.yellow} band="yellow" />
+        <SummaryStat label="Incorrect" count={counts.red} band="red" />
+        <SummaryStat label="Don't know" count={counts.dont_know} band="dont_know" />
+      </dl>
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        {practiceMissedActive
+          ? "Practice round — analytics logged, SRS schedule untouched."
+          : practiceMode
+            ? "Practice mode — your answers were logged but the SRS schedule wasn't touched."
+            : "These ratings have been logged to your daily review queue."}
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {missedCount > 0 ? (
+          <button
+            type="button"
+            onClick={onPracticeMissed}
+            className={cn(buttonVariants({ size: "default" }))}
+          >
+            Practice missed ({missedCount})
+          </button>
+        ) : null}
+        <Link
+          href={`/systems/${mechanismSystem}/${chapterId}`}
+          className={cn(buttonVariants({ size: "default", variant: "outline" }))}
+        >
+          Back to Chapter
+        </Link>
+        <Link
+          href="/today"
+          className={cn(
+            buttonVariants({ size: "default", variant: missedCount > 0 ? "outline" : "default" }),
+          )}
+        >
+          Open today&apos;s review
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function SummaryStat({ label, count, band }: { label: string; count: number; band: GradingBand }) {
+  const cls =
+    band === "green"
+      ? "bg-emerald-50 text-emerald-900"
+      : band === "yellow"
+        ? "bg-amber-50 text-amber-900"
+        : band === "red"
+          ? "bg-red-50 text-red-900"
+          : "bg-slate-50 text-slate-700";
+  return (
+    <div className={cn("flex flex-col rounded-md py-3", cls)}>
+      <dt className="text-[11px] tracking-widest uppercase">{label}</dt>
+      <dd className="text-2xl font-semibold">{count}</dd>
+    </div>
+  );
+}
+
+/**
+ * Read-only replay of a previously-answered MCQ. Shows the stem, all
+ * four options with the student's pick + the correct option marked,
+ * any matching misconception correction, and the elaborative
+ * explanation. Buttons are inert — first answer per card is canonical
+ * and locked, you can't re-pick from history.
+ */
+function McqHistoryView({
+  question,
+  card,
+  snapshot,
+  viewIndex,
+  totalQuestions,
+  liveIndex,
+  onPrevious,
+  onForward,
+}: {
+  question: McqQuestion;
+  card: Card;
+  snapshot: CardSnapshot;
+  viewIndex: number;
+  totalQuestions: number;
+  liveIndex: number;
+  onPrevious: () => void;
+  onForward: () => void;
+}) {
+  const correctIndex = question.options.findIndex((o) => o.isCorrect);
+  const onLastHistory = viewIndex === liveIndex - 1;
+  const bandLabel: Record<GradingBand, string> = {
+    green: "Correct",
+    yellow: "Partial",
+    red: "Incorrect",
+    dont_know: "Don't know",
+  };
+  const bandClass: Record<GradingBand, string> = {
+    green: "bg-emerald-100 text-emerald-900",
+    yellow: "bg-amber-100 text-amber-900",
+    red: "bg-red-100 text-red-900",
+    dont_know: "bg-slate-100 text-slate-700",
+  };
+  const selectedOptionText =
+    !snapshot.dontKnow && snapshot.selectedIndex >= 0
+      ? question.options[snapshot.selectedIndex]?.text
+      : null;
+  const matchingMisconception =
+    selectedOptionText !== null
+      ? card.misconceptions.find((m) => m.wrong_answer === selectedOptionText)
+      : undefined;
+  return (
+    <article className="border-border flex flex-col gap-5 rounded-md border p-5">
+      <header className="flex items-center justify-between gap-2">
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">
+          Reviewing question {viewIndex + 1} of {totalQuestions}
+        </p>
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+            bandClass[snapshot.band],
+          )}
+        >
+          {bandLabel[snapshot.band]}
+        </span>
+      </header>
+
+      <p className="text-base leading-relaxed">{question.stem}</p>
+
+      <ul className="flex flex-col gap-2">
+        {question.options.map((option, i) => {
+          const isStudentPick = !snapshot.dontKnow && snapshot.selectedIndex === i;
+          const isCorrectOpt = i === correctIndex;
+          return (
+            <li
+              key={`${question.cardId}-${i}`}
+              className={cn(
+                "border-input flex items-start gap-3 rounded-md border p-3 text-sm",
+                isCorrectOpt && "border-emerald-500 bg-emerald-50 text-emerald-900",
+                isStudentPick && !isCorrectOpt && "border-red-500 bg-red-50 text-red-900",
+                !isStudentPick && !isCorrectOpt && "opacity-70",
+              )}
+            >
+              <span className="text-muted-foreground font-mono text-xs">
+                {String.fromCharCode(65 + i)}.
+              </span>
+              <span className="flex-1">{option.text}</span>
+              {isStudentPick ? (
+                <span className="text-[10px] tracking-widest uppercase">Your pick</span>
+              ) : isCorrectOpt ? (
+                <span className="text-[10px] tracking-widest uppercase">Correct</span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+
+      {snapshot.dontKnow ? (
+        <p className="text-muted-foreground text-xs">
+          You opted out — &ldquo;I don&apos;t know.&rdquo;
+        </p>
+      ) : null}
+
+      <div className="border-border bg-muted/40 flex flex-col gap-3 rounded-md border p-4 text-sm leading-relaxed">
+        {!snapshot.dontKnow && matchingMisconception ? (
+          <div>
+            <p className="text-muted-foreground text-xs tracking-widest uppercase">
+              What went wrong
+            </p>
+            <p>{matchingMisconception.description}</p>
+          </div>
+        ) : null}
+        <div>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">Why</p>
+          <p>{question.elaborativeExplanation}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <button
+          type="button"
+          onClick={onPrevious}
+          disabled={viewIndex === 0}
+          className="border-input hover:bg-muted text-foreground rounded-md border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ← Previous
+        </button>
+        <button
+          type="button"
+          onClick={onForward}
+          className="border-input hover:bg-muted text-foreground rounded-md border px-3 py-1.5"
+        >
+          {onLastHistory ? "Back to current →" : "Forward →"}
+        </button>
+      </div>
+    </article>
+  );
+}

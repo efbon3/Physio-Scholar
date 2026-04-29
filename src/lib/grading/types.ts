@@ -6,9 +6,9 @@
  * / `Grader` needs to change when the implementation swaps.
  *
  * Rubric per Vision Document §2.7:
- *   green  — "Well explained" — learner captured the mechanism
+ *   green  — "Well explained" — learner captured the Chapter
  *   yellow — "Partially correct" — some content right, some missing/wrong
- *   red    — "Missing the mechanism" — misses or misapplies the core model
+ *   red    — "Missing the Chapter" — misses or misapplies the core model
  *   pending — the grader has not yet run (offline, queued, or Phase 4 not
  *             yet live). UI shows "Grading when online" text.
  */

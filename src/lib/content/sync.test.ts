@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { __resetContentDBForTests, getContentDB } from "./db";
-import type { Mechanism } from "./loader";
+import type { Chapter } from "./loader";
 import {
   clearMechanisms,
   getMechanism,
@@ -10,16 +10,16 @@ import {
   syncMechanisms,
 } from "./sync";
 
-function makeMechanism(overrides: Partial<Mechanism["frontmatter"]> = {}): Mechanism {
+function makeMechanism(overrides: Partial<Chapter["frontmatter"]> = {}): Chapter {
   return {
     frontmatter: {
       id: "frank-starling",
-      title: "Frank-Starling Mechanism",
+      title: "Frank-Starling Chapter",
       organ_system: "cardiovascular",
       nmc_competencies: ["PY-CV-1.5"],
       exam_patterns: ["neet-pg"],
       prerequisites: [],
-      related_mechanisms: [],
+      related_chapters: [],
       blooms_distribution: { remember: 10, understand: 30, apply: 30, analyze: 30 },
       author: "a",
       reviewer: "pending",

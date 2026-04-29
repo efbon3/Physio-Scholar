@@ -1,0 +1,43 @@
+# Learning chapter template
+#
+# Save this file as e.g. `ch01-introduction-and-homeostasis.md` (the
+# filename's basename, sans `.md`, becomes the URL slug). Then fill
+# in the four layer sections below. Any layer you leave out is hidden
+# from the tab strip — author what you have, ship the rest later.
+#
+# ---
+# chapter: Chapter 1 — Introduction to Physiology and Homeostasis
+# part: Part I — Foundations of Physiology
+# status: draft
+# ---
+#
+# # Layer 1 — Core
+#
+# 30-second elevator description of the chapter. The single most
+# important sentence-or-paragraph a learner should walk away with.
+# Bullet points OK. Keep it tight.
+#
+# # Layer 2 — Working
+#
+# Two-to-three-minute working explanation. The level a competent
+# first-year MBBS student should be able to recite. Diagrams welcome
+# (use Markdown image syntax, drop the file via the admin upload tool).
+#
+# # Layer 3 — Deep Dive
+#
+# Eight-to-ten-minute deeper read. The mechanism's nuance, the
+# experimental evidence, the edge cases, the historical context, the
+# cross-system integrations. This is where the review-book detail
+# lives.
+#
+# # Layer 4 — Clinical Integration
+#
+# How the chapter shows up at bedside. Diseases that disrupt the
+# mechanism, drug classes that target it, common patient presentations,
+# differential reasoning. Anchors the chapter in clinical practice.
+#
+# # Sources
+#
+# Optional. Bulleted list of references — Guyton, Costanzo, Sherwood,
+# Ganong, primary literature. Surfaced as a small footer below the
+# layer tabs.

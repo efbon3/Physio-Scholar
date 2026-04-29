@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { organSystemSchema } from "@/lib/content/schema";
 import { createClient } from "@/lib/supabase/server";
 
 import { PrivacyPanel } from "./privacy-panel";
@@ -9,19 +10,15 @@ export const metadata = {
   title: "Settings",
 };
 
-const ALL_SYSTEMS = [
-  "cardiovascular",
-  "respiratory",
-  "renal",
-  "gastrointestinal",
-  "endocrine",
-  "nervous",
-  "musculoskeletal",
-  "reproductive",
-  "blood",
-  "immune",
-  "integumentary",
-] as const;
+// Source of truth: the schema's `organSystemSchema` enum. Keeping the
+// settings list derived from there means a new system added to the
+// platform (e.g. when content lands for `foundations` or
+// `special-senses`) automatically appears in the filter, and the
+// settings UI can never drift out of sync with what chapters actually
+// declare. `general` is filtered out — it's a legacy alias for
+// `foundations` (per schema docs) and shouldn't be a separate
+// user-facing toggle.
+const ALL_SYSTEMS = organSystemSchema.options.filter((s) => s !== "general");
 
 /**
  * Settings page — currently a single surface for the per-student
@@ -76,7 +73,7 @@ export default async function SettingsPage() {
         // a different key re-mounts the form with a fresh useState
         // initializer — no stale local state, no useEffect needed.
         key={[...activeSystems].sort().join("|")}
-        allSystems={ALL_SYSTEMS as unknown as string[]}
+        allSystems={[...ALL_SYSTEMS]}
         initiallyChecked={activeSystems}
       />
 

@@ -68,19 +68,19 @@ describe("findActiveExamWindow", () => {
 });
 
 describe("buildBoostCardIds", () => {
-  // Minimal mechanism + card stand-ins. The helper only reads
+  // Minimal Chapter + card stand-ins. The helper only reads
   // frontmatter.organ_system / frontmatter.id from mechanisms and
-  // id / mechanism_id from cards.
+  // id / chapter_id from cards.
   const mechanisms = [
     { frontmatter: { id: "frank-starling", organ_system: "cardiovascular" } },
     { frontmatter: { id: "baroreceptor-reflex", organ_system: "cardiovascular" } },
     { frontmatter: { id: "renal-clearance", organ_system: "renal" } },
   ] as never;
   const cards = [
-    { id: "frank-starling:1", mechanism_id: "frank-starling" },
-    { id: "frank-starling:2", mechanism_id: "frank-starling" },
-    { id: "baroreceptor-reflex:1", mechanism_id: "baroreceptor-reflex" },
-    { id: "renal-clearance:1", mechanism_id: "renal-clearance" },
+    { id: "frank-starling:1", chapter_id: "frank-starling" },
+    { id: "frank-starling:2", chapter_id: "frank-starling" },
+    { id: "baroreceptor-reflex:1", chapter_id: "baroreceptor-reflex" },
+    { id: "renal-clearance:1", chapter_id: "renal-clearance" },
   ];
 
   it("returns the cards belonging to mechanisms in the exam's organ_systems", () => {

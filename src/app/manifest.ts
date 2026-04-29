@@ -19,7 +19,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Physio-Scholar",
     short_name: "Physio-Scholar",
     description:
-      "Mechanism-based active-recall learning for MBBS physiology. V1 pilot for cardiovascular fundamentals.",
+      "Chapter-based active-recall learning for MBBS physiology. V1 pilot for cardiovascular fundamentals.",
     start_url: "/today",
     scope: "/",
     display: "standalone",

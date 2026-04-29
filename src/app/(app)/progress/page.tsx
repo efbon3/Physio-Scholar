@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { extractCards, type Card } from "@/lib/content/cards";
-import { readAllMechanisms } from "@/lib/content/source";
+import { readAllChapters } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
 import { ProgressDashboard } from "./progress-dashboard";
@@ -13,7 +13,7 @@ export const metadata = {
 /**
  * Progress tab — Phase 5 learner-facing analytics. The route shell +
  * placeholder copy shipped in D1; D3 wires in the real Dexie-backed
- * metrics (streak, retention%, per-mechanism mastery, activity
+ * metrics (streak, retention%, per-Chapter mastery, activity
  * sparkline).
  *
  * Per build spec §2.3, the full Progress surface eventually includes
@@ -33,7 +33,7 @@ export default async function ProgressPage() {
     }
   }
 
-  const mechanisms = await readAllMechanisms();
+  const mechanisms = await readAllChapters();
   const cards: Card[] = mechanisms.flatMap(extractCards);
   const mechanismTitles = Object.fromEntries(
     mechanisms.map((m) => [m.frontmatter.id, m.frontmatter.title]),

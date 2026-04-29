@@ -49,7 +49,7 @@ export default async function AdminOverview() {
       >
         <p>
           Dispute queue lands with the Phase 4 AI grader. Content edits are made in the repo (
-          <code>content/mechanisms/</code>) and shipped via a normal deploy — admin does not write
+          <code>content/chapters/</code>) and shipped via a normal deploy — admin does not write
           content in the app.
         </p>
       </section>

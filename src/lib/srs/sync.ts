@@ -364,6 +364,10 @@ export async function syncNow(params: {
 // ---------------- Mappers ----------------
 
 function toReviewInsert(row: StoredReview): ReviewsInsert {
+  // `engagement_method` lives on the local row but the Supabase
+  // `reviews` table doesn't have a matching column yet — that lands
+  // in a Phase-6 migration. Drop the field on push so existing
+  // installs keep working until then.
   const base: ReviewsInsert = {
     profile_id: row.profile_id,
     card_id: row.card_id,
@@ -424,6 +428,7 @@ function toStoredReview(row: Database["public"]["Tables"]["reviews"]["Row"]): St
     time_spent_seconds: row.time_spent_seconds,
     session_id: row.session_id,
     self_explanation: row.self_explanation,
+    engagement_method: null,
     created_at: row.created_at,
     pending_sync: 0,
   };

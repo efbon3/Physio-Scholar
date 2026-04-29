@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 
-import { parseMechanism, type Mechanism } from "./loader";
+import { parseChapter, type Chapter } from "./loader";
 
 /**
- * Supabase-backed mechanism source.
+ * Supabase-backed chapter source.
  *
- * CMS-authored mechanisms land in `public.content_mechanisms` as full
+ * CMS-authored chapters land in `public.content_chapters` as full
  * markdown text (frontmatter + body). At render time, the
  * dual-source loader in `./source.ts` asks this module for published
  * rows first, then layers the filesystem markdown underneath for any
@@ -21,12 +21,12 @@ import { parseMechanism, type Mechanism } from "./loader";
  */
 
 /**
- * Read every published mechanism out of the DB, parsed.
+ * Read every published chapter out of the DB, parsed.
  * Returns [] when Supabase is unconfigured or unreachable. Parse errors
  * on a specific row are logged but don't abort the whole load — one
- * malformed DB row shouldn't nuke the Systems page.
+ * malformed DB row shouldn't nuke the Assessment page.
  */
-export async function readPublishedMechanismsFromDb(): Promise<Mechanism[]> {
+export async function readPublishedChaptersFromDb(): Promise<Chapter[]> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
   let supabase;
   try {
@@ -36,37 +36,37 @@ export async function readPublishedMechanismsFromDb(): Promise<Mechanism[]> {
   }
 
   const { data, error } = await supabase
-    .from("content_mechanisms")
+    .from("content_chapters")
     .select("id, markdown")
     .eq("status", "published");
 
   if (error || !data) return [];
 
-  const parsed: Mechanism[] = [];
+  const parsed: Chapter[] = [];
   for (const row of data) {
     try {
-      const mechanism = parseMechanism(row.markdown);
+      const chapter = parseChapter(row.markdown);
       // Defence: frontmatter's id field must match the DB key. If they
       // disagree, skip the row — but log loudly so the mismatch gets
       // noticed in Vercel logs instead of the row just vanishing from
       // /systems with no diagnostic.
-      if (mechanism.frontmatter.id !== row.id) {
+      if (chapter.frontmatter.id !== row.id) {
         console.warn(
-          `[content/db-source] Skipping mechanism: DB id "${row.id}" does not match frontmatter id "${mechanism.frontmatter.id}". Edit the row in /admin/content and align them.`,
+          `[content/db-source] Skipping chapter: DB id "${row.id}" does not match frontmatter id "${chapter.frontmatter.id}". Edit the row in /admin/content and align them.`,
         );
         continue;
       }
-      parsed.push(mechanism);
+      parsed.push(chapter);
     } catch (err) {
       // Malformed DB row — log, don't crash.
-      console.error(`Failed to parse DB mechanism ${row.id}`, err);
+      console.error(`Failed to parse DB chapter ${row.id}`, err);
     }
   }
   return parsed;
 }
 
-/** Read one mechanism from the DB by id, or null if absent / unpublished. */
-export async function readPublishedMechanismByIdFromDb(id: string): Promise<Mechanism | null> {
+/** Read one chapter from the DB by id, or null if absent / unpublished. */
+export async function readPublishedChapterByIdFromDb(id: string): Promise<Chapter | null> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
   let supabase;
   try {
@@ -76,7 +76,7 @@ export async function readPublishedMechanismByIdFromDb(id: string): Promise<Mech
   }
 
   const { data, error } = await supabase
-    .from("content_mechanisms")
+    .from("content_chapters")
     .select("id, markdown")
     .eq("id", id)
     .eq("status", "published")
@@ -85,16 +85,16 @@ export async function readPublishedMechanismByIdFromDb(id: string): Promise<Mech
   if (error || !data) return null;
 
   try {
-    const mechanism = parseMechanism(data.markdown);
-    if (mechanism.frontmatter.id !== data.id) {
+    const chapter = parseChapter(data.markdown);
+    if (chapter.frontmatter.id !== data.id) {
       console.warn(
-        `[content/db-source] Mechanism "${data.id}" requested, but frontmatter id is "${mechanism.frontmatter.id}". Falling back to filesystem.`,
+        `[content/db-source] Chapter "${data.id}" requested, but frontmatter id is "${chapter.frontmatter.id}". Falling back to filesystem.`,
       );
       return null;
     }
-    return mechanism;
+    return chapter;
   } catch (err) {
-    console.error(`Failed to parse DB mechanism ${id}`, err);
+    console.error(`Failed to parse DB chapter ${id}`, err);
     return null;
   }
 }

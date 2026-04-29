@@ -1,7 +1,7 @@
 import Dexie, { type Table } from "dexie";
 
-import type { MechanismFrontmatter, MechanismStatus, OrganSystem } from "./schema";
-import type { Mechanism, MechanismLayers } from "./loader";
+import type { ChapterFrontmatter, ChapterStatus, OrganSystem } from "./schema";
+import type { Chapter, ChapterLayers } from "./loader";
 
 /**
  * Row shape in the local mechanisms table.
@@ -18,16 +18,16 @@ import type { Mechanism, MechanismLayers } from "./loader";
 export type StoredMechanism = {
   id: string;
   organ_system: OrganSystem;
-  status: MechanismStatus;
+  status: ChapterStatus;
   version: string;
   indexed_at: string;
-  frontmatter: MechanismFrontmatter;
+  frontmatter: ChapterFrontmatter;
   body: string;
-  layers: MechanismLayers;
+  layers: ChapterLayers;
 };
 
-/** Flatten a parsed Mechanism into the row shape the DB indexes on. */
-export function toStored(m: Mechanism, indexedAt: string): StoredMechanism {
+/** Flatten a parsed Chapter into the row shape the DB indexes on. */
+export function toStored(m: Chapter, indexedAt: string): StoredMechanism {
   return {
     id: m.frontmatter.id,
     organ_system: m.frontmatter.organ_system,

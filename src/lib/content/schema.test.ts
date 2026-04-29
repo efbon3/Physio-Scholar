@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   bloomsDistributionSchema,
-  mechanismFrontmatterSchema,
-  mechanismStatusSchema,
+  chapterFrontmatterSchema,
+  chapterStatusSchema,
   organSystemSchema,
 } from "./schema";
 
@@ -17,15 +17,15 @@ describe("organSystemSchema", () => {
   });
 });
 
-describe("mechanismStatusSchema", () => {
+describe("chapterStatusSchema", () => {
   it("accepts the four lifecycle states", () => {
     for (const s of ["draft", "review", "published", "retired"] as const) {
-      expect(mechanismStatusSchema.parse(s)).toBe(s);
+      expect(chapterStatusSchema.parse(s)).toBe(s);
     }
   });
 
   it("rejects anything else", () => {
-    expect(() => mechanismStatusSchema.parse("archived")).toThrow();
+    expect(() => chapterStatusSchema.parse("archived")).toThrow();
   });
 });
 
@@ -51,12 +51,12 @@ describe("bloomsDistributionSchema", () => {
 
 const validFrontmatter = {
   id: "frank-starling",
-  title: "Frank-Starling Mechanism",
+  title: "Frank-Starling Chapter",
   organ_system: "cardiovascular",
   nmc_competencies: ["PY-CV-1.5", "PY-CV-1.6"],
   exam_patterns: ["neet-pg", "ini-cet"],
   prerequisites: ["cardiac-cycle"],
-  related_mechanisms: ["cardiac-output-regulation"],
+  related_chapters: ["cardiac-output-regulation"],
   blooms_distribution: { remember: 10, understand: 30, apply: 30, analyze: 30 },
   author: "author-1",
   reviewer: "pending",
@@ -66,54 +66,56 @@ const validFrontmatter = {
   last_reviewed: "2026-05-15",
 };
 
-describe("mechanismFrontmatterSchema", () => {
+describe("chapterFrontmatterSchema", () => {
   it("accepts the canonical example from SOP Appendix A", () => {
-    const result = mechanismFrontmatterSchema.parse(validFrontmatter);
+    const result = chapterFrontmatterSchema.parse(validFrontmatter);
     expect(result.id).toBe("frank-starling");
     expect(result.published_date).toBeInstanceOf(Date);
   });
 
   it("rejects an id with capital letters", () => {
     expect(() =>
-      mechanismFrontmatterSchema.parse({ ...validFrontmatter, id: "Frank-Starling" }),
+      chapterFrontmatterSchema.parse({ ...validFrontmatter, id: "Frank-Starling" }),
     ).toThrow(/kebab-case/);
   });
 
   it("rejects an id that starts with a hyphen", () => {
     expect(() =>
-      mechanismFrontmatterSchema.parse({ ...validFrontmatter, id: "-frank-starling" }),
+      chapterFrontmatterSchema.parse({ ...validFrontmatter, id: "-frank-starling" }),
     ).toThrow();
   });
 
   it("rejects malformed NMC competency codes", () => {
     expect(() =>
-      mechanismFrontmatterSchema.parse({
+      chapterFrontmatterSchema.parse({
         ...validFrontmatter,
         nmc_competencies: ["py-cv-1.5"], // lowercase — should fail
       }),
     ).toThrow();
   });
 
-  it("requires at least one NMC competency", () => {
-    expect(() =>
-      mechanismFrontmatterSchema.parse({ ...validFrontmatter, nmc_competencies: [] }),
-    ).toThrow();
+  it("accepts an empty NMC competencies array (chapter-format content has no NMC tags)", () => {
+    const parsed = chapterFrontmatterSchema.parse({
+      ...validFrontmatter,
+      nmc_competencies: [],
+    });
+    expect(parsed.nmc_competencies).toEqual([]);
   });
 
   it("requires at least one exam pattern", () => {
     expect(() =>
-      mechanismFrontmatterSchema.parse({ ...validFrontmatter, exam_patterns: [] }),
+      chapterFrontmatterSchema.parse({ ...validFrontmatter, exam_patterns: [] }),
     ).toThrow();
   });
 
-  it("accepts prerequisites as an empty array (a foundational mechanism has none)", () => {
+  it("accepts prerequisites as an empty array (a foundational Chapter has none)", () => {
     expect(
-      mechanismFrontmatterSchema.parse({ ...validFrontmatter, prerequisites: [] }).prerequisites,
+      chapterFrontmatterSchema.parse({ ...validFrontmatter, prerequisites: [] }).prerequisites,
     ).toEqual([]);
   });
 
   it("coerces ISO date strings to Date objects", () => {
-    const { published_date } = mechanismFrontmatterSchema.parse(validFrontmatter);
+    const { published_date } = chapterFrontmatterSchema.parse(validFrontmatter);
     expect(published_date.getUTCFullYear()).toBe(2026);
   });
 });

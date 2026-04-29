@@ -26,14 +26,14 @@ export type DailyReviewBucket = {
   count: number;
 };
 
-export type MechanismProgress = {
-  mechanismId: string;
+export type ChapterProgress = {
+  chapterId: string;
   title: string;
   seen: number;
   total: number;
-  /** null when the learner hasn't reviewed any cards in this mechanism yet. */
+  /** null when the learner hasn't reviewed any cards in this Chapter yet. */
   masteryPct: number | null;
-  /** Milliseconds since epoch of the most recent review in this mechanism. */
+  /** Milliseconds since epoch of the most recent review in this Chapter. */
   lastReviewedMs: number | null;
 };
 
@@ -50,7 +50,7 @@ export type ProgressSnapshot = {
   cardsByStatus: Record<CardStatus, number>;
   /** Sparkline data — always returns exactly `days` entries, oldest first. */
   dailyReviews: DailyReviewBucket[];
-  byMechanism: MechanismProgress[];
+  byChapter: ChapterProgress[];
 };
 
 /** Number of days rendered on the Progress tab's activity sparkline. */
@@ -142,7 +142,7 @@ export type ComputeInput = {
   cardStates: readonly StoredCardState[];
   /** Authored cards — the universe the Today + Systems surfaces see. */
   allCards: readonly Card[];
-  /** Mechanism title lookup, keyed by mechanism id. */
+  /** Chapter title lookup, keyed by Chapter id. */
   mechanismTitles: ReadonlyMap<string, string>;
   now: Date;
 };
@@ -203,13 +203,13 @@ export function computeProgressSnapshot({
     cardsByStatus[row.status] += 1;
   }
 
-  // Per-mechanism progress.
+  // Per-Chapter progress.
   const byMechanismMap = new Map<
     string,
     { seen: number; total: number; easeSum: number; easeCount: number; lastMs: number | null }
   >();
   for (const card of allCards) {
-    const entry = byMechanismMap.get(card.mechanism_id) ?? {
+    const entry = byMechanismMap.get(card.chapter_id) ?? {
       seen: 0,
       total: 0,
       easeSum: 0,
@@ -217,15 +217,15 @@ export function computeProgressSnapshot({
       lastMs: null,
     };
     entry.total += 1;
-    byMechanismMap.set(card.mechanism_id, entry);
+    byMechanismMap.set(card.chapter_id, entry);
   }
   const cardIdToMechanism = new Map<string, string>();
-  for (const card of allCards) cardIdToMechanism.set(card.id, card.mechanism_id);
+  for (const card of allCards) cardIdToMechanism.set(card.id, card.chapter_id);
 
   for (const row of cardStates) {
-    const mechanismId = cardIdToMechanism.get(row.card_id);
-    if (!mechanismId) continue;
-    const entry = byMechanismMap.get(mechanismId);
+    const chapterId = cardIdToMechanism.get(row.card_id);
+    if (!chapterId) continue;
+    const entry = byMechanismMap.get(chapterId);
     if (!entry) continue;
     entry.seen += 1;
     entry.easeSum += row.ease;
@@ -236,19 +236,19 @@ export function computeProgressSnapshot({
     }
   }
 
-  const byMechanism: MechanismProgress[] = [];
-  for (const [mechanismId, entry] of byMechanismMap) {
+  const byChapter: ChapterProgress[] = [];
+  for (const [chapterId, entry] of byMechanismMap) {
     const avgEase = entry.easeCount > 0 ? entry.easeSum / entry.easeCount : null;
-    byMechanism.push({
-      mechanismId,
-      title: mechanismTitles.get(mechanismId) ?? mechanismId,
+    byChapter.push({
+      chapterId,
+      title: mechanismTitles.get(chapterId) ?? chapterId,
       seen: entry.seen,
       total: entry.total,
       masteryPct: masteryFromEase(avgEase),
       lastReviewedMs: entry.lastMs,
     });
   }
-  byMechanism.sort((a, b) => {
+  byChapter.sort((a, b) => {
     // Surface the mechanisms the learner touched most recently first.
     const aMs = a.lastReviewedMs ?? 0;
     const bMs = b.lastReviewedMs ?? 0;
@@ -275,6 +275,6 @@ export function computeProgressSnapshot({
     retentionPct30d,
     cardsByStatus,
     dailyReviews,
-    byMechanism,
+    byChapter,
   };
 }

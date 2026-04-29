@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
-import { readAllMechanisms } from "@/lib/content/source";
+import { readAllChapters } from "@/lib/content/source";
 
 export const metadata = {
-  title: "Systems",
+  title: "Assessment",
 };
 
 type SystemGroup = {
@@ -13,7 +13,7 @@ type SystemGroup = {
 };
 
 export default async function SystemsPage() {
-  const mechanisms = await readAllMechanisms();
+  const mechanisms = await readAllChapters();
 
   // Group by organ_system; sort systems alphabetically, mechanisms alphabetically.
   const grouped = new Map<string, SystemGroup>();
@@ -30,15 +30,15 @@ export default async function SystemsPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-16">
       <header className="flex flex-col gap-2">
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">Systems</h1>
-        <p className="text-sm">Browse mechanisms by organ system.</p>
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">Assessment</h1>
+        <p className="text-sm">Browse chapters by organ system.</p>
       </header>
 
       {groups.length === 0 ? (
         <EmptyState
           icon="📚"
-          title="No mechanisms yet"
-          description="Mechanisms appear here as soon as content is published. The author edits markdown under content/mechanisms/ and a deploy ships them."
+          title="No chapters yet"
+          description="Chapters appear here as soon as content is published. The author edits markdown under content/chapters/ and a deploy ships them."
           tone="muted"
         />
       ) : (

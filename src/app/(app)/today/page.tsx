@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { readVisibleEvents } from "@/lib/calendar/events";
 import { buildBoostCardIds, findActiveExamWindow } from "@/lib/calendar/srs-weighting";
 import { extractCards, type Card } from "@/lib/content/cards";
-import { readAllMechanisms } from "@/lib/content/source";
+import { readAllChapters } from "@/lib/content/source";
 import { pickRandomQuote } from "@/lib/motivation/quotes";
 import { createClient } from "@/lib/supabase/server";
 
@@ -62,7 +62,7 @@ export default async function TodayPage() {
     redirect("/login?next=/today");
   }
 
-  const mechanisms = await readAllMechanisms();
+  const mechanisms = await readAllChapters();
 
   // Honour the learner's active-systems preference for the count and the
   // queue assembly. The Today summary should match what /review will
@@ -71,7 +71,7 @@ export default async function TodayPage() {
     ? mechanisms.filter((m) => studySystems.includes(m.frontmatter.organ_system))
     : mechanisms;
   const cards: Card[] = inScope.flatMap(extractCards);
-  // Mechanism title lookup powers the weak-area + daily-challenge widgets.
+  // Chapter title lookup powers the weak-area + daily-challenge widgets.
   // Built from `inScope` so the daily challenge only rotates through
   // mechanisms the learner has actively opted into studying.
   const mechanismTitles: Record<string, string> = {};

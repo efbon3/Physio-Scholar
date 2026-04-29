@@ -28,7 +28,7 @@ export type PreflightModalProps = {
   questionCount: number;
   /** Approximate session length, shown to the learner. */
   estimatedMinutes: number;
-  /** Optional second line — e.g., the active mechanism title. */
+  /** Optional second line — e.g., the active Chapter title. */
   context?: string | null;
   onAccept: () => void;
   /** Path the cancel button links to. Defaults to /today. */

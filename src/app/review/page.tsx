@@ -5,12 +5,13 @@ import { readVisibleEvents } from "@/lib/calendar/events";
 import { buildBoostCardIds, findActiveExamWindow } from "@/lib/calendar/srs-weighting";
 import {
   applyCardFilters,
+  filterByFormat,
   parseDifficultyFilter,
   parsePriorityFilter,
 } from "@/lib/content/card-filters";
-import { extractCards, type Card } from "@/lib/content/cards";
+import { extractCards, type Card, type QuestionFormat } from "@/lib/content/cards";
 import { normaliseMechanismId } from "@/lib/content/filters";
-import { readAllMechanisms } from "@/lib/content/source";
+import { readAllChapters } from "@/lib/content/source";
 import { requireApprovedUser } from "@/lib/auth/approval";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,19 +22,34 @@ export const metadata = {
 };
 
 type SearchParams = {
-  mechanism?: string | string[];
+  Chapter?: string | string[];
   priority?: string | string[];
   difficulty?: string | string[];
+  /**
+   * Optional format filter ("descriptive" by default for /review since
+   * the session-player UI is text-input-based). Passed by the
+   * Chapter-page format picker so a learner who picks "Descriptive"
+   * lands on a queue of just descriptive-format cards.
+   */
+  format?: string | string[];
 };
+
+const VALID_FORMATS = new Set<QuestionFormat>(["mcq", "descriptive", "fill_blank"]);
+function parseFormatFilter(raw: string | string[] | undefined): QuestionFormat | null {
+  if (!raw) return null;
+  const value = (Array.isArray(raw) ? raw[0] : raw)?.trim().toLowerCase().replace(/-/g, "_");
+  if (!value) return null;
+  return VALID_FORMATS.has(value as QuestionFormat) ? (value as QuestionFormat) : null;
+}
 
 /**
  * Review-session entry point. Server-rendered so the card universe is
  * already in the HTML; the client-side session player then reads local
  * card_states from Dexie, assembles the queue, and runs the loop.
  *
- * `?mechanism=<id>` narrows the card universe to a single mechanism so
- * a learner can drill just one topic (wired from the mechanism-detail
- * "Study this mechanism" CTA per build spec §2.3). An unknown or
+ * `?Chapter=<id>` narrows the card universe to a single Chapter so
+ * a learner can drill just one topic (wired from the Chapter-detail
+ * "Study this Chapter" CTA per build spec §2.3). An unknown or
  * malformed id falls back to the full queue — better to study
  * something than fail closed on a typo.
  *
@@ -50,14 +66,15 @@ export default async function ReviewPage({
   searchParams: Promise<SearchParams>;
 }) {
   const resolvedParams = await searchParams;
-  const mechanismFilter = normaliseMechanismId(resolvedParams.mechanism);
+  const mechanismFilter = normaliseMechanismId(resolvedParams.Chapter);
   // J7: priority + difficulty filter chips. Either axis can be a CSV
   // ("must,should") or omitted entirely; null means "no filter on this
   // axis". Drives `applyCardFilters` below — the learner can ask for
   // just must-know foundationals, or any combination, without losing
-  // the per-mechanism / per-system filters that already exist.
+  // the per-Chapter / per-system filters that already exist.
   const priorityFilter = parsePriorityFilter(resolvedParams.priority);
   const difficultyFilter = parseDifficultyFilter(resolvedParams.difficulty);
+  const formatFilter = parseFormatFilter(resolvedParams.format);
 
   // Approval gate before anything else — unapproved learners bounce
   // to /pending-approval. (app) layout enforces this for /today etc;
@@ -90,7 +107,7 @@ export default async function ReviewPage({
     }
     if (!userId) {
       const next = mechanismFilter
-        ? `/review?mechanism=${encodeURIComponent(mechanismFilter)}`
+        ? `/review?Chapter=${encodeURIComponent(mechanismFilter)}`
         : "/review";
       redirect(`/login?next=${encodeURIComponent(next)}`);
     }
@@ -98,12 +115,12 @@ export default async function ReviewPage({
 
   // Build the card universe from authored content. Frank-Starling lands
   // here today via the Phase 2 loader + C3a parser. As the cohort grows,
-  // every file in content/mechanisms/ automatically contributes cards.
-  const mechanisms = await readAllMechanisms();
+  // every file in content/chapters/ automatically contributes cards.
+  const mechanisms = await readAllChapters();
 
   // Apply the per-student "active organ systems" filter (J0). If the
   // learner has narrowed their study scope (e.g., cardiovascular only),
-  // exclude mechanisms outside that scope. A `?mechanism=<id>` filter
+  // exclude mechanisms outside that scope. A `?Chapter=<id>` filter
   // takes precedence — explicit topic intent wins over the general
   // preference. When no preference is set (CI / preview), all systems
   // remain active.
@@ -120,7 +137,7 @@ export default async function ReviewPage({
       const filtered = extractCards(match);
       // Only apply the filter when it yields cards — otherwise fall back
       // to the full queue so the learner isn't bounced straight to the
-      // empty state on a draft mechanism without a Questions section.
+      // empty state on a draft Chapter without a Questions section.
       if (filtered.length > 0) {
         cards = filtered;
         focusTitle = match.frontmatter.title;
@@ -129,7 +146,7 @@ export default async function ReviewPage({
   }
 
   // Apply priority / difficulty filters last. Same fallback posture as
-  // the mechanism filter: if the combination yields zero cards we keep
+  // the Chapter filter: if the combination yields zero cards we keep
   // the unfiltered list rather than trapping the learner on the empty
   // state. The session-player UI then surfaces "Nothing due" naturally.
   if (priorityFilter || difficultyFilter) {
@@ -137,6 +154,15 @@ export default async function ReviewPage({
       priority: priorityFilter,
       difficulty: difficultyFilter,
     });
+    if (filtered.length > 0) cards = filtered;
+  }
+
+  // Format filter — applied after priority / difficulty so that a
+  // strict format choice doesn't override what the learner asked for
+  // on the other axes. Same empty-state fallback: if no cards match,
+  // keep the wider deck rather than trap on "no questions found."
+  if (formatFilter) {
+    const filtered = filterByFormat(cards, formatFilter);
     if (filtered.length > 0) cards = filtered;
   }
 
@@ -150,7 +176,7 @@ export default async function ReviewPage({
   // author runbook; removing the misfiring check is the safer interim.
 
   // Build the title-and-organ-system map once at request time so the
-  // ReviewHeader can show "Frank-Starling Mechanism · Cardiovascular"
+  // ReviewHeader can show "Frank-Starling Chapter · Cardiovascular"
   // instead of the kebab-case slug.
   const mechanismTitles: Record<string, { title: string; organSystem: string }> = {};
   for (const m of mechanisms) {
@@ -161,9 +187,9 @@ export default async function ReviewPage({
   }
 
   // J7 exam-aware boost: same logic as /today. We don't apply weighting
-  // when the learner explicitly drilled into a single mechanism via
-  // `?mechanism=…` — that's a deliberate focus and the boost would
-  // be a no-op anyway (the queue is already a single mechanism).
+  // when the learner explicitly drilled into a single Chapter via
+  // `?Chapter=…` — that's a deliberate focus and the boost would
+  // be a no-op anyway (the queue is already a single Chapter).
   const events = await readVisibleEvents();
   const activeExam = mechanismFilter ? null : findActiveExamWindow(events, new Date());
   const boostCardIds = activeExam

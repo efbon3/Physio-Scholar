@@ -1,4 +1,4 @@
-import type { Mechanism } from "@/lib/content/loader";
+import type { Chapter } from "@/lib/content/loader";
 
 import type { ExamEventRow } from "./events";
 
@@ -57,7 +57,7 @@ export function findActiveExamWindow(
 }
 
 /**
- * Build the set of card ids whose mechanism falls inside any of the
+ * Build the set of card ids whose Chapter falls inside any of the
  * exam's listed `organ_systems`. The page passes this set to
  * `assembleQueue` so the queue assembler can reorder cards without
  * understanding organ systems itself.
@@ -68,8 +68,8 @@ export function findActiveExamWindow(
  */
 export function buildBoostCardIds(
   exam: ExamEventRow,
-  mechanisms: readonly Mechanism[],
-  cards: readonly { id: string; mechanism_id: string }[],
+  mechanisms: readonly Chapter[],
+  cards: readonly { id: string; chapter_id: string }[],
 ): Set<string> {
   const out = new Set<string>();
   if (exam.organ_systems.length === 0) return out;
@@ -81,7 +81,7 @@ export function buildBoostCardIds(
     }
   }
   for (const card of cards) {
-    if (inScopeMechanisms.has(card.mechanism_id)) out.add(card.id);
+    if (inScopeMechanisms.has(card.chapter_id)) out.add(card.id);
   }
   return out;
 }

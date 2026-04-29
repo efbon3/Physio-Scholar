@@ -5,9 +5,9 @@ import { useId, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Tab keys used by the mechanism detail page. The labels and ordering
+ * Tab keys used by the Chapter detail page. The labels and ordering
  * come from SOP Appendix A (Layer 1 Core → Layer 4 Clinical). The string
- * keys match `MechanismLayers` in `src/lib/content/loader.ts`.
+ * keys match `ChapterLayers` in `src/lib/content/loader.ts`.
  */
 export type MechanismTabKey = "core" | "working" | "deepDive" | "clinicalIntegration";
 
@@ -37,11 +37,11 @@ type Props = {
 };
 
 /**
- * Accessible tablist for the four mechanism layers. Keyboard support
+ * Accessible tablist for the four Chapter layers. Keyboard support
  * follows WAI-ARIA APG: ArrowLeft/ArrowRight move focus + activate,
  * Home/End jump to ends, Tab moves into the active panel.
  */
-export function MechanismTabs({ panels, defaultTab }: Props) {
+export function ChapterTabs({ panels, defaultTab }: Props) {
   const availableTabs = MECHANISM_TAB_ORDER.filter((key) => panels[key] !== undefined);
   const initialTab = defaultTab && panels[defaultTab] ? defaultTab : availableTabs[0];
   const [active, setActive] = useState<MechanismTabKey | undefined>(initialTab);
@@ -81,7 +81,7 @@ export function MechanismTabs({ panels, defaultTab }: Props) {
     <div className="flex flex-col gap-4">
       <div
         role="tablist"
-        aria-label="Mechanism layers"
+        aria-label="Chapter layers"
         onKeyDown={onKeyDown}
         className="flex flex-wrap gap-1 border-b"
       >

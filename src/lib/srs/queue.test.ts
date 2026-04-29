@@ -7,11 +7,17 @@ import { newCardState, type CardState } from "./types";
 
 const NOW = new Date("2026-05-01T10:00:00Z");
 
-function card(id: string, index = Number.parseInt(id.split(":")[1] ?? "1", 10)): Card {
+function card(
+  id: string,
+  index = Number.parseInt(id.split(":")[1] ?? "1", 10),
+  overrides: Partial<Card> = {},
+): Card {
   return {
     id,
-    mechanism_id: id.split(":")[0],
+    chapter_id: id.split(":")[0],
     index,
+    format: "descriptive",
+    status: "published",
     type: "prediction",
     blooms_level: "apply",
     priority: "should",
@@ -22,6 +28,7 @@ function card(id: string, index = Number.parseInt(id.split(":")[1] ?? "1", 10)):
     hints: [],
     misconceptions: [],
     exam_patterns: [],
+    ...overrides,
   };
 }
 
@@ -152,6 +159,33 @@ describe("assembleQueue — status filters", () => {
     ]);
     const q = assembleQueue({ cards, cardStates: states, now: NOW, maxNewCards: 0 });
     expect(q.map((x) => x.card.id)).toEqual(["l:1"]);
+  });
+
+  it("excludes retired cards even when due card_state exists", () => {
+    const cards = [
+      card("retired:1", 1, { status: "retired" }),
+      card("ok:1", 1, { status: "published" }),
+    ];
+    const states = new Map<string, CardState>([
+      ["retired:1", stateAt(new Date("2026-04-01T10:00:00Z"))],
+      ["ok:1", stateAt(new Date("2026-04-01T10:00:00Z"))],
+    ]);
+    const q = assembleQueue({ cards, cardStates: states, now: NOW, maxNewCards: 0 });
+    expect(q.map((x) => x.card.id)).toEqual(["ok:1"]);
+  });
+
+  it("excludes retired cards from the new-card bucket too", () => {
+    const cards = [
+      card("retired:1", 1, { status: "retired" }),
+      card("new:1", 1, { status: "published" }),
+    ];
+    const q = assembleQueue({
+      cards,
+      cardStates: new Map(),
+      now: NOW,
+      maxNewCards: 5,
+    });
+    expect(q.map((x) => x.card.id)).toEqual(["new:1"]);
   });
 });
 

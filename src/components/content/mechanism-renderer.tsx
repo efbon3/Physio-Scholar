@@ -1,39 +1,37 @@
-import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { buttonVariants } from "@/components/ui/button";
 import { extractCards } from "@/lib/content/cards";
-import type { Mechanism } from "@/lib/content/loader";
-import { cn } from "@/lib/utils";
+import type { Chapter } from "@/lib/content/loader";
 
-import { MechanismStats } from "./mechanism-stats";
-import { MechanismTabs, type MechanismTabKey } from "./mechanism-tabs";
+import { FormatPicker } from "./format-picker";
+import { ChapterStats } from "./mechanism-stats";
+import { ChapterTabs, type MechanismTabKey } from "./mechanism-tabs";
 
 type Props = {
-  mechanism: Mechanism;
+  chapter: Chapter;
   /**
    * Signed-in learner id. Passed in from the server page (falls back to
    * "preview" in CI / unconfigured previews, same sentinel the review
-   * page uses) so the Dexie-backed MechanismStats is scoped correctly.
+   * page uses) so the Dexie-backed ChapterStats is scoped correctly.
    */
   profileId: string;
 };
 
 /**
- * Mechanism detail page — static reading surfaces (Phase 2) plus the
+ * Chapter detail page — static reading surfaces (Phase 2) plus the
  * Phase 5 additions: a proper tablist for the four reading layers,
- * per-mechanism stats pulled from Dexie, and a "Study this mechanism"
- * CTA that launches `/review?mechanism=<id>` filtered to just these
+ * per-Chapter stats pulled from Dexie, and a "Study this Chapter"
+ * CTA that launches `/review?Chapter=<id>` filtered to just these
  * cards.
  *
  * Markdown rendering stays on the server so the `react-markdown` +
- * `remark-gfm` parsers stay out of the client bundle. The `MechanismTabs`
+ * `remark-gfm` parsers stay out of the client bundle. The `ChapterTabs`
  * client component receives the already-rendered ReactNodes as panels
  * and only owns the show/hide state + keyboard interactions.
  */
-export function MechanismRenderer({ mechanism, profileId }: Props) {
-  const { layers, frontmatter } = mechanism;
+export function ChapterRenderer({ chapter, profileId }: Props) {
+  const { layers, frontmatter } = chapter;
 
   const panels: Partial<Record<MechanismTabKey, React.ReactNode>> = {};
   if (layers.core) {
@@ -51,7 +49,7 @@ export function MechanismRenderer({ mechanism, profileId }: Props) {
     );
   }
 
-  const cards = extractCards(mechanism);
+  const cards = extractCards(chapter);
   const cardIds = cards.map((c) => c.id);
   const hasCards = cardIds.length > 0;
 
@@ -71,28 +69,22 @@ export function MechanismRenderer({ mechanism, profileId }: Props) {
       </header>
 
       <section
-        aria-label="Your progress on this mechanism"
+        aria-label="Your progress on this chapter"
         className="border-border bg-muted/40 flex flex-col gap-4 rounded-md border p-4"
       >
-        <MechanismStats cardIds={cardIds} profileId={profileId} />
-        {hasCards ? (
-          <div>
-            <Link
-              href={`/review?mechanism=${encodeURIComponent(frontmatter.id)}`}
-              className={cn(buttonVariants({ size: "lg" }))}
-            >
-              Study this mechanism
-            </Link>
-          </div>
-        ) : (
+        <ChapterStats cardIds={cardIds} profileId={profileId} />
+        {!hasCards ? (
           <p className="text-muted-foreground text-xs">
-            No cards have been authored for this mechanism yet — once the `# Questions` section
-            lands in the markdown, a Study CTA will appear here.
+            No questions have been authored for this chapter yet. The textbook layers below are
+            still readable; the &ldquo;Test yourself&rdquo; panel appears once the
+            <code> # Questions</code> section lands in the markdown.
           </p>
-        )}
+        ) : null}
       </section>
 
-      <MechanismTabs panels={panels} />
+      <ChapterTabs panels={panels} />
+
+      {hasCards ? <FormatPicker chapterId={frontmatter.id} cards={cards} /> : null}
 
       {layers.sources ? (
         <footer className="text-muted-foreground flex flex-col gap-2 border-t pt-4 text-xs">

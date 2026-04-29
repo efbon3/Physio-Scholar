@@ -1,44 +1,42 @@
 import { describe, expect, it } from "vitest";
 
-import { readMechanismById, readAllMechanisms } from "./fs";
+import { readChapterById, readAllChapters } from "./fs";
 
 /**
- * These tests rely on the `content/mechanisms/` directory being populated
- * with at least the placeholder Frank-Starling mechanism (shipped in B4).
- * They double as a smoke test for the schema + loader + fs integration.
+ * Smoke tests against whatever Chapter files are currently shipped
+ * in `content/chapters/`. The two-zone redesign emptied the
+ * directory in 84b05ea; the chapter-format adapter (chapter-parser.ts)
+ * loaded the first chapter back. Both states are valid — these tests
+ * just confirm the loader doesn't crash and returns a sensible result.
  */
-describe("readAllMechanisms", () => {
-  it("returns the placeholder mechanism parsed and validated", async () => {
-    const mechanisms = await readAllMechanisms();
-    expect(mechanisms.length).toBeGreaterThan(0);
-    const fs = mechanisms.find((m) => m.frontmatter.id === "frank-starling");
-    expect(fs).toBeDefined();
-    expect(fs?.frontmatter.organ_system).toBe("cardiovascular");
+describe("readAllChapters", () => {
+  it("returns an array of parsed mechanisms (possibly empty)", async () => {
+    const mechanisms = await readAllChapters();
+    expect(Array.isArray(mechanisms)).toBe(true);
+    // Every returned row must be a fully validated Chapter.
+    for (const m of mechanisms) {
+      expect(m.frontmatter.id).toMatch(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/);
+      expect(m.frontmatter.title.length).toBeGreaterThan(0);
+    }
   });
 });
 
-describe("readMechanismById", () => {
-  it("loads a known mechanism by id", async () => {
-    const m = await readMechanismById("frank-starling");
-    expect(m).not.toBeNull();
-    expect(m?.frontmatter.title).toMatch(/Frank-Starling/i);
-  });
-
+describe("readChapterById", () => {
   it("returns null for a non-existent id (no throw)", async () => {
-    expect(await readMechanismById("does-not-exist-yet")).toBeNull();
+    expect(await readChapterById("does-not-exist-yet")).toBeNull();
   });
 
   it("rejects path-traversal attempts without touching the filesystem", async () => {
     // All of these must return null because the id pattern check trips
     // before any filesystem access happens.
-    expect(await readMechanismById("../secret")).toBeNull();
-    expect(await readMechanismById("..")).toBeNull();
-    expect(await readMechanismById("/etc/passwd")).toBeNull();
-    expect(await readMechanismById("foo/bar")).toBeNull();
-    expect(await readMechanismById("foo\\bar")).toBeNull();
-    expect(await readMechanismById("")).toBeNull();
-    expect(await readMechanismById("-starts-with-hyphen")).toBeNull();
-    expect(await readMechanismById("ends-with-hyphen-")).toBeNull();
-    expect(await readMechanismById("UPPERCASE")).toBeNull();
+    expect(await readChapterById("../secret")).toBeNull();
+    expect(await readChapterById("..")).toBeNull();
+    expect(await readChapterById("/etc/passwd")).toBeNull();
+    expect(await readChapterById("foo/bar")).toBeNull();
+    expect(await readChapterById("foo\\bar")).toBeNull();
+    expect(await readChapterById("")).toBeNull();
+    expect(await readChapterById("-starts-with-hyphen")).toBeNull();
+    expect(await readChapterById("ends-with-hyphen-")).toBeNull();
+    expect(await readChapterById("UPPERCASE")).toBeNull();
   });
 });

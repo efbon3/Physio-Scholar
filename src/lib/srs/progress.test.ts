@@ -17,6 +17,7 @@ function review(overrides: Partial<StoredReview>): StoredReview {
     time_spent_seconds: 30,
     session_id: null,
     self_explanation: null,
+    engagement_method: null,
     created_at: new Date().toISOString(),
     pending_sync: 0,
     ...overrides,
@@ -38,11 +39,13 @@ function cardState(overrides: Partial<StoredCardState>): StoredCardState {
   return { ...base, ...overrides };
 }
 
-function card(id: string, mechanismId: string): Card {
+function card(id: string, chapterId: string): Card {
   return {
     id,
-    mechanism_id: mechanismId,
+    chapter_id: chapterId,
     index: Number.parseInt(id.split(":")[1] ?? "1", 10),
+    format: "descriptive",
+    status: "published",
     type: "recall",
     blooms_level: "understand",
     priority: "should",
@@ -57,7 +60,7 @@ function card(id: string, mechanismId: string): Card {
 }
 
 const mechanismTitles = new Map<string, string>([
-  ["frank-starling", "Frank-Starling Mechanism"],
+  ["frank-starling", "Frank-Starling Chapter"],
   ["baroreceptor-reflex", "Baroreceptor Reflex"],
 ]);
 
@@ -91,8 +94,8 @@ describe("computeProgressSnapshot — empty state", () => {
     expect(snap.cardsByStatus.learning).toBe(0);
     expect(snap.dailyReviews).toHaveLength(PROGRESS_SPARK_DAYS);
     expect(snap.dailyReviews.every((d) => d.count === 0)).toBe(true);
-    expect(snap.byMechanism).toHaveLength(1);
-    expect(snap.byMechanism[0].masteryPct).toBeNull();
+    expect(snap.byChapter).toHaveLength(1);
+    expect(snap.byChapter[0].masteryPct).toBeNull();
   });
 });
 
@@ -196,8 +199,8 @@ describe("computeProgressSnapshot — streaks", () => {
   });
 });
 
-describe("computeProgressSnapshot — per-mechanism aggregation", () => {
-  it("bins seen/total per mechanism", () => {
+describe("computeProgressSnapshot — per-Chapter aggregation", () => {
+  it("bins seen/total per Chapter", () => {
     const allCards = [
       card("frank-starling:1", "frank-starling"),
       card("frank-starling:2", "frank-starling"),
@@ -214,8 +217,8 @@ describe("computeProgressSnapshot — per-mechanism aggregation", () => {
       mechanismTitles,
       now: NOW,
     });
-    const fs = snap.byMechanism.find((m) => m.mechanismId === "frank-starling")!;
-    const br = snap.byMechanism.find((m) => m.mechanismId === "baroreceptor-reflex")!;
+    const fs = snap.byChapter.find((m) => m.chapterId === "frank-starling")!;
+    const br = snap.byChapter.find((m) => m.chapterId === "baroreceptor-reflex")!;
     expect(fs.total).toBe(2);
     expect(fs.seen).toBe(1);
     expect(fs.masteryPct).toBe(50); // (3.0 - 2.5)/1.0 * 100
@@ -224,11 +227,11 @@ describe("computeProgressSnapshot — per-mechanism aggregation", () => {
     expect(br.masteryPct).toBe(20); // (2.7 - 2.5)/1.0 * 100 rounded
   });
 
-  it("ignores card-state rows for unknown mechanism cards (orphaned state)", () => {
+  it("ignores card-state rows for unknown Chapter cards (orphaned state)", () => {
     const allCards = [card("frank-starling:1", "frank-starling")];
     const states = [
       cardState({ card_id: "frank-starling:1" }),
-      cardState({ card_id: "deleted-mechanism:1" }),
+      cardState({ card_id: "deleted-Chapter:1" }),
     ];
     const snap = computeProgressSnapshot({
       reviews: [],
@@ -238,7 +241,7 @@ describe("computeProgressSnapshot — per-mechanism aggregation", () => {
       now: NOW,
     });
     expect(snap.cardsByStatus.learning).toBe(1);
-    expect(snap.byMechanism.some((m) => m.mechanismId === "deleted-mechanism")).toBe(false);
+    expect(snap.byChapter.some((m) => m.chapterId === "deleted-Chapter")).toBe(false);
   });
 
   it("clamps mastery% to [0, 100] when ease drifts extreme", () => {
@@ -249,7 +252,7 @@ describe("computeProgressSnapshot — per-mechanism aggregation", () => {
       mechanismTitles,
       now: NOW,
     });
-    expect(snap.byMechanism[0].masteryPct).toBe(100);
+    expect(snap.byChapter[0].masteryPct).toBe(100);
   });
 });
 

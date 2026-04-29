@@ -214,6 +214,7 @@ describe("pushPendingReviews", () => {
       time_spent_seconds: 20,
       session_id: null,
       self_explanation: null,
+      engagement_method: null,
       created_at: NOW.toISOString(),
       pending_sync: 1,
     });
@@ -270,6 +271,7 @@ describe("pushPendingReviews", () => {
       time_spent_seconds: 5,
       session_id: null,
       self_explanation: null,
+      engagement_method: null,
       created_at: NOW.toISOString(),
       pending_sync: 1,
     });
@@ -283,6 +285,7 @@ describe("pushPendingReviews", () => {
       time_spent_seconds: 8,
       session_id: null,
       self_explanation: null,
+      engagement_method: null,
       created_at: NOW.toISOString(),
       pending_sync: 1,
     });
@@ -484,6 +487,7 @@ describe("pullRemote — last-write-wins", () => {
       time_spent_seconds: 5,
       session_id: null,
       self_explanation: null,
+      engagement_method: null,
       created_at: "2026-05-01T10:00:00Z",
       pending_sync: 0,
     });

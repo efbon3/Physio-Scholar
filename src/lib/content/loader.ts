@@ -1,9 +1,10 @@
 import matter from "gray-matter";
 
-import { mechanismFrontmatterSchema, type MechanismFrontmatter } from "./schema";
+import { parseAuthorChapter, isAuthorChapterFrontmatter } from "./chapter-parser";
+import { chapterFrontmatterSchema, type ChapterFrontmatter } from "./schema";
 
 /**
- * Typed representation of a parsed mechanism markdown file.
+ * Typed representation of a parsed Chapter markdown file.
  *
  * `body` is the raw markdown body (everything after the frontmatter).
  * `layers` is the same body split into the six canonical top-level
@@ -11,54 +12,69 @@ import { mechanismFrontmatterSchema, type MechanismFrontmatter } from "./schema"
  * quick overview without loading the rest, or for computing a layer-level
  * index without re-parsing.
  *
- * Sections absent from the source (e.g. a draft mechanism without
+ * Sections absent from the source (e.g. a draft Chapter without
  * `# Questions` yet) resolve to `undefined`; a missing section is not an
  * error at parse time — the content lifecycle (SOP §6.1) decides when
  * missing sections gate publication.
  */
-export type MechanismLayers = {
+export type ChapterLayers = {
   core?: string;
   working?: string;
   deepDive?: string;
   clinicalIntegration?: string;
   questions?: string;
-  /**
-   * Optional `# Facts` section — short factual recall items grouped
-   * by category (definitions, normal values, functions, etc). Parsed
-   * by extractFacts() in src/lib/content/facts.ts. Independent of
-   * `# Questions`; mechanisms can have one, the other, both, or neither.
-   */
-  facts?: string;
-  /**
-   * Optional `# Values` section — numeric quantity recall items
-   * (cardiac output, stroke volume, ranges, etc). Parsed by
-   * extractValues() in src/lib/content/values.ts. Authored separately
-   * from `# Facts` even though there's overlap with the
-   * "normal-value" fact category — values are a dedicated module
-   * surfaced at /values for focused numeric drill.
-   */
-  values?: string;
   sources?: string;
 };
 
-export type Mechanism = {
-  frontmatter: MechanismFrontmatter;
+export type Chapter = {
+  frontmatter: ChapterFrontmatter;
   body: string;
-  layers: MechanismLayers;
+  layers: ChapterLayers;
 };
 
 /**
  * Parse a raw markdown document (frontmatter + body) into a validated
- * `Mechanism`. Throws a `ZodError` if frontmatter is missing, malformed,
+ * `Chapter`. Throws a `ZodError` if frontmatter is missing, malformed,
  * or fails any schema invariant (see schema.ts).
+ *
+ * Two input formats are accepted:
+ *   - Canonical Chapter format: frontmatter has `id` (kebab-case),
+ *     `organ_system`, etc. Body has the four reading layers + a
+ *     `# Questions` section. Parsed as-is.
+ *   - Chapter format: frontmatter has `chapter` and `part` fields and
+ *     no `id`. Body has `QUESTION N` blocks under optional `## Pass N`
+ *     groupings. Routed through `parseAuthorChapter()` which derives
+ *     `id` from the chapter title (or, when provided, the filename),
+ *     maps `part` → `organ_system`, and transforms the question blocks
+ *     into the canonical Chapter shape. The returned Chapter is
+ *     indistinguishable from one parsed from a hand-authored
+ *     Chapter file.
+ *
+ * `filenameHint` is the basename of the source file (without `.md`),
+ * passed through by the filesystem loader. When present and the input
+ * is in chapter format, it overrides the chapter-title-derived id so
+ * that the URL slug always matches the filename on disk — otherwise
+ * `/systems/foo/<derived-id>` 404s when the derived id and the
+ * filename don't agree. Callers without a filename (DB rows,
+ * in-memory tests) can omit it.
  *
  * This function is intentionally decoupled from the filesystem so the
  * same parser can run on author IDE previews, Edge runtime handlers
  * (where `fs` is not available), and plain Node tests.
  */
-export function parseMechanism(raw: string): Mechanism {
+export function parseChapter(raw: string, filenameHint?: string): Chapter {
   const parsed = matter(raw);
-  const frontmatter = mechanismFrontmatterSchema.parse(parsed.data);
+
+  if (isAuthorChapterFrontmatter(parsed.data)) {
+    const transformed = parseAuthorChapter(parsed.data, parsed.content, filenameHint);
+    return {
+      frontmatter: transformed.frontmatter,
+      body: transformed.body,
+      layers: splitLayers(transformed.body),
+    };
+  }
+
+  const frontmatter = chapterFrontmatterSchema.parse(parsed.data);
   const body = parsed.content;
   const layers = splitLayers(body);
   return { frontmatter, body, layers };
@@ -85,8 +101,6 @@ const LAYER_HEADINGS = {
     "i",
   ),
   questions: /^#\s+Questions\s*$/i,
-  facts: /^#\s+Facts\s*$/i,
-  values: /^#\s+Values\s*$/i,
   sources: /^#\s+Sources\s*$/i,
 } as const;
 
@@ -96,10 +110,14 @@ type LayerKey = keyof typeof LAYER_HEADINGS;
  * Split a markdown body on top-level `# ` headings that match the
  * canonical layer names. Content inside fenced code blocks is ignored
  * so that a stray `#` in an example block can't tear a section in half.
+ *
+ * Exported so the filesystem loader can re-derive layers after
+ * merging chapter files (it concatenates question sections and needs
+ * the rebuilt `layers.questions` to drive `extractCards`).
  */
-function splitLayers(body: string): MechanismLayers {
+export function splitLayers(body: string): ChapterLayers {
   const lines = body.split(/\r?\n/);
-  const layers: MechanismLayers = {};
+  const layers: ChapterLayers = {};
 
   let currentKey: LayerKey | null = null;
   let currentBuffer: string[] = [];

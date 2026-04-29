@@ -364,12 +364,12 @@ export type Database = {
           },
         ]
       }
-      content_mechanisms: {
+      content_chapters: {
         Row: {
           created_at: string
           id: string
           markdown: string
-          status: Database["public"]["Enums"]["content_mechanism_status"]
+          status: Database["public"]["Enums"]["content_chapter_status"]
           updated_at: string
           updated_by: string | null
         }
@@ -377,7 +377,7 @@ export type Database = {
           created_at?: string
           id: string
           markdown: string
-          status?: Database["public"]["Enums"]["content_mechanism_status"]
+          status?: Database["public"]["Enums"]["content_chapter_status"]
           updated_at?: string
           updated_by?: string | null
         }
@@ -385,13 +385,13 @@ export type Database = {
           created_at?: string
           id?: string
           markdown?: string
-          status?: Database["public"]["Enums"]["content_mechanism_status"]
+          status?: Database["public"]["Enums"]["content_chapter_status"]
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "content_mechanisms_updated_by_fkey"
+            foreignKeyName: "content_chapters_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -671,12 +671,57 @@ export type Database = {
           unique_learners: number
         }[]
       }
+      student_profile_summary: {
+        Args: { p_institution_id: string; p_student_id: string }
+        Returns: {
+          profile_id: string
+          full_name: string | null
+          nickname: string | null
+          year_of_study: number | null
+          reviews_total: number
+          reviews_last_7d: number
+          retention_pct_30d: number | null
+          last_review_at: string | null
+        }[]
+      }
+      student_card_aggregates: {
+        Args: { p_institution_id: string; p_student_id: string }
+        Returns: {
+          card_id: string
+          reviews_total: number
+          reviews_last_30d: number
+          retention_pct_30d: number | null
+          last_review_at: string | null
+        }[]
+      }
+      student_recent_reviews: {
+        Args: { p_institution_id: string; p_student_id: string; p_limit?: number }
+        Returns: {
+          id: string
+          card_id: string
+          rating: Database["public"]["Enums"]["srs_rating"]
+          hints_used: number
+          time_spent_seconds: number
+          created_at: string
+        }[]
+      }
+      assignment_engagement: {
+        Args: { p_assignment_id: string }
+        Returns: {
+          profile_id: string
+          full_name: string | null
+          nickname: string | null
+          year_of_study: number | null
+          reviews_since_assignment: number
+          last_review_at: string | null
+        }[]
+      }
     }
     Enums: {
       content_flag_status: "open" | "resolved" | "rejected"
-      content_mechanism_status: "draft" | "review" | "published" | "retired"
+      content_chapter_status: "draft" | "review" | "published" | "retired"
       srs_card_status: "learning" | "review" | "leech" | "suspended"
-      srs_rating: "again" | "hard" | "good" | "easy"
+      srs_rating: "again" | "hard" | "good" | "easy" | "dont_know"
       study_session_status: "active" | "completed" | "abandoned"
       subscription_status: "active" | "past_due" | "cancelled" | "expired"
       subscription_tier: "free" | "pilot" | "student" | "institution"
@@ -811,9 +856,9 @@ export const Constants = {
   public: {
     Enums: {
       content_flag_status: ["open", "resolved", "rejected"],
-      content_mechanism_status: ["draft", "review", "published", "retired"],
+      content_chapter_status: ["draft", "review", "published", "retired"],
       srs_card_status: ["learning", "review", "leech", "suspended"],
-      srs_rating: ["again", "hard", "good", "easy"],
+      srs_rating: ["again", "hard", "good", "easy", "dont_know"],
       study_session_status: ["active", "completed", "abandoned"],
       subscription_status: ["active", "past_due", "cancelled", "expired"],
       subscription_tier: ["free", "pilot", "student", "institution"],
