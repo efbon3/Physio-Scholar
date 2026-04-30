@@ -10,6 +10,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
+import { DeletePersonalEventButton } from "./delete-personal-event-button";
+
 export const metadata = {
   title: "Calendar",
 };
@@ -112,8 +114,16 @@ export default async function CalendarPage() {
               .reverse()
               .slice(0, 10)
               .map((e) => (
-                <li key={e.id} className="text-muted-foreground text-sm">
-                  <span className="font-mono text-xs">{e.starts_at}</span> · {e.title}
+                <li
+                  key={e.id}
+                  className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
+                  <span>
+                    <span className="font-mono text-xs">{e.starts_at}</span> · {e.title}
+                  </span>
+                  {e.audience === "personal" ? (
+                    <DeletePersonalEventButton id={e.id} title={e.title} />
+                  ) : null}
                 </li>
               ))}
           </ul>
@@ -164,36 +174,43 @@ function EventCard({ event, now }: { event: ExamEventRow; now: Date }) {
   const tone = KIND_TONE[event.kind] ?? "border-input";
   return (
     <li className={cn("flex flex-col gap-1 rounded-md border p-3 text-sm", tone)}>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-medium tracking-widest uppercase">
-          {KIND_LABELS[event.kind] ?? event.kind}
-        </span>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-medium tracking-widest uppercase">
+              {KIND_LABELS[event.kind] ?? event.kind}
+            </span>
+            {event.audience === "personal" ? (
+              <span className="bg-background text-muted-foreground rounded-full border px-2 py-0.5">
+                Personal
+              </span>
+            ) : null}
+            <span className="text-muted-foreground">
+              {days === 0
+                ? "today"
+                : days === 1
+                  ? "tomorrow"
+                  : days > 0
+                    ? `in ${days} days`
+                    : `${Math.abs(days)} days ago`}
+            </span>
+          </div>
+          <p className="font-medium">{event.title}</p>
+          <p className="text-muted-foreground font-mono text-xs">
+            {event.starts_at}
+            {event.ends_at && event.ends_at !== event.starts_at ? ` → ${event.ends_at}` : ""}
+          </p>
+          {event.organ_systems.length > 0 ? (
+            <p className="text-muted-foreground text-xs capitalize">
+              Topics: {event.organ_systems.join(" · ")}
+            </p>
+          ) : null}
+          {event.notes ? <p className="text-muted-foreground text-xs">{event.notes}</p> : null}
+        </div>
         {event.audience === "personal" ? (
-          <span className="bg-background text-muted-foreground rounded-full border px-2 py-0.5">
-            Personal
-          </span>
+          <DeletePersonalEventButton id={event.id} title={event.title} />
         ) : null}
-        <span className="text-muted-foreground">
-          {days === 0
-            ? "today"
-            : days === 1
-              ? "tomorrow"
-              : days > 0
-                ? `in ${days} days`
-                : `${Math.abs(days)} days ago`}
-        </span>
       </div>
-      <p className="font-medium">{event.title}</p>
-      <p className="text-muted-foreground font-mono text-xs">
-        {event.starts_at}
-        {event.ends_at && event.ends_at !== event.starts_at ? ` → ${event.ends_at}` : ""}
-      </p>
-      {event.organ_systems.length > 0 ? (
-        <p className="text-muted-foreground text-xs capitalize">
-          Topics: {event.organ_systems.join(" · ")}
-        </p>
-      ) : null}
-      {event.notes ? <p className="text-muted-foreground text-xs">{event.notes}</p> : null}
     </li>
   );
 }
