@@ -388,14 +388,6 @@ Distractors:
 
 ---
 
-QUESTION 19
-
-Stem: (Question 19 continues from the image-based query on cerebellar peduncle pathways – exact text matches previous pattern)
-
-[INSUFFICIENT SOURCE COVERAGE — the question text and options are not reproduced in the source `.txt` file. The source key marks Q19 as "(image-based; consistent with pathway)" without a letter answer. Recommend supplying the question text and options before publication.]
-
----
-
 QUESTION 20
 
 Stem: Concerning the circuitry between mossy fibers, climbing fibers and cells of the cerebellar cortex, which of the following pairs provide excitatory input?
