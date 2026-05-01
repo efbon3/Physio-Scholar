@@ -201,6 +201,11 @@ export function mapPartToOrganSystem(partField: string): OrganSystem {
   const norm = partField.toLowerCase().replace(/\s+/g, " ").trim();
   if (/part\s+i\b.*foundations/.test(norm)) return "foundations";
   if (/part\s+ii\b.*excitable/.test(norm)) return "musculoskeletal";
+  // Author's curriculum-bank uses "Part II — Neurophysiology" as a
+  // single grouping for nervous-system chapters (ch10+); the syllabus
+  // splits this into Part III. Map to the same `nervous` token either
+  // way so /systems renders both spellings under one section.
+  if (/part\s+ii\b.*neurophysiology/.test(norm)) return "nervous";
   if (/part\s+iii\b.*nervous/.test(norm)) return "nervous";
   if (/part\s+iv\b.*blood/.test(norm)) return "blood";
   if (/part\s+v\b.*cardiovascular/.test(norm)) return "cardiovascular";
