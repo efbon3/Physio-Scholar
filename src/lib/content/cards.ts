@@ -352,12 +352,18 @@ function parseTolerance(raw: string | null): number | undefined {
   const pctMatch = cleaned.match(/^([\d.]+)%$/);
   if (pctMatch) {
     const v = Number.parseFloat(pctMatch[1]);
-    if (Number.isFinite(v)) return v / 100;
+    // Clamp at 1.0 — the schema caps tolerance_pct there. Order-of-
+    // magnitude tolerances on small canonicals (e.g. "2,000–10,000"
+    // canonical with "10³–10⁴" tolerance) compute to a >100% relative
+    // spread upstream; 100% tolerance already grades "anything in the
+    // right ballpark" Green, which is the intent of an order-of-
+    // magnitude tolerance, so clamping is faithful to the source.
+    if (Number.isFinite(v)) return Math.min(v / 100, 1);
   }
   const numMatch = cleaned.match(/^([\d.]+)$/);
   if (numMatch) {
     const v = Number.parseFloat(numMatch[1]);
-    if (Number.isFinite(v)) return v <= 1 ? v : v / 100;
+    if (Number.isFinite(v)) return Math.min(v <= 1 ? v : v / 100, 1);
   }
   return undefined;
 }
