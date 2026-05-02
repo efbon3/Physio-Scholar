@@ -207,6 +207,10 @@ export function mapPartToOrganSystem(partField: string): OrganSystem {
   // way so /systems renders both spellings under one section.
   if (/part\s+ii\b.*neurophysiology/.test(norm)) return "nervous";
   if (/part\s+iii\b.*nervous/.test(norm)) return "nervous";
+  // Author's curriculum-bank uses "Part III — Blood and Immunity" for
+  // ch16-19; the syllabus calls this Part IV. Map to the same `blood`
+  // token regardless of the Roman numeral.
+  if (/part\s+iii\b.*blood/.test(norm)) return "blood";
   if (/part\s+iv\b.*blood/.test(norm)) return "blood";
   if (/part\s+v\b.*cardiovascular/.test(norm)) return "cardiovascular";
   if (/part\s+vi\b.*respiratory/.test(norm)) return "respiratory";
