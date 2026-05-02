@@ -212,6 +212,8 @@ export function mapPartToOrganSystem(partField: string): OrganSystem {
   // token regardless of the Roman numeral.
   if (/part\s+iii\b.*blood/.test(norm)) return "blood";
   if (/part\s+iv\b.*blood/.test(norm)) return "blood";
+  // Author renumbers cardiovascular as Part IV (vs syllabus's Part V).
+  if (/part\s+iv\b.*cardiovascular/.test(norm)) return "cardiovascular";
   if (/part\s+v\b.*cardiovascular/.test(norm)) return "cardiovascular";
   if (/part\s+vi\b.*respiratory/.test(norm)) return "respiratory";
   if (/part\s+vii\b.*renal/.test(norm)) return "renal";
