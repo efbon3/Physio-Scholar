@@ -92,7 +92,13 @@ export async function readChapterById(id: string): Promise<Chapter | null> {
 function mergeChapterFiles(mechanisms: Chapter[]): Chapter[] {
   const groups = new Map<string, Chapter[]>();
   for (const m of mechanisms) {
-    const key = m.frontmatter.title;
+    // Group by case-insensitive, whitespace-collapsed title so files
+    // that drift on capitalisation across formats — e.g. "Leukocytes
+    // And Immunity" (mcq + fillblank) vs "Leukocytes and Immunity"
+    // (descriptive) — still merge into one chapter row on /systems.
+    // The primary file's exact title is preserved on the merged
+    // Chapter via mergeOneGroup; only the grouping key is normalised.
+    const key = normaliseTitleKey(m.frontmatter.title);
     const arr = groups.get(key);
     if (arr) arr.push(m);
     else groups.set(key, [m]);
@@ -107,6 +113,10 @@ function mergeChapterFiles(mechanisms: Chapter[]): Chapter[] {
     result.push(mergeOneGroup(group));
   }
   return result;
+}
+
+function normaliseTitleKey(title: string): string {
+  return title.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 const FORMAT_SUFFIXES = ["-mcq", "-fillblank", "-descriptive"];
