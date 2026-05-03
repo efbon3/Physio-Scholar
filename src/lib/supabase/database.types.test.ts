@@ -22,6 +22,8 @@ describe("Database type", () => {
   it("exposes the public tables (+ J5 admin_audit_log + faculty_assignments + Faculty Platform tables)", () => {
     expectTypeOf<keyof PublicTables>().toEqualTypeOf<
       | "admin_audit_log"
+      | "announcements"
+      | "batches"
       | "card_states"
       | "content_chapters"
       | "content_flags"

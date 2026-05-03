@@ -132,6 +132,81 @@ export type Database = {
           },
         ];
       };
+      announcements: {
+        Row: {
+          body: string | null;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          decision_comment: string | null;
+          faculty_id: string;
+          id: string;
+          institution_id: string;
+          status: string;
+          submitted_at: string | null;
+          target_batch_ids: string[];
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          body?: string | null;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_comment?: string | null;
+          faculty_id: string;
+          id?: string;
+          institution_id: string;
+          status?: string;
+          submitted_at?: string | null;
+          target_batch_ids?: string[];
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          body?: string | null;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_comment?: string | null;
+          faculty_id?: string;
+          id?: string;
+          institution_id?: string;
+          status?: string;
+          submitted_at?: string | null;
+          target_batch_ids?: string[];
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      batches: {
+        Row: {
+          created_at: string;
+          id: string;
+          institution_id: string;
+          name: string;
+          updated_at: string;
+          year_of_study: number | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          institution_id: string;
+          name: string;
+          updated_at?: string;
+          year_of_study?: number | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          institution_id?: string;
+          name?: string;
+          updated_at?: string;
+          year_of_study?: number | null;
+        };
+        Relationships: [];
+      };
       content_flags: {
         Row: {
           card_id: string;
@@ -298,6 +373,7 @@ export type Database = {
           institution_id: string;
           status: string;
           submitted_at: string | null;
+          target_batch_ids: string[];
           title: string;
           updated_at: string;
         };
@@ -313,6 +389,7 @@ export type Database = {
           institution_id: string;
           status?: string;
           submitted_at?: string | null;
+          target_batch_ids?: string[];
           title: string;
           updated_at?: string;
         };
@@ -328,6 +405,7 @@ export type Database = {
           institution_id?: string;
           status?: string;
           submitted_at?: string | null;
+          target_batch_ids?: string[];
           title?: string;
           updated_at?: string;
         };
@@ -384,6 +462,7 @@ export type Database = {
           approved_at: string | null;
           approved_by: string | null;
           avatar_url: string | null;
+          batch_id: string | null;
           college_name: string | null;
           consent_analytics: boolean;
           consent_analytics_updated_at: string | null;
@@ -418,6 +497,7 @@ export type Database = {
           approved_at?: string | null;
           approved_by?: string | null;
           avatar_url?: string | null;
+          batch_id?: string | null;
           college_name?: string | null;
           consent_analytics?: boolean;
           consent_analytics_updated_at?: string | null;
@@ -452,6 +532,7 @@ export type Database = {
           approved_at?: string | null;
           approved_by?: string | null;
           avatar_url?: string | null;
+          batch_id?: string | null;
           college_name?: string | null;
           consent_analytics?: boolean;
           consent_analytics_updated_at?: string | null;
