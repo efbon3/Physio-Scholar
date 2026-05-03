@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { FlagCard } from "@/app/review/components/flag-card";
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import { bandToRating, type GradingBand } from "@/lib/grading/rating-mapping";
@@ -491,6 +492,8 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
           </button>
         </div>
       ) : null}
+
+      {status === "revealed" || status === "method" ? <FlagCard cardId={card.id} /> : null}
     </article>
   );
 }

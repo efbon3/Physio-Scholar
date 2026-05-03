@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { FlagCard } from "@/app/review/components/flag-card";
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import { gradeFillBlank } from "@/lib/grading/fill-blank";
@@ -350,6 +351,7 @@ export function FillBlankSession({ cards, chapterId, mechanismSystem, profileId 
               {isLastCard ? "Finish" : "Continue"}
             </button>
           </div>
+          <FlagCard cardId={card.id} />
         </div>
       ) : null}
     </article>

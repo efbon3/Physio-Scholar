@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { FlagCard } from "@/app/review/components/flag-card";
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import type { McqQuestion } from "@/lib/content/exam";
@@ -375,6 +376,7 @@ export function McqSession({ questions, cards, chapterId, mechanismSystem, profi
               {isLastQuestion ? "Finish" : "Continue"}
             </button>
           </div>
+          <FlagCard cardId={question.cardId} />
         </div>
       ) : null}
     </article>
