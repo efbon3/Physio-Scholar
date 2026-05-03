@@ -27,12 +27,22 @@ const UUID_RE = /^[0-9a-f-]{36}$/i;
 const TARGET_BATCH_IDS_SCHEMA = z
   .array(z.string().regex(UUID_RE, "Invalid batch id"))
   .max(50, "Too many target batches");
+const MAX_MARKS_SCHEMA = z
+  .union([z.literal(""), z.string()])
+  .transform((v) => (v === "" ? null : Number(v)))
+  .pipe(
+    z.union([
+      z.null(),
+      z.number().positive("Max marks must be > 0").max(10000, "Max marks too large"),
+    ]),
+  );
 
 const createSchema = z.object({
   title: TITLE_SCHEMA,
   description: DESCRIPTION_SCHEMA,
   due_at: DUE_AT_SCHEMA,
   target_batch_ids: TARGET_BATCH_IDS_SCHEMA,
+  max_marks: MAX_MARKS_SCHEMA,
 });
 
 const updateSchema = createSchema.extend({
@@ -80,6 +90,7 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
     description: formData.get("description")?.toString() ?? "",
     due_at: formData.get("due_at")?.toString() ?? "",
     target_batch_ids: pickTargetBatchIds(formData),
+    max_marks: formData.get("max_marks")?.toString() ?? "",
   });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid form input." };
@@ -100,6 +111,7 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
       description: parsed.data.description,
       due_at: parsed.data.due_at,
       target_batch_ids: parsed.data.target_batch_ids,
+      max_marks: parsed.data.max_marks,
       status: initialStatus,
     })
     .select("id")
@@ -194,6 +206,7 @@ export async function updateAssignmentAction(formData: FormData): Promise<Assign
     description: formData.get("description")?.toString() ?? "",
     due_at: formData.get("due_at")?.toString() ?? "",
     target_batch_ids: pickTargetBatchIds(formData),
+    max_marks: formData.get("max_marks")?.toString() ?? "",
   });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid form input." };
@@ -206,6 +219,7 @@ export async function updateAssignmentAction(formData: FormData): Promise<Assign
       description: parsed.data.description,
       due_at: parsed.data.due_at,
       target_batch_ids: parsed.data.target_batch_ids,
+      max_marks: parsed.data.max_marks,
     })
     .eq("id", parsed.data.id);
   if (error) {
@@ -244,4 +258,93 @@ export async function deleteAssignmentAction(id: string): Promise<AssignmentResu
   revalidatePath("/admin/assignments");
   revalidatePath("/today");
   return { status: "ok" };
+}
+
+// ───────────────────────────── marks ─────────────────────────────
+
+const markRowSchema = z.object({
+  student_id: z.string().regex(UUID_RE, "Invalid student id"),
+  marks: z.union([z.literal(""), z.string()]),
+});
+
+const SAVE_MARKS_SCHEMA = z.object({
+  assignment_id: z.string().regex(UUID_RE, "Invalid assignment id"),
+  rows: z.array(markRowSchema).max(500, "Too many rows"),
+});
+
+/**
+ * Save marks for one assignment as a batch upsert. The action checks
+ * the assignment's max_marks and refuses any score that exceeds it
+ * (UI also enforces this, belt-and-brace). Empty-string marks are
+ * skipped — they leave existing rows untouched. Faculty who want to
+ * un-score a student should delete the row, which RLS only lets
+ * admins do; for now an empty string is a no-op.
+ */
+export async function saveAssignmentMarksAction(
+  assignmentId: string,
+  rows: Array<{ student_id: string; marks: string }>,
+): Promise<AssignmentResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { status: "error", message: "Marks unavailable in this environment." };
+  }
+  const parsed = SAVE_MARKS_SCHEMA.safeParse({ assignment_id: assignmentId, rows });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Please sign in." };
+
+  const { data: assignment, error: aErr } = await supabase
+    .from("faculty_assignments")
+    .select("max_marks, status")
+    .eq("id", parsed.data.assignment_id)
+    .single();
+  if (aErr || !assignment) {
+    return { status: "error", message: "Assignment not found." };
+  }
+  if (assignment.max_marks === null) {
+    return {
+      status: "error",
+      message: "This assignment isn't graded — set max_marks first.",
+    };
+  }
+  const max = Number(assignment.max_marks);
+
+  const cleaned = parsed.data.rows
+    .map((r) => ({ student_id: r.student_id, marksRaw: r.marks.trim() }))
+    .filter((r) => r.marksRaw.length > 0);
+  for (const r of cleaned) {
+    const n = Number(r.marksRaw);
+    if (!Number.isFinite(n) || n < 0 || n > max) {
+      return {
+        status: "error",
+        message: `Marks for one student is out of range (0..${max}).`,
+      };
+    }
+  }
+
+  if (cleaned.length === 0) {
+    return { status: "ok", id: parsed.data.assignment_id };
+  }
+
+  const payload = cleaned.map((r) => ({
+    assignment_id: parsed.data.assignment_id,
+    student_id: r.student_id,
+    marks: Number(r.marksRaw),
+    graded_by: user.id,
+    graded_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from("assignment_marks")
+    .upsert(payload, { onConflict: "assignment_id,student_id" });
+  if (error) return { status: "error", message: `Could not save: ${error.message}` };
+
+  revalidatePath(`/faculty/assignments/${parsed.data.assignment_id}/marks`);
+  revalidatePath("/today");
+  return { status: "ok", id: parsed.data.assignment_id };
 }

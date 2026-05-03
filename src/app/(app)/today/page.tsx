@@ -4,14 +4,17 @@ import { readVisibleEvents } from "@/lib/calendar/events";
 import { buildBoostCardIds, findActiveExamWindow } from "@/lib/calendar/srs-weighting";
 import { extractCards, type Card } from "@/lib/content/cards";
 import { readAllChapters } from "@/lib/content/source";
+import { gradeFor, parseGradeThresholds } from "@/lib/grading/thresholds";
 import { pickRandomQuote } from "@/lib/motivation/quotes";
 import { createClient } from "@/lib/supabase/server";
 
 import {
   TodayDashboard,
   type AnnouncementSummary,
+  type AttendanceSummary,
   type FacultyAssignment,
   type InboxMessageSummary,
+  type MarkSummary,
   type UpcomingGoal,
 } from "./today-dashboard";
 
@@ -131,6 +134,8 @@ export default async function TodayPage() {
   let assignments: FacultyAssignment[] = [];
   let announcements: AnnouncementSummary[] = [];
   let inboxMessages: InboxMessageSummary[] = [];
+  let attendanceSummary: AttendanceSummary | null = null;
+  let recentMarks: MarkSummary[] = [];
   if (user) {
     try {
       const supabaseForReads = await createClient();
@@ -192,12 +197,111 @@ export default async function TodayPage() {
         sentAt: m.sent_at,
         readAt: m.read_at,
       }));
+
+      // My-attendance + my-marks. RLS lets students read only their own
+      // rows so we just SELECT and aggregate. We avoid Postgrest's
+      // implicit-join syntax (it requires FK relationships in the
+      // generated types and ours don't all have them yet) by issuing
+      // separate queries and joining client-side.
+      const [{ data: attRows }, { data: codeRows }, { data: profileRow }, { data: markRows }] =
+        await Promise.all([
+          supabaseForReads
+            .from("attendance_records")
+            .select("code, class_session_id")
+            .eq("student_id", user.id),
+          supabaseForReads.from("attendance_codes").select("code, counts_toward_total"),
+          supabaseForReads.from("profiles").select("institution_id").eq("id", user.id).single(),
+          supabaseForReads
+            .from("assignment_marks")
+            .select("assignment_id, marks, graded_at")
+            .eq("student_id", user.id)
+            .order("graded_at", { ascending: false })
+            .limit(3),
+        ]);
+
+      // Pull session status for the records we have (one batch query).
+      const sessionIds = Array.from(new Set((attRows ?? []).map((r) => r.class_session_id))).filter(
+        (v): v is string => Boolean(v),
+      );
+      const { data: sessionRows } = sessionIds.length
+        ? await supabaseForReads.from("class_sessions").select("id, status").in("id", sessionIds)
+        : { data: [] as Array<{ id: string; status: string }> };
+      const sessionStatusById = new Map((sessionRows ?? []).map((s) => [s.id, s.status as string]));
+
+      // Institution settings for threshold + grade cut-offs.
+      let threshold = 0.75;
+      let gradeThresholds = parseGradeThresholds(null);
+      if (profileRow?.institution_id) {
+        const { data: instRow } = await supabaseForReads
+          .from("institutions")
+          .select("attendance_threshold, grade_thresholds")
+          .eq("id", profileRow.institution_id)
+          .single();
+        if (instRow) {
+          threshold = Number(instRow.attendance_threshold ?? 0.75);
+          gradeThresholds = parseGradeThresholds(instRow.grade_thresholds);
+        }
+      }
+
+      const countsByCode = new Map<string, boolean>(
+        (codeRows ?? []).map((c) => [c.code, c.counts_toward_total]),
+      );
+      const heldRecords = (attRows ?? []).filter(
+        (r) =>
+          sessionStatusById.get(r.class_session_id) === "held" && countsByCode.get(r.code) === true,
+      );
+      // "attended" = anything that counts toward the total minus
+      // explicit absents ("A"). Pilot-scale heuristic; we'll add a
+      // "kind" column on attendance_codes if the rule needs to grow.
+      const attended = heldRecords.filter((r) => r.code.toUpperCase() !== "A").length;
+      attendanceSummary = {
+        totalCounted: heldRecords.length,
+        attended,
+        ratio: heldRecords.length === 0 ? null : attended / heldRecords.length,
+        threshold,
+      };
+
+      const assignmentIdsForMarks = Array.from(
+        new Set((markRows ?? []).map((r) => r.assignment_id)),
+      ).filter((v): v is string => Boolean(v));
+      const { data: assignmentMetaRows } = assignmentIdsForMarks.length
+        ? await supabaseForReads
+            .from("faculty_assignments")
+            .select("id, title, max_marks")
+            .in("id", assignmentIdsForMarks)
+        : {
+            data: [] as Array<{ id: string; title: string; max_marks: number | null }>,
+          };
+      const metaById = new Map(
+        (assignmentMetaRows ?? []).map((a) => [
+          a.id,
+          { title: a.title, maxMarks: a.max_marks === null ? null : Number(a.max_marks) },
+        ]),
+      );
+      recentMarks = (markRows ?? [])
+        .map((m) => {
+          const meta = metaById.get(m.assignment_id);
+          if (!meta || meta.maxMarks === null || meta.maxMarks <= 0) return null;
+          const marksNum = Number(m.marks);
+          if (!Number.isFinite(marksNum)) return null;
+          const pct = (marksNum / meta.maxMarks) * 100;
+          return {
+            id: m.assignment_id,
+            title: meta.title,
+            marks: marksNum,
+            maxMarks: meta.maxMarks,
+            letter: gradeFor(pct, gradeThresholds),
+          };
+        })
+        .filter((v): v is MarkSummary => v !== null);
     } catch {
       // RLS hit / table not yet migrated → empty lists, cards show the
       // "no items yet" copy. Don't surface as an error.
       assignments = [];
       announcements = [];
       inboxMessages = [];
+      attendanceSummary = null;
+      recentMarks = [];
     }
   }
 
@@ -214,6 +318,8 @@ export default async function TodayPage() {
       assignments={assignments}
       announcements={announcements}
       inboxMessages={inboxMessages}
+      attendanceSummary={attendanceSummary}
+      recentMarks={recentMarks}
     />
   );
 }

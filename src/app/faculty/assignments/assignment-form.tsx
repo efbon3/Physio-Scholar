@@ -84,17 +84,35 @@ export function AssignmentForm({ batches }: { batches: AssignmentBatchOption[] }
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="assignment-due">Due date / time (optional)</Label>
-        <Input
-          id="assignment-due"
-          name="due_at_local"
-          type="datetime-local"
-          data-testid="assignment-due"
-        />
-        <p className="text-muted-foreground text-xs">
-          Leave blank if there&apos;s no specific deadline.
-        </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="assignment-due">Due date / time (optional)</Label>
+          <Input
+            id="assignment-due"
+            name="due_at_local"
+            type="datetime-local"
+            data-testid="assignment-due"
+          />
+          <p className="text-muted-foreground text-xs">
+            Leave blank if there&apos;s no specific deadline.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="assignment-max-marks">Max marks (optional)</Label>
+          <Input
+            id="assignment-max-marks"
+            name="max_marks"
+            type="number"
+            min={0.01}
+            max={10000}
+            step="0.01"
+            placeholder="e.g. 100"
+          />
+          <p className="text-muted-foreground text-xs">
+            Set this to make the assignment graded — you can then enter scores per student. Leave
+            blank for a notice-board task.
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">

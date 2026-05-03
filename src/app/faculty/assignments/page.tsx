@@ -78,7 +78,7 @@ export default async function FacultyAssignmentsPage() {
     supabase
       .from("faculty_assignments")
       .select(
-        "id, title, description, due_at, created_at, faculty_id, status, decision_comment, submitted_at, target_batch_ids",
+        "id, title, description, due_at, created_at, faculty_id, status, decision_comment, submitted_at, target_batch_ids, max_marks",
       )
       .eq("institution_id", profile.institution_id)
       .order("due_at", { ascending: true, nullsFirst: false })
@@ -176,6 +176,15 @@ export default async function FacultyAssignmentsPage() {
                         View engagement →
                       </Link>
                     ) : null}
+                    {a.max_marks !== null && a.status === "approved" ? (
+                      <Link
+                        href={`/faculty/assignments/${a.id}/marks`}
+                        className="text-primary underline-offset-2 hover:underline"
+                      >
+                        Enter marks →
+                      </Link>
+                    ) : null}
+                    {a.max_marks !== null ? <span>Out of {Number(a.max_marks)} marks</span> : null}
                     {canSubmit ? <SubmitForReviewButton assignmentId={a.id} /> : null}
                     {isOwner ? (
                       <DeleteAssignmentButton id={a.id} />

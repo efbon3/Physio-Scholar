@@ -63,6 +63,25 @@ export type InboxMessageSummary = {
   readAt: string | null;
 };
 
+export type AttendanceSummary = {
+  /** Sessions counted toward the total (held + counts_toward_total = true). */
+  totalCounted: number;
+  /** Of those, how many were present (or otherwise counted). */
+  attended: number;
+  /** Computed attendance fraction 0..1, or null if there's no data. */
+  ratio: number | null;
+  /** Institution attendance threshold (fraction 0..1). */
+  threshold: number;
+};
+
+export type MarkSummary = {
+  id: string;
+  title: string;
+  marks: number;
+  maxMarks: number;
+  letter: string | null;
+};
+
 /**
  * Today tab — post-login landing dashboard.
  *
@@ -91,6 +110,8 @@ export function TodayDashboard({
   assignments,
   announcements,
   inboxMessages,
+  attendanceSummary,
+  recentMarks,
 }: {
   cards: readonly Card[];
   greetingName: string;
@@ -110,6 +131,10 @@ export function TodayDashboard({
   announcements: readonly AnnouncementSummary[];
   /** Up to five most recent HOD/admin → student messages. */
   inboxMessages: readonly InboxMessageSummary[];
+  /** Aggregated attendance (held sessions only) — null when student has no records. */
+  attendanceSummary: AttendanceSummary | null;
+  /** Up to three most recent graded assignments. */
+  recentMarks: readonly MarkSummary[];
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
 
@@ -210,11 +235,96 @@ export function TodayDashboard({
         <UpcomingGoalsCard goals={upcomingGoals} />
         <WeakSystemCard weakArea={data?.weakArea ?? null} />
         <FacultyHomeworkCard assignments={assignments} />
+        <MyAttendanceCard summary={attendanceSummary} />
+        <MyMarksCard marks={recentMarks} />
       </section>
 
       {inboxMessages.length > 0 ? <InboxCard messages={inboxMessages} /> : null}
       {announcements.length > 0 ? <AnnouncementsCard announcements={announcements} /> : null}
     </main>
+  );
+}
+
+function MyAttendanceCard({ summary }: { summary: AttendanceSummary | null }) {
+  if (summary === null || summary.totalCounted === 0) {
+    return (
+      <article
+        aria-label="My attendance"
+        className="border-input flex flex-col gap-2 rounded-md border p-4"
+      >
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">My attendance</p>
+        <p className="font-heading text-base font-medium">No data yet.</p>
+        <p className="text-muted-foreground text-xs">
+          Once your faculty marks the first held session, your attendance % will appear here.
+        </p>
+      </article>
+    );
+  }
+  const pct = summary.ratio === null ? null : Math.round(summary.ratio * 100);
+  const thresholdPct = Math.round(summary.threshold * 100);
+  const below = summary.ratio !== null && summary.ratio < summary.threshold;
+  return (
+    <article
+      aria-label="My attendance"
+      className={`flex flex-col gap-2 rounded-md border p-4 ${
+        below
+          ? "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950"
+          : "border-input"
+      }`}
+    >
+      <p className="text-muted-foreground text-xs tracking-widest uppercase">My attendance</p>
+      <p className="font-heading text-base font-medium">
+        {pct === null ? "—" : `${pct}%`}
+        <span className="text-muted-foreground ml-1 text-xs">
+          ({summary.attended}/{summary.totalCounted})
+        </span>
+      </p>
+      {below ? (
+        <p className="text-xs text-amber-900 dark:text-amber-100">
+          Below the {thresholdPct}% threshold. Show up.
+        </p>
+      ) : (
+        <p className="text-muted-foreground text-xs">Threshold: {thresholdPct}%.</p>
+      )}
+    </article>
+  );
+}
+
+function MyMarksCard({ marks }: { marks: readonly MarkSummary[] }) {
+  if (marks.length === 0) {
+    return (
+      <article
+        aria-label="My marks"
+        className="border-input flex flex-col gap-2 rounded-md border p-4"
+      >
+        <p className="text-muted-foreground text-xs tracking-widest uppercase">My marks</p>
+        <p className="font-heading text-base font-medium">No graded work yet.</p>
+        <p className="text-muted-foreground text-xs">
+          Faculty-graded assignments will appear here once they enter your scores.
+        </p>
+      </article>
+    );
+  }
+  return (
+    <article
+      aria-label="My marks"
+      className="border-input flex flex-col gap-2 rounded-md border p-4"
+    >
+      <p className="text-muted-foreground text-xs tracking-widest uppercase">My marks</p>
+      <ul className="flex flex-col gap-2">
+        {marks.map((m) => {
+          const pct = Math.round((m.marks / m.maxMarks) * 100);
+          return (
+            <li key={m.id} className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">{m.title}</span>
+              <span className="text-muted-foreground text-xs">
+                {m.marks}/{m.maxMarks} · {pct}%{m.letter ? ` · ${m.letter}` : ""}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </article>
   );
 }
 
