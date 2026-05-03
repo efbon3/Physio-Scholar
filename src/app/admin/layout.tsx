@@ -37,7 +37,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-border bg-background sticky top-0 z-10 border-b">
+      <header data-print="hide" className="border-border bg-background sticky top-0 z-10 border-b">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-2 px-4 py-2">
           <Link
             href="/today"

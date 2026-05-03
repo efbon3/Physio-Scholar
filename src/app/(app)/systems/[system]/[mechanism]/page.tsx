@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ChapterRenderer } from "@/components/content/mechanism-renderer";
+import { PrintButton } from "@/components/print-button";
 import { readAllChapters, readChapterById } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
@@ -49,15 +50,21 @@ export default async function ChapterPage({ params }: Params) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-6 py-12">
-      <nav className="text-muted-foreground text-xs">
-        <Link href="/systems" className="underline-offset-2 hover:underline">
-          Assessment
-        </Link>
-        {" / "}
-        <Link href={`/systems#${system}`} className="capitalize underline-offset-2 hover:underline">
-          {system}
-        </Link>
-      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <nav data-print="hide" className="text-muted-foreground text-xs">
+          <Link href="/systems" className="underline-offset-2 hover:underline">
+            Assessment
+          </Link>
+          {" / "}
+          <Link
+            href={`/systems#${system}`}
+            className="capitalize underline-offset-2 hover:underline"
+          >
+            {system}
+          </Link>
+        </nav>
+        <PrintButton label="Download PDF" />
+      </div>
       <ChapterRenderer chapter={chapter} profileId={profileId} />
     </main>
   );

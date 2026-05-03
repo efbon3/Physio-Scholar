@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PrintButton } from "@/components/print-button";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
@@ -96,7 +97,10 @@ export default async function FacultySchedulePage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Faculty</p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="text-muted-foreground text-sm tracking-widest uppercase">Faculty</p>
+          <PrintButton label="Download PDF" />
+        </div>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Schedule</h1>
         <p className="text-muted-foreground text-sm">
           Plan classes here, then mark attendance once each session is held. Students see the same
@@ -105,6 +109,7 @@ export default async function FacultySchedulePage() {
       </header>
 
       <section
+        data-print="hide"
         aria-label="New class session"
         className="border-input flex flex-col gap-3 rounded-md border p-4"
       >
@@ -152,7 +157,7 @@ export default async function FacultySchedulePage() {
         )}
       </section>
 
-      <footer className="border-border border-t pt-4">
+      <footer data-print="hide" className="border-border border-t pt-4">
         <Link href="/faculty">
           <Button variant="ghost" size="sm">
             Back to faculty hub

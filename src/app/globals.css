@@ -131,3 +131,44 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Print rules — when a user clicks the PrintButton it calls
+ * window.print() which triggers the browser dialog. "Save as PDF" is
+ * the natural destination on every modern browser. These rules strip
+ * the chrome (anything tagged data-print="hide") and force a printable
+ * black-on-white palette so the saved PDF is legible regardless of
+ * the on-screen theme.
+ */
+@media print {
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  a {
+    color: inherit !important;
+    text-decoration: underline;
+  }
+
+  /* Border tones inherited from var(--border) print as faint grey, which is what we want. */
+  .text-muted-foreground {
+    color: #444 !important;
+  }
+
+  /* Avoid breaking individual list items / cards across pages where possible. */
+  li,
+  article,
+  section {
+    page-break-inside: avoid;
+  }
+
+  @page {
+    margin: 1.5cm;
+  }
+}

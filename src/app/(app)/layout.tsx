@@ -65,10 +65,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // rest of the row.
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <AppNav profileId={profileId} isAdmin={isAdmin} isFaculty={isFaculty} />
+      <div data-print="hide">
+        <AppNav profileId={profileId} isAdmin={isAdmin} isFaculty={isFaculty} />
+      </div>
       <div className="min-w-0 flex-1">{children}</div>
-      <InstallPrompt />
-      <Watermark userId={profileId === "preview" ? null : profileId} />
+      <div data-print="hide">
+        <InstallPrompt />
+        <Watermark userId={profileId === "preview" ? null : profileId} />
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PrintButton } from "@/components/print-button";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
@@ -119,7 +120,10 @@ export default async function FacultyAttendancePage(props: { params: Promise<{ i
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
       <header className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Faculty</p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="text-muted-foreground text-sm tracking-widest uppercase">Faculty</p>
+          <PrintButton label="Download PDF" />
+        </div>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">{session.topic}</h1>
         <p className="text-muted-foreground text-sm">
           {startLabel} · {session.duration_minutes} min
@@ -155,7 +159,7 @@ export default async function FacultyAttendancePage(props: { params: Promise<{ i
         />
       )}
 
-      <footer className="border-border border-t pt-4">
+      <footer data-print="hide" className="border-border border-t pt-4">
         <Link href="/faculty/schedule">
           <Button variant="ghost" size="sm">
             Back to schedule

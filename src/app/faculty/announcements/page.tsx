@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PrintButton } from "@/components/print-button";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
@@ -96,7 +97,10 @@ export default async function FacultyAnnouncementsPage() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Faculty</p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="text-muted-foreground text-sm tracking-widest uppercase">Faculty</p>
+          <PrintButton label="Download PDF" />
+        </div>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Announcements</h1>
         <p className="text-muted-foreground text-sm">
           Short notices for students. Pick specific batches or leave the picker empty to broadcast
@@ -105,6 +109,7 @@ export default async function FacultyAnnouncementsPage() {
       </header>
 
       <section
+        data-print="hide"
         aria-label="Create announcement"
         className="border-input flex flex-col gap-3 rounded-md border p-4"
       >
