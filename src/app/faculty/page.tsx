@@ -185,6 +185,12 @@ export default async function FacultyHubPage() {
           cta="Manage announcements"
         />
         <FacultyCard
+          title="Schedule &amp; attendance"
+          description="Plan classes and mark attendance once each session is held. Students see upcoming sessions on their dashboard."
+          href="/faculty/schedule"
+          cta="Open schedule"
+        />
+        <FacultyCard
           title="Per-student progress"
           description="Drill into a single student — their Chapter-by-Chapter mastery, recent activity, and which topics they're slipping on. The struggler-first sort surfaces who needs your attention."
           href="/faculty/students"
