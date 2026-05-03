@@ -38,18 +38,39 @@ export default async function FacultyApprovalsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_admin, institution_id, full_name, nickname")
+    .select("role, is_admin, institution_id, department_id, full_name, nickname")
     .eq("id", user.id)
     .single();
   const role = profile?.role ?? "student";
-  const isApprover = profile?.is_admin || role === "hod";
-  if (!isApprover) redirect("/faculty");
+  const isApprover = Boolean(profile?.is_admin) || role === "hod";
+  if (!profile || !isApprover) redirect("/faculty");
 
-  const { data, error } = await supabase
+  // Department scope: HODs see only their own department's faculty.
+  // Admins see everyone in the institution. HODs without a department
+  // assigned yet fall back to institution-wide (otherwise they'd be
+  // locked out of every queue) — admin can fix that on /admin/users.
+  const scopeByDepartment = !profile.is_admin && Boolean(profile.department_id);
+  let facultyIdsInScope: string[] | null = null;
+  if (scopeByDepartment && profile.department_id) {
+    const { data: deptFaculty } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("department_id", profile.department_id);
+    facultyIdsInScope = (deptFaculty ?? []).map((f) => f.id);
+    if (facultyIdsInScope.length === 0) {
+      facultyIdsInScope = ["00000000-0000-0000-0000-000000000000"]; // empty sentinel
+    }
+  }
+
+  let queueQuery = supabase
     .from("faculty_assignments")
     .select("id, title, description, due_at, submitted_at, faculty_id, status")
     .in("status", ["pending_hod", "changes_requested"])
     .order("submitted_at", { ascending: true, nullsFirst: false });
+  if (facultyIdsInScope) {
+    queueQuery = queueQuery.in("faculty_id", facultyIdsInScope);
+  }
+  const { data, error } = await queueQuery;
 
   const rows = (data ?? []) as Array<
     Pick<

@@ -6,6 +6,23 @@ import { createClient } from "@/lib/supabase/server";
 
 import { AssignmentForm } from "./assignment-form";
 import { DeleteAssignmentButton } from "./delete-button";
+import { SubmitForReviewButton } from "./submit-button";
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: "Draft",
+  pending_hod: "Pending HOD",
+  approved: "Approved",
+  rejected: "Rejected",
+  changes_requested: "Changes requested",
+};
+
+const STATUS_TONE: Record<string, string> = {
+  draft: "border-input bg-muted text-muted-foreground",
+  pending_hod: "border-amber-300 bg-amber-50 text-amber-900",
+  approved: "border-emerald-300 bg-emerald-50 text-emerald-900",
+  rejected: "border-rose-300 bg-rose-50 text-rose-900",
+  changes_requested: "border-amber-300 bg-amber-50 text-amber-900",
+};
 
 export const metadata = {
   title: "Faculty assignments",
@@ -59,7 +76,9 @@ export default async function FacultyAssignmentsPage() {
 
   const { data: rows, error } = await supabase
     .from("faculty_assignments")
-    .select("id, title, description, due_at, created_at, faculty_id")
+    .select(
+      "id, title, description, due_at, created_at, faculty_id, status, decision_comment, submitted_at",
+    )
     .eq("institution_id", profile.institution_id)
     .order("due_at", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -96,32 +115,58 @@ export default async function FacultyAssignmentsPage() {
         <h2 className="font-heading text-lg font-medium">All assignments ({rows?.length ?? 0})</h2>
         {rows && rows.length > 0 ? (
           <ul className="flex flex-col gap-3">
-            {rows.map((a) => (
-              <li key={a.id} className="border-input flex flex-col gap-2 rounded-md border p-4">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="font-heading text-base font-medium">{a.title}</h3>
-                  <p className="text-muted-foreground text-xs">
-                    {a.due_at ? `Due ${formatDateTime(a.due_at)}` : "No deadline"}
-                  </p>
-                </div>
-                {a.description ? (
-                  <p className="text-sm whitespace-pre-wrap">{a.description}</p>
-                ) : null}
-                <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-                  <Link
-                    href={`/faculty/assignments/${a.id}/engagement`}
-                    className="text-primary underline-offset-2 hover:underline"
-                  >
-                    View engagement →
-                  </Link>
-                  {a.faculty_id === user.id ? (
-                    <DeleteAssignmentButton id={a.id} />
-                  ) : (
-                    <span>Authored by another faculty member.</span>
-                  )}
-                </div>
-              </li>
-            ))}
+            {rows.map((a) => {
+              const isOwner = a.faculty_id === user.id;
+              const statusTone = STATUS_TONE[a.status] ?? "border-input bg-muted";
+              const statusLabel = STATUS_LABEL[a.status] ?? a.status;
+              const canSubmit =
+                isOwner && (a.status === "draft" || a.status === "changes_requested");
+              return (
+                <li key={a.id} className="border-input flex flex-col gap-2 rounded-md border p-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="font-heading text-base font-medium">{a.title}</h3>
+                    <p className="text-muted-foreground text-xs">
+                      {a.due_at ? `Due ${formatDateTime(a.due_at)}` : "No deadline"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs ${statusTone}`}
+                      aria-label={`Status: ${statusLabel}`}
+                    >
+                      {statusLabel}
+                    </span>
+                    {a.status === "approved" && a.status !== a.status ? null : null}
+                  </div>
+                  {a.description ? (
+                    <p className="text-sm whitespace-pre-wrap">{a.description}</p>
+                  ) : null}
+                  {a.decision_comment &&
+                  (a.status === "rejected" || a.status === "changes_requested") ? (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                      <p className="font-medium">HOD note</p>
+                      <p className="mt-1 whitespace-pre-wrap">{a.decision_comment}</p>
+                    </div>
+                  ) : null}
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
+                    {a.status === "approved" ? (
+                      <Link
+                        href={`/faculty/assignments/${a.id}/engagement`}
+                        className="text-primary underline-offset-2 hover:underline"
+                      >
+                        View engagement →
+                      </Link>
+                    ) : null}
+                    {canSubmit ? <SubmitForReviewButton assignmentId={a.id} /> : null}
+                    {isOwner ? (
+                      <DeleteAssignmentButton id={a.id} />
+                    ) : (
+                      <span>Authored by another faculty member.</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="text-muted-foreground text-sm">

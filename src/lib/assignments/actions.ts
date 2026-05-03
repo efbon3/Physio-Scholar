@@ -74,6 +74,12 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid form input." };
   }
 
+  // Phase B: new rows start as `draft`. Faculty submits explicitly via
+  // submitAssignmentForReviewAction; HOD approves via the queue. Admin-
+  // authored rows skip the queue (admin work doesn't need HOD sign-off,
+  // and admins typically own the institution).
+  const initialStatus = profile.is_admin ? "approved" : "draft";
+
   const { data, error } = await supabase
     .from("faculty_assignments")
     .insert({
@@ -82,6 +88,7 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
       title: parsed.data.title,
       description: parsed.data.description,
       due_at: parsed.data.due_at,
+      status: initialStatus,
     })
     .select("id")
     .single();
@@ -89,9 +96,68 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
     return { status: "error", message: `Could not create: ${error.message}` };
   }
 
-  revalidatePath("/admin/assignments");
+  revalidatePath("/faculty/assignments");
   revalidatePath("/today");
   return { status: "ok", id: data.id };
+}
+
+/**
+ * Faculty action: move a draft (or changes_requested) row into the HOD
+ * queue. Stamps submitted_at and clears any prior decision metadata so
+ * the HOD sees a clean "fresh review" entry. Admins shouldn't reach
+ * this path — their drafts skip the queue at create-time, but the
+ * action is harmless if they do (RLS still gates).
+ */
+export async function submitAssignmentForReviewAction(
+  assignmentId: string,
+): Promise<AssignmentResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { status: "error", message: "Assignments are unavailable in this environment." };
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(assignmentId)) {
+    return { status: "error", message: "Invalid id." };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Please sign in." };
+
+  // Verify the row exists, belongs to caller, and is in a status the
+  // workflow allows submitting from. RLS enforces ownership at write
+  // time too; this read just makes the error message readable.
+  const { data: row } = await supabase
+    .from("faculty_assignments")
+    .select("status, faculty_id")
+    .eq("id", assignmentId)
+    .single();
+  if (!row || row.faculty_id !== user.id) {
+    return { status: "error", message: "Not found, or not yours to submit." };
+  }
+  if (row.status !== "draft" && row.status !== "changes_requested") {
+    return {
+      status: "error",
+      message: `Can't submit from status "${row.status}".`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("faculty_assignments")
+    .update({
+      status: "pending_hod",
+      submitted_at: new Date().toISOString(),
+      decided_at: null,
+      decided_by: null,
+      decision_comment: null,
+    })
+    .eq("id", assignmentId);
+  if (error) {
+    return { status: "error", message: `Could not submit: ${error.message}` };
+  }
+
+  revalidatePath("/faculty/assignments");
+  revalidatePath("/faculty/approvals");
+  return { status: "ok", id: assignmentId };
 }
 
 /**
