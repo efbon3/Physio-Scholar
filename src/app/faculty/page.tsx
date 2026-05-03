@@ -34,25 +34,74 @@ export default async function FacultyHubPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_faculty, is_admin, institution_id, full_name, nickname")
+    .select("is_faculty, is_admin, institution_id, department_id, role, full_name, nickname")
     .eq("id", user.id)
     .single();
 
   if (!profile?.is_faculty && !profile?.is_admin) redirect("/today");
 
+  const role = profile.role ?? "student";
+  const isHod = role === "hod";
+  const isAdmin = Boolean(profile.is_admin);
   const greetingName = profile.nickname || profile.full_name || "there";
   const noInstitution = profile.is_faculty && !profile.institution_id;
+  const roleLabel = isAdmin ? "Admin" : isHod ? "HOD" : "Faculty";
+
+  // HOD-specific data: pending approval count + their department's
+  // metadata. Admins also see these tiles since they share the
+  // approval / department-management responsibilities.
+  let pendingApprovalCount: number | null = null;
+  let departmentName: string | null = null;
+  let departmentMemberCount: number | null = null;
+
+  if (isHod || isAdmin) {
+    // Pending count — scoped by department for HOD, institution-wide
+    // for admin. Mirrors the page-level filtering on /faculty/approvals.
+    let countQuery = supabase
+      .from("faculty_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending_hod");
+    if (isHod && !isAdmin && profile.department_id) {
+      const { data: deptFaculty } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("department_id", profile.department_id);
+      const facultyIds = (deptFaculty ?? []).map((f) => f.id);
+      if (facultyIds.length > 0) {
+        countQuery = countQuery.in("faculty_id", facultyIds);
+      } else {
+        countQuery = countQuery.in("faculty_id", ["00000000-0000-0000-0000-000000000000"]);
+      }
+    } else if (profile.institution_id) {
+      countQuery = countQuery.eq("institution_id", profile.institution_id);
+    }
+    const { count } = await countQuery;
+    pendingApprovalCount = count ?? 0;
+  }
+
+  if (isHod && profile.department_id) {
+    const [{ data: dept }, { count: memberCount }] = await Promise.all([
+      supabase.from("departments").select("name").eq("id", profile.department_id).single(),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("department_id", profile.department_id),
+    ]);
+    departmentName = dept?.name ?? null;
+    departmentMemberCount = memberCount ?? 0;
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-1">
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">Faculty</p>
+        <p className="text-muted-foreground text-sm tracking-widest uppercase">{roleLabel}</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">
           Welcome, {greetingName}
         </h1>
         <p className="text-muted-foreground text-sm">
-          The surfaces below are scoped to your institution. Students remain anonymous to other
-          students; you see your cohort.
+          {isHod
+            ? "Your department's faculty submit work here for your review. Approve, request changes, or reject — students see only what you've approved."
+            : "The surfaces below are scoped to your institution. Students remain anonymous to other students; you see your cohort."}
         </p>
       </header>
 
@@ -66,7 +115,40 @@ export default async function FacultyHubPage() {
         </div>
       ) : null}
 
+      {isHod && !profile.department_id ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950">
+          <p className="font-medium">No department assigned</p>
+          <p className="text-muted-foreground mt-1">
+            You&apos;re flagged as HOD but no department is assigned to your profile. Ask an admin
+            to set it on <code>/admin/users</code>. Until then, the approval queue will be empty.
+          </p>
+        </div>
+      ) : null}
+
       <section className="grid gap-3 sm:grid-cols-2">
+        {(isHod || isAdmin) && pendingApprovalCount !== null ? (
+          <FacultyCard
+            title={`Approval queue${pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ""}`}
+            description={
+              pendingApprovalCount > 0
+                ? `${pendingApprovalCount} assignment${pendingApprovalCount === 1 ? "" : "s"} waiting for your review. Approve to publish; request changes or reject with a comment.`
+                : "Nothing pending right now. New faculty submissions will appear here."
+            }
+            href="/faculty/approvals"
+            cta={pendingApprovalCount > 0 ? "Review queue" : "Open queue"}
+            tone={pendingApprovalCount > 0 ? "amber" : undefined}
+          />
+        ) : null}
+        {isHod && departmentName ? (
+          <FacultyCard
+            title={`Department · ${departmentName}`}
+            description={`${departmentMemberCount ?? 0} member${
+              departmentMemberCount === 1 ? "" : "s"
+            } in your department. The HOD picker on /admin/departments tracks the head; faculty land here once an admin sets their department_id.`}
+            href="/admin/departments"
+            cta="Manage department"
+          />
+        ) : null}
         <FacultyCard
           title="Cohort analytics"
           description="Roster + per-Chapter retention heatmap for your institution. See where the class is strong and where it's slipping."
@@ -75,7 +157,7 @@ export default async function FacultyHubPage() {
         />
         <FacultyCard
           title="Assignments"
-          description="Create homework — pick a Chapter, set a due date, optionally point to a specific format. Students see the assignment on their Today dashboard."
+          description="Create homework — pick a Chapter, set a due date, optionally point to a specific format. Drafts go to the HOD queue before students see them."
           href="/faculty/assignments"
           cta="Manage assignments"
         />
@@ -96,15 +178,21 @@ function FacultyCard({
   href,
   cta,
   disabled = false,
+  tone,
 }: {
   title: string;
   description: string;
   href: string;
   cta: string;
   disabled?: boolean;
+  tone?: "amber";
 }) {
+  const toneClass =
+    tone === "amber"
+      ? "border-amber-300 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/40"
+      : "border-border bg-card";
   return (
-    <article className="border-border bg-card flex flex-col gap-3 rounded-md border p-4">
+    <article className={cn("flex flex-col gap-3 rounded-md border p-4", toneClass)}>
       <h2 className="text-sm font-semibold">{title}</h2>
       <p className="text-muted-foreground text-xs leading-relaxed">{description}</p>
       <div className="mt-auto">
