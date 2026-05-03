@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
-import { AssignmentForm } from "./assignment-form";
+import { AssignmentForm, type AssignmentBatchOption } from "./assignment-form";
 import { DeleteAssignmentButton } from "./delete-button";
 import { SubmitForReviewButton } from "./submit-button";
 
@@ -74,14 +74,28 @@ export default async function FacultyAssignmentsPage() {
     );
   }
 
-  const { data: rows, error } = await supabase
-    .from("faculty_assignments")
-    .select(
-      "id, title, description, due_at, created_at, faculty_id, status, decision_comment, submitted_at",
-    )
-    .eq("institution_id", profile.institution_id)
-    .order("due_at", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: false });
+  const [{ data: rows, error }, { data: batchRows }] = await Promise.all([
+    supabase
+      .from("faculty_assignments")
+      .select(
+        "id, title, description, due_at, created_at, faculty_id, status, decision_comment, submitted_at, target_batch_ids",
+      )
+      .eq("institution_id", profile.institution_id)
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("batches")
+      .select("id, name, year_of_study")
+      .eq("institution_id", profile.institution_id)
+      .order("year_of_study", { ascending: true, nullsFirst: false })
+      .order("name", { ascending: true }),
+  ]);
+  const batches: AssignmentBatchOption[] = (batchRows ?? []).map((b) => ({
+    id: b.id,
+    name: b.name,
+    year_of_study: b.year_of_study,
+  }));
+  const batchById = new Map(batches.map((b) => [b.id, b]));
 
   if (error) {
     return (
@@ -108,7 +122,7 @@ export default async function FacultyAssignmentsPage() {
         className="border-input flex flex-col gap-3 rounded-md border p-4"
       >
         <h2 className="font-heading text-lg font-medium">New assignment</h2>
-        <AssignmentForm />
+        <AssignmentForm batches={batches} />
       </section>
 
       <section aria-label="All assignments" className="flex flex-col gap-3">
@@ -121,6 +135,11 @@ export default async function FacultyAssignmentsPage() {
               const statusLabel = STATUS_LABEL[a.status] ?? a.status;
               const canSubmit =
                 isOwner && (a.status === "draft" || a.status === "changes_requested");
+              const targetIds: string[] = a.target_batch_ids ?? [];
+              const targetNames =
+                targetIds.length === 0
+                  ? "Whole institution"
+                  : targetIds.map((id) => batchById.get(id)?.name ?? "(unknown batch)").join(" · ");
               return (
                 <li key={a.id} className="border-input flex flex-col gap-2 rounded-md border p-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -129,6 +148,7 @@ export default async function FacultyAssignmentsPage() {
                       {a.due_at ? `Due ${formatDateTime(a.due_at)}` : "No deadline"}
                     </p>
                   </div>
+                  <p className="text-muted-foreground text-xs">Target: {targetNames}</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`rounded-full border px-2 py-0.5 text-xs ${statusTone}`}
@@ -136,7 +156,6 @@ export default async function FacultyAssignmentsPage() {
                     >
                       {statusLabel}
                     </span>
-                    {a.status === "approved" && a.status !== a.status ? null : null}
                   </div>
                   {a.description ? (
                     <p className="text-sm whitespace-pre-wrap">{a.description}</p>

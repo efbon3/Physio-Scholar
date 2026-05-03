@@ -44,6 +44,14 @@ export type FacultyAssignment = {
   dueAt: string | null;
 };
 
+export type AnnouncementSummary = {
+  id: string;
+  title: string;
+  body: string | null;
+  /** ISO timestamp the row was first authored. */
+  createdAt: string;
+};
+
 /**
  * Today tab — post-login landing dashboard.
  *
@@ -70,6 +78,7 @@ export function TodayDashboard({
   upcomingGoals,
   quote,
   assignments,
+  announcements,
 }: {
   cards: readonly Card[];
   greetingName: string;
@@ -85,6 +94,8 @@ export function TodayDashboard({
   quote: Quote;
   /** Up to three faculty-assigned homework items, ordered by due_at. */
   assignments: readonly FacultyAssignment[];
+  /** Up to three approved announcements targeting the learner's batch. */
+  announcements: readonly AnnouncementSummary[];
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
 
@@ -186,7 +197,33 @@ export function TodayDashboard({
         <WeakSystemCard weakArea={data?.weakArea ?? null} />
         <FacultyHomeworkCard assignments={assignments} />
       </section>
+
+      {announcements.length > 0 ? <AnnouncementsCard announcements={announcements} /> : null}
     </main>
+  );
+}
+
+function AnnouncementsCard({ announcements }: { announcements: readonly AnnouncementSummary[] }) {
+  return (
+    <section
+      aria-label="Announcements"
+      className="border-border bg-card flex flex-col gap-3 rounded-md border p-4"
+    >
+      <h2 className="font-heading text-sm font-semibold tracking-wide uppercase">Announcements</h2>
+      <ul className="flex flex-col gap-3">
+        {announcements.map((a) => (
+          <li key={a.id} className="flex flex-col gap-1">
+            <p className="text-sm font-medium">{a.title}</p>
+            {a.body ? (
+              <p className="text-muted-foreground text-xs whitespace-pre-wrap">{a.body}</p>
+            ) : null}
+            <p className="text-muted-foreground text-[10px]">
+              {new Date(a.createdAt).toLocaleDateString()}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

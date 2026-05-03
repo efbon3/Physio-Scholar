@@ -9,13 +9,20 @@ import { createAssignmentAction } from "@/lib/assignments/actions";
 
 type Feedback = { kind: "ok"; message: string } | { kind: "error"; message: string } | null;
 
+export type AssignmentBatchOption = {
+  id: string;
+  name: string;
+  year_of_study: number | null;
+};
+
 /**
  * Faculty assignment-creation form. Submits to createAssignmentAction
- * which validates + writes via RLS. We keep it simple: title (required),
- * description (optional), due date+time (optional). If the deadline
- * input is left blank the row gets due_at = NULL (no deadline).
+ * which validates + writes via RLS. Title (required), description
+ * (optional), due date+time (optional), target batches (multi-select;
+ * empty = broadcast to whole institution). If the deadline input is
+ * left blank the row gets due_at = NULL (no deadline).
  */
-export function AssignmentForm() {
+export function AssignmentForm({ batches }: { batches: AssignmentBatchOption[] }) {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [pending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -87,6 +94,29 @@ export function AssignmentForm() {
         />
         <p className="text-muted-foreground text-xs">
           Leave blank if there&apos;s no specific deadline.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="assignment-targets">Target batches (leave empty to broadcast)</Label>
+        <select
+          id="assignment-targets"
+          name="target_batch_ids"
+          multiple
+          size={Math.min(6, Math.max(2, batches.length))}
+          className="border-input bg-background rounded-md border px-3 py-2 text-sm"
+          aria-describedby="assignment-targets-help"
+        >
+          {batches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+              {b.year_of_study !== null ? ` (Year ${b.year_of_study})` : ""}
+            </option>
+          ))}
+        </select>
+        <p id="assignment-targets-help" className="text-muted-foreground text-xs">
+          Hold Ctrl / Cmd to select multiple. Empty selection = everyone in your institution sees
+          it.
         </p>
       </div>
 

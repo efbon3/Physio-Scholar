@@ -23,16 +23,26 @@ const DESCRIPTION_SCHEMA = z
 const DUE_AT_SCHEMA = z
   .union([z.literal(""), z.string().datetime({ offset: true })])
   .transform((v) => (v === "" ? null : v));
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+const TARGET_BATCH_IDS_SCHEMA = z
+  .array(z.string().regex(UUID_RE, "Invalid batch id"))
+  .max(50, "Too many target batches");
 
 const createSchema = z.object({
   title: TITLE_SCHEMA,
   description: DESCRIPTION_SCHEMA,
   due_at: DUE_AT_SCHEMA,
+  target_batch_ids: TARGET_BATCH_IDS_SCHEMA,
 });
 
 const updateSchema = createSchema.extend({
   id: z.string().uuid("Invalid assignment id"),
 });
+
+function pickTargetBatchIds(formData: FormData): string[] {
+  const raw = formData.getAll("target_batch_ids").map((v) => String(v));
+  return Array.from(new Set(raw.filter((v) => v.length > 0)));
+}
 
 /**
  * Faculty creates a new assignment for their institution. The form
@@ -69,6 +79,7 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
     title: formData.get("title")?.toString() ?? "",
     description: formData.get("description")?.toString() ?? "",
     due_at: formData.get("due_at")?.toString() ?? "",
+    target_batch_ids: pickTargetBatchIds(formData),
   });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid form input." };
@@ -88,6 +99,7 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
       title: parsed.data.title,
       description: parsed.data.description,
       due_at: parsed.data.due_at,
+      target_batch_ids: parsed.data.target_batch_ids,
       status: initialStatus,
     })
     .select("id")
@@ -181,6 +193,7 @@ export async function updateAssignmentAction(formData: FormData): Promise<Assign
     title: formData.get("title")?.toString() ?? "",
     description: formData.get("description")?.toString() ?? "",
     due_at: formData.get("due_at")?.toString() ?? "",
+    target_batch_ids: pickTargetBatchIds(formData),
   });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid form input." };
@@ -192,6 +205,7 @@ export async function updateAssignmentAction(formData: FormData): Promise<Assign
       title: parsed.data.title,
       description: parsed.data.description,
       due_at: parsed.data.due_at,
+      target_batch_ids: parsed.data.target_batch_ids,
     })
     .eq("id", parsed.data.id);
   if (error) {

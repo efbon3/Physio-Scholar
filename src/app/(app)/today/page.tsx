@@ -7,7 +7,12 @@ import { readAllChapters } from "@/lib/content/source";
 import { pickRandomQuote } from "@/lib/motivation/quotes";
 import { createClient } from "@/lib/supabase/server";
 
-import { TodayDashboard, type FacultyAssignment, type UpcomingGoal } from "./today-dashboard";
+import {
+  TodayDashboard,
+  type AnnouncementSummary,
+  type FacultyAssignment,
+  type UpcomingGoal,
+} from "./today-dashboard";
 
 export const metadata = {
   title: "Dashboard",
@@ -123,24 +128,43 @@ export default async function TodayPage() {
   // graveyard for stale assignments — faculty can manage those at
   // /faculty/assignments).
   let assignments: FacultyAssignment[] = [];
+  let announcements: AnnouncementSummary[] = [];
   if (user) {
     try {
       const supabaseForReads = await createClient();
-      const { data: rows } = await supabaseForReads
-        .from("faculty_assignments")
-        .select("id, title, due_at")
-        .or(`due_at.gte.${now.toISOString()},due_at.is.null`)
-        .order("due_at", { ascending: true, nullsFirst: false })
-        .limit(3);
-      assignments = (rows ?? []).map((r) => ({
+      const [assignmentsRes, announcementsRes] = await Promise.all([
+        supabaseForReads
+          .from("faculty_assignments")
+          .select("id, title, due_at")
+          .or(`due_at.gte.${now.toISOString()},due_at.is.null`)
+          .order("due_at", { ascending: true, nullsFirst: false })
+          .limit(3),
+        // Announcements: RLS already filters to status=approved AND
+        // (target_batch_ids is empty OR contains the student's
+        // batch_id), so the page just reads the most recent few.
+        supabaseForReads
+          .from("announcements")
+          .select("id, title, body, created_at")
+          .eq("status", "approved")
+          .order("created_at", { ascending: false })
+          .limit(3),
+      ]);
+      assignments = (assignmentsRes.data ?? []).map((r) => ({
         id: r.id,
         title: r.title,
         dueAt: r.due_at,
       }));
+      announcements = (announcementsRes.data ?? []).map((r) => ({
+        id: r.id,
+        title: r.title,
+        body: r.body,
+        createdAt: r.created_at,
+      }));
     } catch {
-      // RLS hit / table not yet migrated → empty list, the card shows the
-      // "no homework yet" copy. Don't surface as an error.
+      // RLS hit / table not yet migrated → empty lists, cards show the
+      // "no items yet" copy. Don't surface as an error.
       assignments = [];
+      announcements = [];
     }
   }
 
@@ -155,6 +179,7 @@ export default async function TodayPage() {
       upcomingGoals={upcomingGoals}
       quote={quote}
       assignments={assignments}
+      announcements={announcements}
     />
   );
 }
