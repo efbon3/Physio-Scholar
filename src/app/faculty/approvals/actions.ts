@@ -143,3 +143,114 @@ export async function requestAssignmentChangesAction(
   revalidatePath("/faculty/assignments");
   return { status: "ok" };
 }
+
+// ─────────────────────────── announcements ───────────────────────────
+
+/** Approve an announcement. */
+export async function approveAnnouncementAction(
+  announcementId: string,
+  comment?: string | null,
+): Promise<DecisionResult> {
+  if (!UUID_RE.test(announcementId)) return { status: "error", message: "Invalid id." };
+  const guard = await requireApprover();
+  if (!guard.ok) return { status: "error", message: guard.error };
+
+  const trimmed = typeof comment === "string" ? comment.trim().slice(0, 1000) : "";
+  const now = new Date().toISOString();
+  const { error } = await guard.supabase
+    .from("announcements")
+    .update({
+      status: "approved",
+      decided_at: now,
+      decided_by: guard.actorId,
+      decision_comment: trimmed.length > 0 ? trimmed : null,
+    })
+    .eq("id", announcementId);
+  if (error) return { status: "error", message: `Could not approve: ${error.message}` };
+
+  await writeAuditEntry({
+    action: "announcement_approve",
+    target_type: "announcements",
+    target_id: announcementId,
+    details: { comment: trimmed || null },
+  });
+
+  revalidatePath("/faculty/approvals");
+  revalidatePath("/faculty/announcements");
+  revalidatePath("/today");
+  return { status: "ok" };
+}
+
+/** Reject an announcement. Comment required. */
+export async function rejectAnnouncementAction(
+  announcementId: string,
+  comment: string,
+): Promise<DecisionResult> {
+  if (!UUID_RE.test(announcementId)) return { status: "error", message: "Invalid id." };
+  const trimmed = comment.trim();
+  if (trimmed.length < 1) return { status: "error", message: "A reason is required." };
+  if (trimmed.length > 1000) return { status: "error", message: "Reason is too long." };
+
+  const guard = await requireApprover();
+  if (!guard.ok) return { status: "error", message: guard.error };
+
+  const now = new Date().toISOString();
+  const { error } = await guard.supabase
+    .from("announcements")
+    .update({
+      status: "rejected",
+      decided_at: now,
+      decided_by: guard.actorId,
+      decision_comment: trimmed,
+    })
+    .eq("id", announcementId);
+  if (error) return { status: "error", message: `Could not reject: ${error.message}` };
+
+  await writeAuditEntry({
+    action: "announcement_reject",
+    target_type: "announcements",
+    target_id: announcementId,
+    details: { comment: trimmed },
+  });
+
+  revalidatePath("/faculty/approvals");
+  revalidatePath("/faculty/announcements");
+  return { status: "ok" };
+}
+
+/** Send an announcement back to faculty for revisions. Comment required. */
+export async function requestAnnouncementChangesAction(
+  announcementId: string,
+  comment: string,
+): Promise<DecisionResult> {
+  if (!UUID_RE.test(announcementId)) return { status: "error", message: "Invalid id." };
+  const trimmed = comment.trim();
+  if (trimmed.length < 1) return { status: "error", message: "Tell the faculty what to change." };
+  if (trimmed.length > 1000) return { status: "error", message: "Comment is too long." };
+
+  const guard = await requireApprover();
+  if (!guard.ok) return { status: "error", message: guard.error };
+
+  const now = new Date().toISOString();
+  const { error } = await guard.supabase
+    .from("announcements")
+    .update({
+      status: "changes_requested",
+      decided_at: now,
+      decided_by: guard.actorId,
+      decision_comment: trimmed,
+    })
+    .eq("id", announcementId);
+  if (error) return { status: "error", message: `Could not save: ${error.message}` };
+
+  await writeAuditEntry({
+    action: "announcement_request_changes",
+    target_type: "announcements",
+    target_id: announcementId,
+    details: { comment: trimmed },
+  });
+
+  revalidatePath("/faculty/approvals");
+  revalidatePath("/faculty/announcements");
+  return { status: "ok" };
+}

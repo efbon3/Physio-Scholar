@@ -57,26 +57,43 @@ export default async function FacultyHubPage() {
   if (isHod || isAdmin) {
     // Pending count — scoped by department for HOD, institution-wide
     // for admin. Mirrors the page-level filtering on /faculty/approvals.
-    let countQuery = supabase
-      .from("faculty_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending_hod");
+    // Counts both publishable kinds (assignments + announcements).
+    const buildCountQuery = (table: "faculty_assignments" | "announcements") => {
+      let q = supabase
+        .from(table)
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending_hod");
+      if (isHod && !isAdmin && profile.department_id) {
+        // facultyIds populated below — short-circuit when empty.
+      } else if (profile.institution_id) {
+        q = q.eq("institution_id", profile.institution_id);
+      }
+      return q;
+    };
+
+    let facultyIdsForScope: string[] | null = null;
     if (isHod && !isAdmin && profile.department_id) {
       const { data: deptFaculty } = await supabase
         .from("profiles")
         .select("id")
         .eq("department_id", profile.department_id);
-      const facultyIds = (deptFaculty ?? []).map((f) => f.id);
-      if (facultyIds.length > 0) {
-        countQuery = countQuery.in("faculty_id", facultyIds);
-      } else {
-        countQuery = countQuery.in("faculty_id", ["00000000-0000-0000-0000-000000000000"]);
+      facultyIdsForScope = (deptFaculty ?? []).map((f) => f.id);
+      if (facultyIdsForScope.length === 0) {
+        facultyIdsForScope = ["00000000-0000-0000-0000-000000000000"];
       }
-    } else if (profile.institution_id) {
-      countQuery = countQuery.eq("institution_id", profile.institution_id);
     }
-    const { count } = await countQuery;
-    pendingApprovalCount = count ?? 0;
+
+    let assignmentsCountQuery = buildCountQuery("faculty_assignments");
+    let announcementsCountQuery = buildCountQuery("announcements");
+    if (facultyIdsForScope) {
+      assignmentsCountQuery = assignmentsCountQuery.in("faculty_id", facultyIdsForScope);
+      announcementsCountQuery = announcementsCountQuery.in("faculty_id", facultyIdsForScope);
+    }
+    const [{ count: assignCount }, { count: announceCount }] = await Promise.all([
+      assignmentsCountQuery,
+      announcementsCountQuery,
+    ]);
+    pendingApprovalCount = (assignCount ?? 0) + (announceCount ?? 0);
   }
 
   if (isHod && profile.department_id) {
@@ -160,6 +177,12 @@ export default async function FacultyHubPage() {
           description="Create homework — pick a Chapter, set a due date, optionally point to a specific format. Drafts go to the HOD queue before students see them."
           href="/faculty/assignments"
           cta="Manage assignments"
+        />
+        <FacultyCard
+          title="Announcements"
+          description="Short notices for students — broadcast to the whole institution or target specific batches. Drafts go through HOD review before students see them."
+          href="/faculty/announcements"
+          cta="Manage announcements"
         />
         <FacultyCard
           title="Per-student progress"

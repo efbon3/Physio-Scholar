@@ -3,8 +3,11 @@
 import { useState, useTransition } from "react";
 
 import {
+  approveAnnouncementAction,
   approveAssignmentAction,
+  rejectAnnouncementAction,
   rejectAssignmentAction,
+  requestAnnouncementChangesAction,
   requestAssignmentChangesAction,
 } from "./actions";
 
@@ -15,14 +18,25 @@ import {
  * changes + Reject require a comment so the faculty knows what to
  * fix or why the work was refused.
  *
- * The buttons disable while the action is in flight; errors render
- * inline. On success the page revalidates server-side, so the row
- * disappears from the queue on its own.
+ * `kind` selects which underlying server action gets called. Same
+ * decision shape across both — the only thing that differs is the
+ * table the action writes to + the audit-log action label.
  */
-export function DecisionBar({ assignmentId }: { assignmentId: string }) {
+type Kind = "assignment" | "announcement";
+
+export function DecisionBar({ id, kind }: { id: string; kind: Kind }) {
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const approve = async (text: string) =>
+    kind === "assignment" ? approveAssignmentAction(id, text) : approveAnnouncementAction(id, text);
+  const requestChanges = async (text: string) =>
+    kind === "assignment"
+      ? requestAssignmentChangesAction(id, text)
+      : requestAnnouncementChangesAction(id, text);
+  const reject = async (text: string) =>
+    kind === "assignment" ? rejectAssignmentAction(id, text) : rejectAnnouncementAction(id, text);
 
   return (
     <div className="flex flex-col gap-2">
@@ -43,7 +57,7 @@ export function DecisionBar({ assignmentId }: { assignmentId: string }) {
           onClick={() => {
             setError(null);
             startTransition(async () => {
-              const result = await approveAssignmentAction(assignmentId, comment);
+              const result = await approve(comment);
               if (result.status === "error") setError(result.message);
             });
           }}
@@ -57,7 +71,7 @@ export function DecisionBar({ assignmentId }: { assignmentId: string }) {
           onClick={() => {
             setError(null);
             startTransition(async () => {
-              const result = await requestAssignmentChangesAction(assignmentId, comment);
+              const result = await requestChanges(comment);
               if (result.status === "error") setError(result.message);
             });
           }}
@@ -71,7 +85,7 @@ export function DecisionBar({ assignmentId }: { assignmentId: string }) {
           onClick={() => {
             setError(null);
             startTransition(async () => {
-              const result = await rejectAssignmentAction(assignmentId, comment);
+              const result = await reject(comment);
               if (result.status === "error") setError(result.message);
             });
           }}

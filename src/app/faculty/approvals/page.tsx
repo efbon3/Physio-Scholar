@@ -62,15 +62,31 @@ export default async function FacultyApprovalsPage() {
     }
   }
 
-  let queueQuery = supabase
+  let assignmentsQuery = supabase
     .from("faculty_assignments")
     .select("id, title, description, due_at, submitted_at, faculty_id, status")
     .in("status", ["pending_hod", "changes_requested"])
     .order("submitted_at", { ascending: true, nullsFirst: false });
   if (facultyIdsInScope) {
-    queueQuery = queueQuery.in("faculty_id", facultyIdsInScope);
+    assignmentsQuery = assignmentsQuery.in("faculty_id", facultyIdsInScope);
   }
-  const { data, error } = await queueQuery;
+
+  let announcementsQuery = supabase
+    .from("announcements")
+    .select("id, title, body, target_batch_ids, submitted_at, faculty_id, status")
+    .in("status", ["pending_hod", "changes_requested"])
+    .order("submitted_at", { ascending: true, nullsFirst: false });
+  if (facultyIdsInScope) {
+    announcementsQuery = announcementsQuery.in("faculty_id", facultyIdsInScope);
+  }
+
+  const [assignmentsRes, announcementsRes] = await Promise.all([
+    assignmentsQuery,
+    announcementsQuery,
+  ]);
+  const data = assignmentsRes.data;
+  const error = assignmentsRes.error ?? announcementsRes.error;
+  const announcementsData = announcementsRes.data ?? [];
 
   const rows = (data ?? []) as Array<
     Pick<
@@ -79,8 +95,21 @@ export default async function FacultyApprovalsPage() {
     > & { status: string }
   >;
 
+  type AnnouncementRow = {
+    id: string;
+    title: string;
+    body: string | null;
+    target_batch_ids: string[];
+    submitted_at: string | null;
+    faculty_id: string;
+    status: string;
+  };
+  const announcementRows = announcementsData as AnnouncementRow[];
+
   // Hydrate faculty names in one query so we don't do N round-trips.
-  const facultyIds = Array.from(new Set(rows.map((r) => r.faculty_id)));
+  const facultyIds = Array.from(
+    new Set([...rows.map((r) => r.faculty_id), ...announcementRows.map((r) => r.faculty_id)]),
+  );
   const facultyById = new Map<string, PendingAssignment["faculty"]>();
   if (facultyIds.length > 0) {
     const { data: facultyRows } = await supabase
@@ -91,6 +120,21 @@ export default async function FacultyApprovalsPage() {
       facultyById.set(f.id, { full_name: f.full_name, nickname: f.nickname });
     }
   }
+
+  // Hydrate batch names for the announcement target list.
+  const batchIds = Array.from(new Set(announcementRows.flatMap((r) => r.target_batch_ids)));
+  const batchNameById = new Map<string, string>();
+  if (batchIds.length > 0) {
+    const { data: batchRows } = await supabase
+      .from("batches")
+      .select("id, name")
+      .in("id", batchIds);
+    for (const b of batchRows ?? []) {
+      batchNameById.set(b.id, b.name);
+    }
+  }
+
+  const queueIsEmpty = rows.length === 0 && announcementRows.length === 0;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
@@ -107,43 +151,99 @@ export default async function FacultyApprovalsPage() {
 
       {error ? (
         <p className="text-destructive text-sm">Failed to load queue: {error.message}</p>
-      ) : rows.length === 0 ? (
+      ) : queueIsEmpty ? (
         <div className="border-border bg-muted/40 rounded-md border p-6 text-center text-sm">
           Queue is empty — nothing pending review right now.
         </div>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {rows.map((r) => {
-            const faculty = facultyById.get(r.faculty_id) ?? null;
-            const facultyName = faculty?.nickname || faculty?.full_name || "(unknown faculty)";
-            return (
-              <li
-                key={r.id}
-                className="border-border flex flex-col gap-3 rounded-md border p-4 text-sm"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="font-heading text-lg font-medium">{r.title}</h2>
-                  <span className="text-muted-foreground text-xs">
-                    {r.status === "changes_requested" ? "Awaiting revision · " : ""}
-                    Submitted {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "—"}
-                  </span>
-                </div>
-                <p className="text-muted-foreground text-xs">By {facultyName}</p>
-                {r.description ? (
-                  <p className="text-foreground/90 whitespace-pre-wrap">{r.description}</p>
-                ) : (
-                  <p className="text-muted-foreground text-xs italic">No description</p>
-                )}
-                {r.due_at ? (
-                  <p className="text-muted-foreground text-xs">
-                    Due: {new Date(r.due_at).toLocaleString()}
-                  </p>
-                ) : null}
-                <DecisionBar assignmentId={r.id} />
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          {rows.length > 0 ? (
+            <section aria-label="Pending assignments" className="flex flex-col gap-3">
+              <h2 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                Assignments ({rows.length})
+              </h2>
+              <ul className="flex flex-col gap-4">
+                {rows.map((r) => {
+                  const faculty = facultyById.get(r.faculty_id) ?? null;
+                  const facultyName =
+                    faculty?.nickname || faculty?.full_name || "(unknown faculty)";
+                  return (
+                    <li
+                      key={r.id}
+                      className="border-border flex flex-col gap-3 rounded-md border p-4 text-sm"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 className="font-heading text-lg font-medium">{r.title}</h3>
+                        <span className="text-muted-foreground text-xs">
+                          {r.status === "changes_requested" ? "Awaiting revision · " : ""}
+                          Submitted{" "}
+                          {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "—"}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground text-xs">By {facultyName}</p>
+                      {r.description ? (
+                        <p className="text-foreground/90 whitespace-pre-wrap">{r.description}</p>
+                      ) : (
+                        <p className="text-muted-foreground text-xs italic">No description</p>
+                      )}
+                      {r.due_at ? (
+                        <p className="text-muted-foreground text-xs">
+                          Due: {new Date(r.due_at).toLocaleString()}
+                        </p>
+                      ) : null}
+                      <DecisionBar id={r.id} kind="assignment" />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
+
+          {announcementRows.length > 0 ? (
+            <section aria-label="Pending announcements" className="flex flex-col gap-3">
+              <h2 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                Announcements ({announcementRows.length})
+              </h2>
+              <ul className="flex flex-col gap-4">
+                {announcementRows.map((r) => {
+                  const faculty = facultyById.get(r.faculty_id) ?? null;
+                  const facultyName =
+                    faculty?.nickname || faculty?.full_name || "(unknown faculty)";
+                  const targetNames =
+                    r.target_batch_ids.length === 0
+                      ? "Whole institution"
+                      : r.target_batch_ids
+                          .map((id) => batchNameById.get(id) ?? "(unknown batch)")
+                          .join(" · ");
+                  return (
+                    <li
+                      key={r.id}
+                      className="border-border flex flex-col gap-3 rounded-md border p-4 text-sm"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 className="font-heading text-lg font-medium">{r.title}</h3>
+                        <span className="text-muted-foreground text-xs">
+                          {r.status === "changes_requested" ? "Awaiting revision · " : ""}
+                          Submitted{" "}
+                          {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "—"}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        By {facultyName} · Target: {targetNames}
+                      </p>
+                      {r.body ? (
+                        <p className="text-foreground/90 whitespace-pre-wrap">{r.body}</p>
+                      ) : (
+                        <p className="text-muted-foreground text-xs italic">No body</p>
+                      )}
+                      <DecisionBar id={r.id} kind="announcement" />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
+        </>
       )}
     </main>
   );
