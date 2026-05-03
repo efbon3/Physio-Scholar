@@ -79,7 +79,10 @@ export default async function FacultyAssignmentMarksPage(props: {
 
   // Roster — students in any of the target batches, or the whole
   // institution if target_batch_ids is empty. We read with two
-  // queries (or one) depending on whether targets exist.
+  // queries (or one) depending on whether targets exist. Server
+  // returns rows in full_name order so the SQL is simple; we re-sort
+  // client-side by roll number with a numeric-aware comparator so
+  // "1, 2, 10" beats "1, 10, 2" when roll numbers are pure integers.
   const targetIds: string[] = (assignment.target_batch_ids ?? []) as string[];
   let rosterQuery = supabase
     .from("profiles")
@@ -92,12 +95,14 @@ export default async function FacultyAssignmentMarksPage(props: {
     rosterQuery = rosterQuery.in("batch_id", targetIds);
   }
   const { data: rosterRows, error: rosterError } = await rosterQuery;
-  const roster: MarksRosterEntry[] = (rosterRows ?? []).map((r) => ({
-    id: r.id,
-    full_name: r.full_name,
-    nickname: r.nickname,
-    roll_number: r.roll_number,
-  }));
+  const roster: MarksRosterEntry[] = (rosterRows ?? [])
+    .map((r) => ({
+      id: r.id,
+      full_name: r.full_name,
+      nickname: r.nickname,
+      roll_number: r.roll_number,
+    }))
+    .sort(compareByRoll);
 
   const { data: existing } = await supabase
     .from("assignment_marks")
@@ -145,4 +150,21 @@ export default async function FacultyAssignmentMarksPage(props: {
       </footer>
     </main>
   );
+}
+
+/**
+ * Roll-number comparator. Tries numeric first ("1" < "2" < "10");
+ * falls back to localeCompare for alphanumeric rolls ("21A" < "21B").
+ * Nulls sort last so an unset roll doesn't crowd the start of the list.
+ */
+function compareByRoll(a: MarksRosterEntry, b: MarksRosterEntry): number {
+  const ar = a.roll_number?.trim() ?? "";
+  const br = b.roll_number?.trim() ?? "";
+  if (!ar && !br) return (a.full_name ?? "").localeCompare(b.full_name ?? "");
+  if (!ar) return 1;
+  if (!br) return -1;
+  const an = Number(ar);
+  const bn = Number(br);
+  if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  return ar.localeCompare(br, undefined, { numeric: true });
 }

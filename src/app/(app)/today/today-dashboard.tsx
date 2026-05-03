@@ -326,6 +326,12 @@ function MyMarksCard({ marks }: { marks: readonly MarkSummary[] }) {
           );
         })}
       </ul>
+      <Link
+        href="/me/marks"
+        className="text-muted-foreground mt-1 self-start text-xs underline-offset-2 hover:underline"
+      >
+        Full report card →
+      </Link>
     </article>
   );
 }
