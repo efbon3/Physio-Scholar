@@ -79,6 +79,29 @@ export default async function FacultyStudentDetailPage({
   const callerRole = profile.role ?? "student";
   const canMessageStudent = Boolean(profile.is_admin) || callerRole === "hod";
 
+  // Past messages this caller has sent to this student. RLS allows the
+  // sender to read their own rows; we filter further by recipient_id.
+  // Shown only when canMessageStudent is true (the same gate as the
+  // composer below) — other faculty have no business seeing the HOD's
+  // direct-message trail.
+  type SentMessage = {
+    id: string;
+    body: string;
+    sent_at: string;
+    read_at: string | null;
+  };
+  let sentMessages: SentMessage[] = [];
+  if (canMessageStudent) {
+    const { data: msgs } = await supabase
+      .from("weak_student_messages")
+      .select("id, body, sent_at, read_at")
+      .eq("sender_id", user.id)
+      .eq("recipient_id", studentId)
+      .order("sent_at", { ascending: false })
+      .limit(20);
+    sentMessages = (msgs ?? []) as SentMessage[];
+  }
+
   // Three RPCs in parallel.
   const [summaryRes, aggRes, recentRes] = await Promise.all([
     supabase.rpc("student_profile_summary", {
@@ -156,6 +179,41 @@ export default async function FacultyStudentDetailPage({
 
       {canMessageStudent ? (
         <MessageComposer recipientId={studentId} recipientName={greetingName} />
+      ) : null}
+
+      {canMessageStudent && sentMessages.length > 0 ? (
+        <section
+          aria-label="Sent messages"
+          className="border-input flex flex-col gap-3 rounded-md border p-4"
+        >
+          <h2 className="font-heading text-lg font-medium">Sent messages</h2>
+          <p className="text-muted-foreground text-xs">
+            Your last {sentMessages.length} message
+            {sentMessages.length === 1 ? "" : "s"} to this student. Each row shows whether they have
+            read it yet.
+          </p>
+          <ul className="flex flex-col gap-2 text-sm">
+            {sentMessages.map((m) => (
+              <li key={m.id} className="border-input flex flex-col gap-1 rounded-md border p-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">
+                    Sent {new Date(m.sent_at).toLocaleString()}
+                  </span>
+                  <span
+                    className={
+                      m.read_at !== null
+                        ? "rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+                        : "rounded-full border px-2 py-0.5"
+                    }
+                  >
+                    {m.read_at !== null ? `Read ${new Date(m.read_at).toLocaleString()}` : "Unread"}
+                  </span>
+                </div>
+                <p className="whitespace-pre-wrap">{m.body}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       <section aria-label="Chapter breakdown" className="flex flex-col gap-3">
