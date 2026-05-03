@@ -23,8 +23,12 @@ describe("Database type", () => {
     expectTypeOf<keyof PublicTables>().toEqualTypeOf<
       | "admin_audit_log"
       | "announcements"
+      | "assignment_marks"
+      | "attendance_codes"
+      | "attendance_records"
       | "batches"
       | "card_states"
+      | "class_sessions"
       | "content_chapters"
       | "content_flags"
       | "departments"

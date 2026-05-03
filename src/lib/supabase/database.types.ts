@@ -132,6 +132,138 @@ export type Database = {
           },
         ];
       };
+      assignment_marks: {
+        Row: {
+          assignment_id: string;
+          graded_at: string;
+          graded_by: string | null;
+          id: string;
+          marks: number;
+          student_id: string;
+        };
+        Insert: {
+          assignment_id: string;
+          graded_at?: string;
+          graded_by?: string | null;
+          id?: string;
+          marks: number;
+          student_id: string;
+        };
+        Update: {
+          assignment_id?: string;
+          graded_at?: string;
+          graded_by?: string | null;
+          id?: string;
+          marks?: number;
+          student_id?: string;
+        };
+        Relationships: [];
+      };
+      attendance_codes: {
+        Row: {
+          code: string;
+          counts_toward_total: boolean;
+          created_at: string;
+          display_order: number;
+          id: string;
+          institution_id: string;
+          label: string;
+          updated_at: string;
+        };
+        Insert: {
+          code: string;
+          counts_toward_total?: boolean;
+          created_at?: string;
+          display_order?: number;
+          id?: string;
+          institution_id: string;
+          label: string;
+          updated_at?: string;
+        };
+        Update: {
+          code?: string;
+          counts_toward_total?: boolean;
+          created_at?: string;
+          display_order?: number;
+          id?: string;
+          institution_id?: string;
+          label?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      attendance_records: {
+        Row: {
+          class_session_id: string;
+          code: string;
+          id: string;
+          marked_at: string;
+          marked_by: string | null;
+          student_id: string;
+        };
+        Insert: {
+          class_session_id: string;
+          code: string;
+          id?: string;
+          marked_at?: string;
+          marked_by?: string | null;
+          student_id: string;
+        };
+        Update: {
+          class_session_id?: string;
+          code?: string;
+          id?: string;
+          marked_at?: string;
+          marked_by?: string | null;
+          student_id?: string;
+        };
+        Relationships: [];
+      };
+      class_sessions: {
+        Row: {
+          batch_id: string | null;
+          created_at: string;
+          duration_minutes: number;
+          faculty_id: string;
+          id: string;
+          institution_id: string;
+          location: string | null;
+          notes: string | null;
+          scheduled_at: string;
+          status: string;
+          topic: string;
+          updated_at: string;
+        };
+        Insert: {
+          batch_id?: string | null;
+          created_at?: string;
+          duration_minutes?: number;
+          faculty_id: string;
+          id?: string;
+          institution_id: string;
+          location?: string | null;
+          notes?: string | null;
+          scheduled_at: string;
+          status?: string;
+          topic: string;
+          updated_at?: string;
+        };
+        Update: {
+          batch_id?: string | null;
+          created_at?: string;
+          duration_minutes?: number;
+          faculty_id?: string;
+          id?: string;
+          institution_id?: string;
+          location?: string | null;
+          notes?: string | null;
+          scheduled_at?: string;
+          status?: string;
+          topic?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       announcements: {
         Row: {
           body: string | null;
@@ -371,6 +503,7 @@ export type Database = {
           faculty_id: string;
           id: string;
           institution_id: string;
+          max_marks: number | null;
           status: string;
           submitted_at: string | null;
           target_batch_ids: string[];
@@ -387,6 +520,7 @@ export type Database = {
           faculty_id: string;
           id?: string;
           institution_id: string;
+          max_marks?: number | null;
           status?: string;
           submitted_at?: string | null;
           target_batch_ids?: string[];
@@ -403,6 +537,7 @@ export type Database = {
           faculty_id?: string;
           id?: string;
           institution_id?: string;
+          max_marks?: number | null;
           status?: string;
           submitted_at?: string | null;
           target_batch_ids?: string[];
@@ -428,8 +563,10 @@ export type Database = {
       };
       institutions: {
         Row: {
+          attendance_threshold: number;
           country: string;
           created_at: string;
+          grade_thresholds: Json;
           id: string;
           name: string;
           slug: string;
@@ -437,8 +574,10 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          attendance_threshold?: number;
           country?: string;
           created_at?: string;
+          grade_thresholds?: Json;
           id?: string;
           name: string;
           slug: string;
@@ -446,8 +585,10 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          attendance_threshold?: number;
           country?: string;
           created_at?: string;
+          grade_thresholds?: Json;
           id?: string;
           name?: string;
           slug?: string;
