@@ -453,3 +453,77 @@ export async function setUserDepartmentAction(
   revalidatePath(`/admin/users/${targetProfileId}`);
   return { status: "ok" };
 }
+
+/**
+ * Admin: assign or clear a user's batch. Pass `null` to unlink. The
+ * target batch (when non-null) must belong to the same institution
+ * as the target user — checked here before the write.
+ */
+export async function setUserBatchAction(
+  targetProfileId: string,
+  batchId: string | null,
+): Promise<ApprovalResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { status: "error", message: "Batch assignment is unavailable here." };
+  }
+  if (!UUID_RE_FACULTY.test(targetProfileId)) {
+    return { status: "error", message: "Invalid target id." };
+  }
+  if (batchId !== null && !UUID_RE_FACULTY.test(batchId)) {
+    return { status: "error", message: "Invalid batch id." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Please sign in." };
+
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+  if (!callerProfile?.is_admin) {
+    return { status: "error", message: "Only admins can assign batches." };
+  }
+
+  if (batchId !== null) {
+    const { data: target } = await supabase
+      .from("profiles")
+      .select("institution_id")
+      .eq("id", targetProfileId)
+      .single();
+    const { data: batch } = await supabase
+      .from("batches")
+      .select("institution_id")
+      .eq("id", batchId)
+      .single();
+    if (!target || !batch || target.institution_id !== batch.institution_id) {
+      return {
+        status: "error",
+        message: "Batch and user must share an institution.",
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ batch_id: batchId })
+    .eq("id", targetProfileId);
+
+  if (error) {
+    return { status: "error", message: `Could not save batch: ${error.message}` };
+  }
+
+  void writeAuditEntry({
+    action: "user.set_batch",
+    target_type: "profile",
+    target_id: targetProfileId,
+    details: { batch_id: batchId },
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${targetProfileId}`);
+  return { status: "ok" };
+}

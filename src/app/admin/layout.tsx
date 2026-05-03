@@ -18,6 +18,7 @@ const ADMIN_TABS = [
   { label: "Users", href: "/admin/users" },
   { label: "Cohort", href: "/admin/cohort" },
   { label: "Departments", href: "/admin/departments" },
+  { label: "Batches", href: "/admin/batches" },
   { label: "Permissions", href: "/admin/permissions" },
   { label: "Content flags", href: "/admin/flags" },
   { label: "Calendar", href: "/admin/calendar" },

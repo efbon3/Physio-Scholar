@@ -11,7 +11,11 @@ import {
   unrejectUserAction,
 } from "../actions";
 
-import { RoleAndDepartmentEditor, type DepartmentOption } from "./role-and-department-editor";
+import {
+  RoleAndDepartmentEditor,
+  type BatchOption,
+  type DepartmentOption,
+} from "./role-and-department-editor";
 
 export const metadata = {
   title: "User · Admin",
@@ -39,23 +43,38 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, full_name, nickname, roll_number, college_name, date_of_birth, address, phone, avatar_url, year_of_study, institution_id, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, rejected_at, rejected_by, rejection_reason, consent_terms_accepted_at, consent_privacy_accepted_at, consent_analytics, created_at, updated_at, deletion_requested_at, role, department_id",
+      "id, full_name, nickname, roll_number, college_name, date_of_birth, address, phone, avatar_url, year_of_study, institution_id, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, rejected_at, rejected_by, rejection_reason, consent_terms_accepted_at, consent_privacy_accepted_at, consent_analytics, created_at, updated_at, deletion_requested_at, role, department_id, batch_id",
     )
     .eq("id", id)
     .single();
 
   if (error || !profile) notFound();
 
-  // Department list for the role/department editor — same institution
-  // as the target user. Empty list when the user has no institution.
+  // Department + batch lists for the role/department editor — same
+  // institution as the target user. Empty lists when the user has no
+  // institution.
   let departments: DepartmentOption[] = [];
+  let batches: BatchOption[] = [];
   if (profile.institution_id) {
-    const { data: deptRows } = await supabase
-      .from("departments")
-      .select("id, name")
-      .eq("institution_id", profile.institution_id)
-      .order("name", { ascending: true });
-    departments = (deptRows ?? []).map((d) => ({ id: d.id, name: d.name }));
+    const [deptRes, batchRes] = await Promise.all([
+      supabase
+        .from("departments")
+        .select("id, name")
+        .eq("institution_id", profile.institution_id)
+        .order("name", { ascending: true }),
+      supabase
+        .from("batches")
+        .select("id, name, year_of_study")
+        .eq("institution_id", profile.institution_id)
+        .order("year_of_study", { ascending: true, nullsFirst: false })
+        .order("name", { ascending: true }),
+    ]);
+    departments = (deptRes.data ?? []).map((d) => ({ id: d.id, name: d.name }));
+    batches = (batchRes.data ?? []).map((b) => ({
+      id: b.id,
+      name: b.name,
+      year_of_study: b.year_of_study,
+    }));
   }
 
   const [{ count: reviewCount }, { data: latestReview }] = await Promise.all([
@@ -147,7 +166,9 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         profileId={profile.id}
         currentRole={profile.role ?? "student"}
         currentDepartmentId={profile.department_id ?? null}
+        currentBatchId={profile.batch_id ?? null}
         departments={departments}
+        batches={batches}
       />
 
       <ApprovalControls profile={profile} />

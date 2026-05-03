@@ -4,11 +4,17 @@ import { useState, useTransition } from "react";
 
 import { ROLE_LABEL, ROLE_ORDER } from "@/lib/admin/role-permissions";
 
-import { setUserDepartmentAction, setUserRoleAction } from "../actions";
+import { setUserBatchAction, setUserDepartmentAction, setUserRoleAction } from "../actions";
 
 export type DepartmentOption = {
   id: string;
   name: string;
+};
+
+export type BatchOption = {
+  id: string;
+  name: string;
+  year_of_study: number | null;
 };
 
 /**
@@ -26,15 +32,20 @@ export function RoleAndDepartmentEditor({
   profileId,
   currentRole,
   currentDepartmentId,
+  currentBatchId,
   departments,
+  batches,
 }: {
   profileId: string;
   currentRole: string;
   currentDepartmentId: string | null;
+  currentBatchId: string | null;
   departments: DepartmentOption[];
+  batches: BatchOption[];
 }) {
   const [role, setRole] = useState(currentRole);
   const [departmentId, setDepartmentId] = useState<string | null>(currentDepartmentId);
+  const [batchId, setBatchId] = useState<string | null>(currentBatchId);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -97,6 +108,36 @@ export function RoleAndDepartmentEditor({
           {departments.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex items-center gap-3 text-sm">
+        <span className="text-muted-foreground w-28">Batch</span>
+        <select
+          value={batchId ?? ""}
+          disabled={pending}
+          onChange={(e) => {
+            const next = e.target.value === "" ? null : e.target.value;
+            const prev = batchId;
+            setBatchId(next);
+            setError(null);
+            startTransition(async () => {
+              const result = await setUserBatchAction(profileId, next);
+              if (result.status === "error") {
+                setBatchId(prev);
+                setError(result.message);
+              }
+            });
+          }}
+          className="border-input bg-background rounded-md border px-2 py-1 text-sm"
+        >
+          <option value="">— none —</option>
+          {batches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+              {b.year_of_study !== null ? ` (Year ${b.year_of_study})` : ""}
             </option>
           ))}
         </select>
