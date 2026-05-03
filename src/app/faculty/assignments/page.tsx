@@ -149,6 +149,9 @@ export default async function FacultyAssignmentsPage() {
                     </p>
                   </div>
                   <p className="text-muted-foreground text-xs">Target: {targetNames}</p>
+                  <p className="text-muted-foreground text-[10px]">
+                    Posted {new Date(a.created_at).toLocaleString()}
+                  </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`rounded-full border px-2 py-0.5 text-xs ${statusTone}`}

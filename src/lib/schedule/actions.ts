@@ -69,10 +69,17 @@ export async function createClassSessionAction(formData: FormData): Promise<Sche
     .select("is_faculty, is_admin, institution_id, role")
     .eq("id", user.id)
     .single();
-  if (!profile?.is_faculty && !profile?.is_admin && profile?.role !== "hod") {
-    return { status: "error", message: "Only faculty, HODs, or admins can schedule classes." };
+  const role = profile?.role ?? "student";
+  const canSchedule = Boolean(
+    profile?.is_faculty || profile?.is_admin || role === "hod" || role === "deo",
+  );
+  if (!canSchedule) {
+    return {
+      status: "error",
+      message: "Only faculty, HODs, DEOs, or admins can schedule classes.",
+    };
   }
-  if (!profile.institution_id) {
+  if (!profile?.institution_id) {
     return { status: "error", message: "Your profile is not linked to an institution." };
   }
 
@@ -88,6 +95,11 @@ export async function createClassSessionAction(formData: FormData): Promise<Sche
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid form input." };
   }
 
+  // Phase G: new rows from DEOs / faculty / HODs default to draft —
+  // they explicitly submit via submitClassSessionForReviewAction.
+  // Admin-authored rows skip the workflow and land approved.
+  const initialApproval = profile.is_admin ? "approved" : "draft";
+
   const { data, error } = await supabase
     .from("class_sessions")
     .insert({
@@ -99,6 +111,7 @@ export async function createClassSessionAction(formData: FormData): Promise<Sche
       duration_minutes: parsed.data.duration_minutes,
       location: parsed.data.location,
       notes: parsed.data.notes,
+      approval_status: initialApproval,
     })
     .select("id")
     .single();
@@ -107,6 +120,57 @@ export async function createClassSessionAction(formData: FormData): Promise<Sche
   revalidatePath("/faculty/schedule");
   revalidatePath("/today");
   return { status: "ok", id: data.id };
+}
+
+/**
+ * Author submits a draft class_session for HOD review. Mirrors
+ * submitAssignmentForReviewAction. Stamps submitted_at, clears prior
+ * decision metadata, flips approval_status → pending_hod.
+ */
+export async function submitClassSessionForReviewAction(
+  sessionId: string,
+): Promise<ScheduleResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { status: "error", message: "Schedule unavailable in this environment." };
+  }
+  if (!UUID_RE.test(sessionId)) return { status: "error", message: "Invalid session id." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Please sign in." };
+
+  const { data: row } = await supabase
+    .from("class_sessions")
+    .select("approval_status, faculty_id")
+    .eq("id", sessionId)
+    .single();
+  if (!row || row.faculty_id !== user.id) {
+    return { status: "error", message: "Not found, or not yours to submit." };
+  }
+  if (row.approval_status !== "draft" && row.approval_status !== "changes_requested") {
+    return {
+      status: "error",
+      message: `Can't submit from status "${row.approval_status}".`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("class_sessions")
+    .update({
+      approval_status: "pending_hod",
+      submitted_at: new Date().toISOString(),
+      decided_at: null,
+      decided_by: null,
+      decision_comment: null,
+    })
+    .eq("id", sessionId);
+  if (error) return { status: "error", message: `Could not submit: ${error.message}` };
+
+  revalidatePath("/faculty/schedule");
+  revalidatePath("/faculty/approvals");
+  return { status: "ok", id: sessionId };
 }
 
 export async function updateClassSessionAction(formData: FormData): Promise<ScheduleResult> {

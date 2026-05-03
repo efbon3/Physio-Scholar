@@ -254,3 +254,110 @@ export async function requestAnnouncementChangesAction(
   revalidatePath("/faculty/announcements");
   return { status: "ok" };
 }
+
+// ───────────────────────────── class_sessions ─────────────────────────────
+
+/** Approve a class_sessions row (publishes the schedule entry). */
+export async function approveClassSessionAction(
+  sessionId: string,
+  comment?: string | null,
+): Promise<DecisionResult> {
+  if (!UUID_RE.test(sessionId)) return { status: "error", message: "Invalid id." };
+  const guard = await requireApprover();
+  if (!guard.ok) return { status: "error", message: guard.error };
+
+  const trimmed = typeof comment === "string" ? comment.trim().slice(0, 1000) : "";
+  const now = new Date().toISOString();
+  const { error } = await guard.supabase
+    .from("class_sessions")
+    .update({
+      approval_status: "approved",
+      decided_at: now,
+      decided_by: guard.actorId,
+      decision_comment: trimmed.length > 0 ? trimmed : null,
+    })
+    .eq("id", sessionId);
+  if (error) return { status: "error", message: `Could not approve: ${error.message}` };
+
+  await writeAuditEntry({
+    action: "class_session_approve",
+    target_type: "class_sessions",
+    target_id: sessionId,
+    details: { comment: trimmed || null },
+  });
+
+  revalidatePath("/faculty/approvals");
+  revalidatePath("/faculty/schedule");
+  revalidatePath("/today");
+  return { status: "ok" };
+}
+
+export async function rejectClassSessionAction(
+  sessionId: string,
+  comment: string,
+): Promise<DecisionResult> {
+  if (!UUID_RE.test(sessionId)) return { status: "error", message: "Invalid id." };
+  const trimmed = comment.trim();
+  if (trimmed.length < 1) return { status: "error", message: "A reason is required." };
+  if (trimmed.length > 1000) return { status: "error", message: "Reason is too long." };
+  const guard = await requireApprover();
+  if (!guard.ok) return { status: "error", message: guard.error };
+
+  const now = new Date().toISOString();
+  const { error } = await guard.supabase
+    .from("class_sessions")
+    .update({
+      approval_status: "rejected",
+      decided_at: now,
+      decided_by: guard.actorId,
+      decision_comment: trimmed,
+    })
+    .eq("id", sessionId);
+  if (error) return { status: "error", message: `Could not reject: ${error.message}` };
+
+  await writeAuditEntry({
+    action: "class_session_reject",
+    target_type: "class_sessions",
+    target_id: sessionId,
+    details: { comment: trimmed },
+  });
+
+  revalidatePath("/faculty/approvals");
+  revalidatePath("/faculty/schedule");
+  return { status: "ok" };
+}
+
+export async function requestClassSessionChangesAction(
+  sessionId: string,
+  comment: string,
+): Promise<DecisionResult> {
+  if (!UUID_RE.test(sessionId)) return { status: "error", message: "Invalid id." };
+  const trimmed = comment.trim();
+  if (trimmed.length < 1) return { status: "error", message: "A comment is required." };
+  if (trimmed.length > 1000) return { status: "error", message: "Comment is too long." };
+  const guard = await requireApprover();
+  if (!guard.ok) return { status: "error", message: guard.error };
+
+  const now = new Date().toISOString();
+  const { error } = await guard.supabase
+    .from("class_sessions")
+    .update({
+      approval_status: "changes_requested",
+      decided_at: now,
+      decided_by: guard.actorId,
+      decision_comment: trimmed,
+    })
+    .eq("id", sessionId);
+  if (error) return { status: "error", message: `Could not save: ${error.message}` };
+
+  await writeAuditEntry({
+    action: "class_session_request_changes",
+    target_type: "class_sessions",
+    target_id: sessionId,
+    details: { comment: trimmed },
+  });
+
+  revalidatePath("/faculty/approvals");
+  revalidatePath("/faculty/schedule");
+  return { status: "ok" };
+}

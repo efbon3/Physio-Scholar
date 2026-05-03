@@ -221,8 +221,12 @@ export type Database = {
       };
       class_sessions: {
         Row: {
+          approval_status: string;
           batch_id: string | null;
           created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          decision_comment: string | null;
           duration_minutes: number;
           faculty_id: string;
           id: string;
@@ -231,12 +235,17 @@ export type Database = {
           notes: string | null;
           scheduled_at: string;
           status: string;
+          submitted_at: string | null;
           topic: string;
           updated_at: string;
         };
         Insert: {
+          approval_status?: string;
           batch_id?: string | null;
           created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_comment?: string | null;
           duration_minutes?: number;
           faculty_id: string;
           id?: string;
@@ -245,12 +254,17 @@ export type Database = {
           notes?: string | null;
           scheduled_at: string;
           status?: string;
+          submitted_at?: string | null;
           topic: string;
           updated_at?: string;
         };
         Update: {
+          approval_status?: string;
           batch_id?: string | null;
           created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_comment?: string | null;
           duration_minutes?: number;
           faculty_id?: string;
           id?: string;
@@ -259,6 +273,7 @@ export type Database = {
           notes?: string | null;
           scheduled_at?: string;
           status?: string;
+          submitted_at?: string | null;
           topic?: string;
           updated_at?: string;
         };

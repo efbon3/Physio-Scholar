@@ -382,7 +382,7 @@ function AnnouncementsCard({ announcements }: { announcements: readonly Announce
               <p className="text-muted-foreground text-xs whitespace-pre-wrap">{a.body}</p>
             ) : null}
             <p className="text-muted-foreground text-[10px]">
-              {new Date(a.createdAt).toLocaleDateString()}
+              Posted {new Date(a.createdAt).toLocaleString()}
             </p>
           </li>
         ))}

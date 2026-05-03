@@ -80,13 +80,26 @@ export default async function FacultyApprovalsPage() {
     announcementsQuery = announcementsQuery.in("faculty_id", facultyIdsInScope);
   }
 
-  const [assignmentsRes, announcementsRes] = await Promise.all([
+  let classSessionsQuery = supabase
+    .from("class_sessions")
+    .select(
+      "id, topic, scheduled_at, duration_minutes, batch_id, location, notes, submitted_at, faculty_id, approval_status",
+    )
+    .in("approval_status", ["pending_hod", "changes_requested"])
+    .order("submitted_at", { ascending: true, nullsFirst: false });
+  if (facultyIdsInScope) {
+    classSessionsQuery = classSessionsQuery.in("faculty_id", facultyIdsInScope);
+  }
+
+  const [assignmentsRes, announcementsRes, classSessionsRes] = await Promise.all([
     assignmentsQuery,
     announcementsQuery,
+    classSessionsQuery,
   ]);
   const data = assignmentsRes.data;
-  const error = assignmentsRes.error ?? announcementsRes.error;
+  const error = assignmentsRes.error ?? announcementsRes.error ?? classSessionsRes.error;
   const announcementsData = announcementsRes.data ?? [];
+  const classSessionsData = classSessionsRes.data ?? [];
 
   const rows = (data ?? []) as Array<
     Pick<
@@ -106,9 +119,27 @@ export default async function FacultyApprovalsPage() {
   };
   const announcementRows = announcementsData as AnnouncementRow[];
 
+  type ClassSessionRow = {
+    id: string;
+    topic: string;
+    scheduled_at: string;
+    duration_minutes: number;
+    batch_id: string | null;
+    location: string | null;
+    notes: string | null;
+    submitted_at: string | null;
+    faculty_id: string;
+    approval_status: string;
+  };
+  const classSessionRows = classSessionsData as ClassSessionRow[];
+
   // Hydrate faculty names in one query so we don't do N round-trips.
   const facultyIds = Array.from(
-    new Set([...rows.map((r) => r.faculty_id), ...announcementRows.map((r) => r.faculty_id)]),
+    new Set([
+      ...rows.map((r) => r.faculty_id),
+      ...announcementRows.map((r) => r.faculty_id),
+      ...classSessionRows.map((r) => r.faculty_id),
+    ]),
   );
   const facultyById = new Map<string, PendingAssignment["faculty"]>();
   if (facultyIds.length > 0) {
@@ -121,8 +152,13 @@ export default async function FacultyApprovalsPage() {
     }
   }
 
-  // Hydrate batch names for the announcement target list.
-  const batchIds = Array.from(new Set(announcementRows.flatMap((r) => r.target_batch_ids)));
+  // Hydrate batch names for the announcement target list + class sessions.
+  const batchIds = Array.from(
+    new Set([
+      ...announcementRows.flatMap((r) => r.target_batch_ids),
+      ...classSessionRows.map((r) => r.batch_id).filter((v): v is string => Boolean(v)),
+    ]),
+  );
   const batchNameById = new Map<string, string>();
   if (batchIds.length > 0) {
     const { data: batchRows } = await supabase
@@ -134,7 +170,8 @@ export default async function FacultyApprovalsPage() {
     }
   }
 
-  const queueIsEmpty = rows.length === 0 && announcementRows.length === 0;
+  const queueIsEmpty =
+    rows.length === 0 && announcementRows.length === 0 && classSessionRows.length === 0;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
@@ -237,6 +274,49 @@ export default async function FacultyApprovalsPage() {
                         <p className="text-muted-foreground text-xs italic">No body</p>
                       )}
                       <DecisionBar id={r.id} kind="announcement" />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
+
+          {classSessionRows.length > 0 ? (
+            <section aria-label="Pending class sessions" className="flex flex-col gap-3">
+              <h2 className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                Class schedule ({classSessionRows.length})
+              </h2>
+              <ul className="flex flex-col gap-4">
+                {classSessionRows.map((r) => {
+                  const faculty = facultyById.get(r.faculty_id) ?? null;
+                  const facultyName = faculty?.nickname || faculty?.full_name || "(unknown author)";
+                  const batchName = r.batch_id
+                    ? (batchNameById.get(r.batch_id) ?? "(unknown batch)")
+                    : "Whole institution";
+                  return (
+                    <li
+                      key={r.id}
+                      className="border-border flex flex-col gap-3 rounded-md border p-4 text-sm"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 className="font-heading text-lg font-medium">{r.topic}</h3>
+                        <span className="text-muted-foreground text-xs">
+                          {r.approval_status === "changes_requested" ? "Awaiting revision · " : ""}
+                          Submitted{" "}
+                          {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "—"}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        By {facultyName} · Batch: {batchName}
+                        {r.location ? ` · ${r.location}` : ""}
+                      </p>
+                      <p className="text-foreground/90 text-sm">
+                        {new Date(r.scheduled_at).toLocaleString()} · {r.duration_minutes} min
+                      </p>
+                      {r.notes ? (
+                        <p className="text-foreground/90 whitespace-pre-wrap">{r.notes}</p>
+                      ) : null}
+                      <DecisionBar id={r.id} kind="class_session" />
                     </li>
                   );
                 })}

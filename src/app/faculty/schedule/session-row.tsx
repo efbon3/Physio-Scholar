@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
-import { deleteClassSessionAction, setClassSessionStatusAction } from "@/lib/schedule/actions";
+import {
+  deleteClassSessionAction,
+  setClassSessionStatusAction,
+  submitClassSessionForReviewAction,
+} from "@/lib/schedule/actions";
 
 import type { ScheduleBatchOption } from "./session-form";
 
@@ -13,6 +17,9 @@ export type SessionRecord = {
   scheduled_at: string;
   duration_minutes: number;
   status: "scheduled" | "held" | "cancelled";
+  approval_status: "draft" | "pending_hod" | "approved" | "rejected" | "changes_requested";
+  decision_comment: string | null;
+  created_at: string;
   location: string | null;
   notes: string | null;
   batch_id: string | null;
@@ -29,6 +36,22 @@ const STATUS_TONE: Record<SessionRecord["status"], string> = {
   scheduled: "border-input bg-muted text-muted-foreground",
   held: "border-emerald-300 bg-emerald-50 text-emerald-900",
   cancelled: "border-rose-300 bg-rose-50 text-rose-900",
+};
+
+const APPROVAL_LABEL: Record<SessionRecord["approval_status"], string> = {
+  draft: "Draft",
+  pending_hod: "Pending HOD",
+  approved: "Approved",
+  rejected: "Rejected",
+  changes_requested: "Changes requested",
+};
+
+const APPROVAL_TONE: Record<SessionRecord["approval_status"], string> = {
+  draft: "border-input bg-muted text-muted-foreground",
+  pending_hod: "border-amber-300 bg-amber-50 text-amber-900",
+  approved: "border-emerald-300 bg-emerald-50 text-emerald-900",
+  rejected: "border-rose-300 bg-rose-50 text-rose-900",
+  changes_requested: "border-amber-300 bg-amber-50 text-amber-900",
 };
 
 /**
@@ -90,12 +113,29 @@ export function SessionRow({
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <span
+          className={`rounded-full border px-2 py-0.5 text-xs ${APPROVAL_TONE[session.approval_status]}`}
+          aria-label={`Approval: ${APPROVAL_LABEL[session.approval_status]}`}
+        >
+          {APPROVAL_LABEL[session.approval_status]}
+        </span>
+        <span
           className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_TONE[session.status]}`}
-          aria-label={`Status: ${STATUS_LABEL[session.status]}`}
+          aria-label={`Lifecycle: ${STATUS_LABEL[session.status]}`}
         >
           {STATUS_LABEL[session.status]}
         </span>
       </div>
+      <p className="text-muted-foreground text-[10px]">
+        Posted {new Date(session.created_at).toLocaleString()}
+      </p>
+      {session.decision_comment &&
+      (session.approval_status === "rejected" ||
+        session.approval_status === "changes_requested") ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+          <p className="font-medium">HOD note</p>
+          <p className="mt-1 whitespace-pre-wrap">{session.decision_comment}</p>
+        </div>
+      ) : null}
       {session.notes ? <p className="text-sm whitespace-pre-wrap">{session.notes}</p> : null}
 
       <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
@@ -105,6 +145,24 @@ export function SessionRow({
         >
           Take attendance →
         </Link>
+
+        {isOwner &&
+        (session.approval_status === "draft" || session.approval_status === "changes_requested") ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                const result = await submitClassSessionForReviewAction(session.id);
+                if (result.status === "error") setError(result.message);
+              });
+            }}
+            className="hover:bg-muted rounded-md border px-2 py-1 text-xs disabled:opacity-50"
+          >
+            Submit for review
+          </button>
+        ) : null}
 
         {session.status === "scheduled" ? (
           <button

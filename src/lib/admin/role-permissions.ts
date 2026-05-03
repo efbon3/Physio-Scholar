@@ -16,7 +16,7 @@
 
 import type { Database } from "@/lib/supabase/database.types";
 
-export type Role = "student" | "faculty" | "hod" | "admin";
+export type Role = "student" | "faculty" | "hod" | "admin" | "deo";
 
 export type RolePermissionsRow = Database["public"]["Tables"]["role_permissions"]["Row"];
 
@@ -128,11 +128,12 @@ export const ROLE_CAPABILITIES: readonly Capability[] = [
 ] as const;
 
 /** Order roles render in across the matrix columns. */
-export const ROLE_ORDER: readonly Role[] = ["student", "faculty", "hod", "admin"] as const;
+export const ROLE_ORDER: readonly Role[] = ["student", "faculty", "deo", "hod", "admin"] as const;
 
 export const ROLE_LABEL: Record<Role, string> = {
   student: "Student",
   faculty: "Faculty",
+  deo: "DEO",
   hod: "HOD",
   admin: "Admin",
 };

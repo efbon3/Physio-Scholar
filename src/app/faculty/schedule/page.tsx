@@ -40,7 +40,9 @@ export default async function FacultySchedulePage() {
     .single();
 
   const role = profile?.role ?? "student";
-  const canSchedule = Boolean(profile?.is_faculty || profile?.is_admin || role === "hod");
+  const canSchedule = Boolean(
+    profile?.is_faculty || profile?.is_admin || role === "hod" || role === "deo",
+  );
   if (!canSchedule) redirect("/today");
 
   if (!profile?.institution_id) {
@@ -59,7 +61,7 @@ export default async function FacultySchedulePage() {
     supabase
       .from("class_sessions")
       .select(
-        "id, topic, scheduled_at, duration_minutes, status, location, notes, batch_id, faculty_id",
+        "id, topic, scheduled_at, duration_minutes, status, approval_status, decision_comment, created_at, location, notes, batch_id, faculty_id",
       )
       .eq("institution_id", profile.institution_id)
       .order("scheduled_at", { ascending: false }),

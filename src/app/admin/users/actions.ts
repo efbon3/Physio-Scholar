@@ -293,9 +293,10 @@ export async function revokeApprovalAction(targetProfileId: string): Promise<App
   return { status: "ok" };
 }
 
-const FACULTY_ROLES: ReadonlyArray<"student" | "faculty" | "hod" | "admin"> = [
+const FACULTY_ROLES: ReadonlyArray<"student" | "faculty" | "hod" | "admin" | "deo"> = [
   "student",
   "faculty",
+  "deo",
   "hod",
   "admin",
 ] as const;

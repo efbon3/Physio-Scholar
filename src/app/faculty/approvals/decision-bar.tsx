@@ -5,10 +5,13 @@ import { useState, useTransition } from "react";
 import {
   approveAnnouncementAction,
   approveAssignmentAction,
+  approveClassSessionAction,
   rejectAnnouncementAction,
   rejectAssignmentAction,
+  rejectClassSessionAction,
   requestAnnouncementChangesAction,
   requestAssignmentChangesAction,
+  requestClassSessionChangesAction,
 } from "./actions";
 
 /**
@@ -22,21 +25,28 @@ import {
  * decision shape across both — the only thing that differs is the
  * table the action writes to + the audit-log action label.
  */
-type Kind = "assignment" | "announcement";
+type Kind = "assignment" | "announcement" | "class_session";
 
 export function DecisionBar({ id, kind }: { id: string; kind: Kind }) {
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const approve = async (text: string) =>
-    kind === "assignment" ? approveAssignmentAction(id, text) : approveAnnouncementAction(id, text);
-  const requestChanges = async (text: string) =>
-    kind === "assignment"
-      ? requestAssignmentChangesAction(id, text)
-      : requestAnnouncementChangesAction(id, text);
-  const reject = async (text: string) =>
-    kind === "assignment" ? rejectAssignmentAction(id, text) : rejectAnnouncementAction(id, text);
+  const approve = async (text: string) => {
+    if (kind === "assignment") return approveAssignmentAction(id, text);
+    if (kind === "announcement") return approveAnnouncementAction(id, text);
+    return approveClassSessionAction(id, text);
+  };
+  const requestChanges = async (text: string) => {
+    if (kind === "assignment") return requestAssignmentChangesAction(id, text);
+    if (kind === "announcement") return requestAnnouncementChangesAction(id, text);
+    return requestClassSessionChangesAction(id, text);
+  };
+  const reject = async (text: string) => {
+    if (kind === "assignment") return rejectAssignmentAction(id, text);
+    if (kind === "announcement") return rejectAnnouncementAction(id, text);
+    return rejectClassSessionAction(id, text);
+  };
 
   return (
     <div className="flex flex-col gap-2">

@@ -67,13 +67,20 @@ export async function createAnnouncementAction(formData: FormData): Promise<Anno
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_faculty, is_admin, institution_id")
+    .select("is_faculty, is_admin, institution_id, role")
     .eq("id", user.id)
     .single();
-  if (!profile?.is_faculty && !profile?.is_admin) {
-    return { status: "error", message: "Only faculty or admins can create announcements." };
+  const role = profile?.role ?? "student";
+  const canAuthor = Boolean(
+    profile?.is_faculty || profile?.is_admin || role === "hod" || role === "deo",
+  );
+  if (!canAuthor) {
+    return {
+      status: "error",
+      message: "Only faculty, HODs, DEOs, or admins can create announcements.",
+    };
   }
-  if (!profile.institution_id) {
+  if (!profile?.institution_id) {
     return { status: "error", message: "Your profile is not linked to an institution." };
   }
 

@@ -144,6 +144,9 @@ export default async function FacultyAnnouncementsPage() {
                       {statusLabel}
                     </span>
                   </div>
+                  <p className="text-muted-foreground text-[10px]">
+                    Posted {new Date(a.created_at).toLocaleString()}
+                  </p>
                   {a.body ? <p className="text-sm whitespace-pre-wrap">{a.body}</p> : null}
                   {a.decision_comment &&
                   (a.status === "rejected" || a.status === "changes_requested") ? (

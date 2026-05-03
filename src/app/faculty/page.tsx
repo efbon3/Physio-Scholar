@@ -38,14 +38,16 @@ export default async function FacultyHubPage() {
     .eq("id", user.id)
     .single();
 
-  if (!profile?.is_faculty && !profile?.is_admin) redirect("/today");
-
+  if (!profile) redirect("/today");
   const role = profile.role ?? "student";
   const isHod = role === "hod";
   const isAdmin = Boolean(profile.is_admin);
+  const isDeo = role === "deo";
+  if (!profile.is_faculty && !isAdmin && !isHod && !isDeo) redirect("/today");
+
   const greetingName = profile.nickname || profile.full_name || "there";
-  const noInstitution = profile.is_faculty && !profile.institution_id;
-  const roleLabel = isAdmin ? "Admin" : isHod ? "HOD" : "Faculty";
+  const noInstitution = (profile.is_faculty || isDeo) && !profile.institution_id;
+  const roleLabel = isAdmin ? "Admin" : isHod ? "HOD" : isDeo ? "DEO" : "Faculty";
 
   // HOD-specific data: pending approval count + their department's
   // metadata. Admins also see these tiles since they share the
@@ -118,7 +120,9 @@ export default async function FacultyHubPage() {
         <p className="text-muted-foreground text-sm">
           {isHod
             ? "Your department's faculty submit work here for your review. Approve, request changes, or reject — students see only what you've approved."
-            : "The surfaces below are scoped to your institution. Students remain anonymous to other students; you see your cohort."}
+            : isDeo
+              ? "Upload class schedule and announcements (HOD reviews before students see them). Enter marks and attendance against existing rows directly."
+              : "The surfaces below are scoped to your institution. Students remain anonymous to other students; you see your cohort."}
         </p>
       </header>
 
@@ -148,8 +152,8 @@ export default async function FacultyHubPage() {
             title={`Approval queue${pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ""}`}
             description={
               pendingApprovalCount > 0
-                ? `${pendingApprovalCount} assignment${pendingApprovalCount === 1 ? "" : "s"} waiting for your review. Approve to publish; request changes or reject with a comment.`
-                : "Nothing pending right now. New faculty submissions will appear here."
+                ? `${pendingApprovalCount} item${pendingApprovalCount === 1 ? "" : "s"} waiting for your review. Approve to publish; request changes or reject with a comment.`
+                : "Nothing pending right now. New submissions will appear here."
             }
             href="/faculty/approvals"
             cta={pendingApprovalCount > 0 ? "Review queue" : "Open queue"}
@@ -166,36 +170,57 @@ export default async function FacultyHubPage() {
             cta="Manage department"
           />
         ) : null}
-        <FacultyCard
-          title="Cohort analytics"
-          description="Roster + per-Chapter retention heatmap for your institution. See where the class is strong and where it's slipping."
-          href="/admin/cohort"
-          cta="Open cohort"
-        />
-        <FacultyCard
-          title="Assignments"
-          description="Create homework — pick a Chapter, set a due date, optionally point to a specific format. Drafts go to the HOD queue before students see them."
-          href="/faculty/assignments"
-          cta="Manage assignments"
-        />
+        {!isDeo ? (
+          <FacultyCard
+            title="Cohort analytics"
+            description="Roster + per-Chapter retention heatmap for your institution. See where the class is strong and where it's slipping."
+            href="/admin/cohort"
+            cta="Open cohort"
+          />
+        ) : null}
+        {!isDeo ? (
+          <FacultyCard
+            title="Assignments"
+            description="Create homework — pick a Chapter, set a due date, optionally point to a specific format. Drafts go to the HOD queue before students see them."
+            href="/faculty/assignments"
+            cta="Manage assignments"
+          />
+        ) : (
+          <FacultyCard
+            title="Marks entry"
+            description="Open an existing assignment and key in marks against each student's roll number. HOD-approved assignments only."
+            href="/faculty/assignments"
+            cta="Open assignments"
+          />
+        )}
         <FacultyCard
           title="Announcements"
-          description="Short notices for students — broadcast to the whole institution or target specific batches. Drafts go through HOD review before students see them."
+          description={
+            isDeo
+              ? "Upload notices and information. HOD reviews before students see them."
+              : "Short notices for students — broadcast to the whole institution or target specific batches. Drafts go through HOD review before students see them."
+          }
           href="/faculty/announcements"
           cta="Manage announcements"
         />
         <FacultyCard
           title="Schedule &amp; attendance"
-          description="Plan classes and mark attendance once each session is held. Students see upcoming sessions on their dashboard."
+          description={
+            isDeo
+              ? "Upload class schedule (HOD-approved) and key in attendance once each session is held."
+              : "Plan classes and mark attendance once each session is held. Students see upcoming sessions on their dashboard."
+          }
           href="/faculty/schedule"
           cta="Open schedule"
         />
-        <FacultyCard
-          title="Per-student progress"
-          description="Drill into a single student — their Chapter-by-Chapter mastery, recent activity, and which topics they're slipping on. The struggler-first sort surfaces who needs your attention."
-          href="/faculty/students"
-          cta="Open students"
-        />
+        {!isDeo ? (
+          <FacultyCard
+            title="Per-student progress"
+            description="Drill into a single student — their Chapter-by-Chapter mastery, recent activity, and which topics they're slipping on. The struggler-first sort surfaces who needs your attention."
+            href="/faculty/students"
+            cta="Open students"
+          />
+        ) : null}
       </section>
     </main>
   );
