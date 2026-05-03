@@ -19,18 +19,21 @@ type ExamEventRow = PublicTables["exam_events"]["Row"];
 type AuditLogRow = PublicTables["admin_audit_log"]["Row"];
 
 describe("Database type", () => {
-  it("exposes the public tables (+ J5 admin_audit_log + faculty_assignments)", () => {
+  it("exposes the public tables (+ J5 admin_audit_log + faculty_assignments + Faculty Platform tables)", () => {
     expectTypeOf<keyof PublicTables>().toEqualTypeOf<
       | "admin_audit_log"
       | "card_states"
-      | "content_flags"
       | "content_chapters"
+      | "content_flags"
+      | "content_mechanisms"
+      | "departments"
       | "exam_events"
       | "faculty_assignments"
       | "institutions"
       | "profiles"
       | "rate_limits"
       | "reviews"
+      | "role_permissions"
       | "study_sessions"
       | "subscriptions"
     >();
