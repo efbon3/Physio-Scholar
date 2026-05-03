@@ -323,31 +323,46 @@ export type Database = {
       faculty_assignments: {
         Row: {
           created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          decision_comment: string | null;
           description: string | null;
           due_at: string | null;
           faculty_id: string;
           id: string;
           institution_id: string;
+          status: string;
+          submitted_at: string | null;
           title: string;
           updated_at: string;
         };
         Insert: {
           created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_comment?: string | null;
           description?: string | null;
           due_at?: string | null;
           faculty_id: string;
           id?: string;
           institution_id: string;
+          status?: string;
+          submitted_at?: string | null;
           title: string;
           updated_at?: string;
         };
         Update: {
           created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_comment?: string | null;
           description?: string | null;
           due_at?: string | null;
           faculty_id?: string;
           id?: string;
           institution_id?: string;
+          status?: string;
+          submitted_at?: string | null;
           title?: string;
           updated_at?: string;
         };
