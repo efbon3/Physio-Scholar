@@ -25,7 +25,6 @@ describe("Database type", () => {
       | "card_states"
       | "content_chapters"
       | "content_flags"
-      | "content_mechanisms"
       | "departments"
       | "exam_events"
       | "faculty_assignments"
