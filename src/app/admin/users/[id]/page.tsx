@@ -11,6 +11,8 @@ import {
   unrejectUserAction,
 } from "../actions";
 
+import { RoleAndDepartmentEditor, type DepartmentOption } from "./role-and-department-editor";
+
 export const metadata = {
   title: "User · Admin",
 };
@@ -37,12 +39,24 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(
-      "id, full_name, nickname, roll_number, college_name, date_of_birth, address, phone, avatar_url, year_of_study, institution_id, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, rejected_at, rejected_by, rejection_reason, consent_terms_accepted_at, consent_privacy_accepted_at, consent_analytics, created_at, updated_at, deletion_requested_at",
+      "id, full_name, nickname, roll_number, college_name, date_of_birth, address, phone, avatar_url, year_of_study, institution_id, is_admin, is_faculty, approved_at, profile_completed_at, requested_role, rejected_at, rejected_by, rejection_reason, consent_terms_accepted_at, consent_privacy_accepted_at, consent_analytics, created_at, updated_at, deletion_requested_at, role, department_id",
     )
     .eq("id", id)
     .single();
 
   if (error || !profile) notFound();
+
+  // Department list for the role/department editor — same institution
+  // as the target user. Empty list when the user has no institution.
+  let departments: DepartmentOption[] = [];
+  if (profile.institution_id) {
+    const { data: deptRows } = await supabase
+      .from("departments")
+      .select("id, name")
+      .eq("institution_id", profile.institution_id)
+      .order("name", { ascending: true });
+    departments = (deptRows ?? []).map((d) => ({ id: d.id, name: d.name }));
+  }
 
   const [{ count: reviewCount }, { data: latestReview }] = await Promise.all([
     supabase.from("reviews").select("*", { count: "exact", head: true }).eq("profile_id", id),
@@ -128,6 +142,13 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           value={requestedRoleLabel(parseRequestedRole(profile.requested_role))}
         />
       </section>
+
+      <RoleAndDepartmentEditor
+        profileId={profile.id}
+        currentRole={profile.role ?? "student"}
+        currentDepartmentId={profile.department_id ?? null}
+        departments={departments}
+      />
 
       <ApprovalControls profile={profile} />
 

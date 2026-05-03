@@ -292,3 +292,164 @@ export async function revokeApprovalAction(targetProfileId: string): Promise<App
   revalidatePath("/admin/users");
   return { status: "ok" };
 }
+
+const FACULTY_ROLES: ReadonlyArray<"student" | "faculty" | "hod" | "admin"> = [
+  "student",
+  "faculty",
+  "hod",
+  "admin",
+] as const;
+
+const UUID_RE_FACULTY = /^[0-9a-f-]{36}$/i;
+
+/**
+ * Admin: change a user's canonical role (`student | faculty | hod |
+ * admin`). Also keeps the legacy boolean flags in sync so existing RLS
+ * policies that gate on `is_admin` / `is_faculty` keep working:
+ *
+ *   role='admin'   → is_admin=true,  is_faculty=true (admins do faculty things too)
+ *   role='hod'     → is_admin=false, is_faculty=true (HOD inherits faculty's RLS)
+ *   role='faculty' → is_admin=false, is_faculty=true
+ *   role='student' → is_admin=false, is_faculty=false
+ *
+ * The caller must be admin. The target can't demote themselves out of
+ * admin (a self-lockout is unrecoverable from the UI; another admin
+ * has to do it).
+ */
+export async function setUserRoleAction(
+  targetProfileId: string,
+  role: string,
+): Promise<ApprovalResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { status: "error", message: "Role editing is unavailable in this environment." };
+  }
+  if (!UUID_RE_FACULTY.test(targetProfileId)) {
+    return { status: "error", message: "Invalid target id." };
+  }
+  if (!FACULTY_ROLES.includes(role as (typeof FACULTY_ROLES)[number])) {
+    return { status: "error", message: `Unknown role: ${role}.` };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Please sign in." };
+
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+  if (!callerProfile?.is_admin) {
+    return { status: "error", message: "Only admins can set user roles." };
+  }
+
+  if (targetProfileId === user.id && role !== "admin") {
+    return {
+      status: "error",
+      message: "You can't demote your own admin role from this UI — ask another admin to do it.",
+    };
+  }
+
+  const isAdmin = role === "admin";
+  const isFaculty = role === "admin" || role === "faculty" || role === "hod";
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      role,
+      is_admin: isAdmin,
+      is_faculty: isFaculty,
+    })
+    .eq("id", targetProfileId);
+
+  if (error) {
+    return { status: "error", message: `Could not set role: ${error.message}` };
+  }
+
+  void writeAuditEntry({
+    action: "user.set_role",
+    target_type: "profile",
+    target_id: targetProfileId,
+    details: { role },
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${targetProfileId}`);
+  return { status: "ok" };
+}
+
+/**
+ * Admin: assign or clear a user's department. Pass `null` to unlink.
+ * The target department (when non-null) must belong to the same
+ * institution as the target user — checked here before the write.
+ */
+export async function setUserDepartmentAction(
+  targetProfileId: string,
+  departmentId: string | null,
+): Promise<ApprovalResult> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { status: "error", message: "Department assignment is unavailable here." };
+  }
+  if (!UUID_RE_FACULTY.test(targetProfileId)) {
+    return { status: "error", message: "Invalid target id." };
+  }
+  if (departmentId !== null && !UUID_RE_FACULTY.test(departmentId)) {
+    return { status: "error", message: "Invalid department id." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "Please sign in." };
+
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+  if (!callerProfile?.is_admin) {
+    return { status: "error", message: "Only admins can assign departments." };
+  }
+
+  if (departmentId !== null) {
+    const { data: target } = await supabase
+      .from("profiles")
+      .select("institution_id")
+      .eq("id", targetProfileId)
+      .single();
+    const { data: dept } = await supabase
+      .from("departments")
+      .select("institution_id")
+      .eq("id", departmentId)
+      .single();
+    if (!target || !dept || target.institution_id !== dept.institution_id) {
+      return {
+        status: "error",
+        message: "Department and user must share an institution.",
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ department_id: departmentId })
+    .eq("id", targetProfileId);
+
+  if (error) {
+    return { status: "error", message: `Could not save department: ${error.message}` };
+  }
+
+  void writeAuditEntry({
+    action: "user.set_department",
+    target_type: "profile",
+    target_id: targetProfileId,
+    details: { department_id: departmentId },
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${targetProfileId}`);
+  return { status: "ok" };
+}
