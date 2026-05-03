@@ -733,6 +733,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      weak_student_messages: {
+        Row: {
+          body: string;
+          id: string;
+          institution_id: string;
+          read_at: string | null;
+          recipient_id: string;
+          sender_id: string | null;
+          sent_at: string;
+        };
+        Insert: {
+          body: string;
+          id?: string;
+          institution_id: string;
+          read_at?: string | null;
+          recipient_id: string;
+          sender_id?: string | null;
+          sent_at?: string;
+        };
+        Update: {
+          body?: string;
+          id?: string;
+          institution_id?: string;
+          read_at?: string | null;
+          recipient_id?: string;
+          sender_id?: string | null;
+          sent_at?: string;
+        };
+        Relationships: [];
+      };
       study_sessions: {
         Row: {
           cards_correct: number;

@@ -11,6 +11,7 @@ import {
   TodayDashboard,
   type AnnouncementSummary,
   type FacultyAssignment,
+  type InboxMessageSummary,
   type UpcomingGoal,
 } from "./today-dashboard";
 
@@ -129,10 +130,11 @@ export default async function TodayPage() {
   // /faculty/assignments).
   let assignments: FacultyAssignment[] = [];
   let announcements: AnnouncementSummary[] = [];
+  let inboxMessages: InboxMessageSummary[] = [];
   if (user) {
     try {
       const supabaseForReads = await createClient();
-      const [assignmentsRes, announcementsRes] = await Promise.all([
+      const [assignmentsRes, announcementsRes, messagesRes] = await Promise.all([
         supabaseForReads
           .from("faculty_assignments")
           .select("id, title, due_at")
@@ -148,6 +150,15 @@ export default async function TodayPage() {
           .eq("status", "approved")
           .order("created_at", { ascending: false })
           .limit(3),
+        // Inbox: RLS limits to messages where recipient_id = auth.uid().
+        // Surface unread first, then a few read tail entries so the
+        // student keeps the trail.
+        supabaseForReads
+          .from("weak_student_messages")
+          .select("id, sender_id, body, sent_at, read_at")
+          .eq("recipient_id", user.id)
+          .order("sent_at", { ascending: false })
+          .limit(5),
       ]);
       assignments = (assignmentsRes.data ?? []).map((r) => ({
         id: r.id,
@@ -160,11 +171,33 @@ export default async function TodayPage() {
         body: r.body,
         createdAt: r.created_at,
       }));
+      const rawMessages = messagesRes.data ?? [];
+      const senderIds = Array.from(
+        new Set(rawMessages.map((m) => m.sender_id).filter((s): s is string => Boolean(s))),
+      );
+      const senderNameById = new Map<string, string>();
+      if (senderIds.length > 0) {
+        const { data: senderRows } = await supabaseForReads
+          .from("profiles")
+          .select("id, full_name, nickname")
+          .in("id", senderIds);
+        for (const s of senderRows ?? []) {
+          senderNameById.set(s.id, s.nickname || s.full_name || "(unknown)");
+        }
+      }
+      inboxMessages = rawMessages.map((m) => ({
+        id: m.id,
+        senderName: m.sender_id ? (senderNameById.get(m.sender_id) ?? "(unknown)") : "(former HOD)",
+        body: m.body,
+        sentAt: m.sent_at,
+        readAt: m.read_at,
+      }));
     } catch {
       // RLS hit / table not yet migrated → empty lists, cards show the
       // "no items yet" copy. Don't surface as an error.
       assignments = [];
       announcements = [];
+      inboxMessages = [];
     }
   }
 
@@ -180,6 +213,7 @@ export default async function TodayPage() {
       quote={quote}
       assignments={assignments}
       announcements={announcements}
+      inboxMessages={inboxMessages}
     />
   );
 }

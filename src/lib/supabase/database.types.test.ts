@@ -37,6 +37,7 @@ describe("Database type", () => {
       | "role_permissions"
       | "study_sessions"
       | "subscriptions"
+      | "weak_student_messages"
     >();
   });
 

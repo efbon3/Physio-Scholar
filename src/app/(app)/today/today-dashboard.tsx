@@ -7,6 +7,8 @@ import { EmptyState } from "@/components/empty-state";
 import type { Card } from "@/lib/content/cards";
 import type { Quote } from "@/lib/motivation/quotes";
 import { loadAllCardStates, loadAllReviews } from "@/lib/srs/local";
+
+import { InboxMessage } from "./inbox-message";
 import {
   computeProgressSnapshot,
   type ChapterProgress,
@@ -52,6 +54,15 @@ export type AnnouncementSummary = {
   createdAt: string;
 };
 
+export type InboxMessageSummary = {
+  id: string;
+  /** Display name of the sender — sender's nickname/full_name or "(former HOD)" if their profile was deleted. */
+  senderName: string;
+  body: string;
+  sentAt: string;
+  readAt: string | null;
+};
+
 /**
  * Today tab — post-login landing dashboard.
  *
@@ -79,6 +90,7 @@ export function TodayDashboard({
   quote,
   assignments,
   announcements,
+  inboxMessages,
 }: {
   cards: readonly Card[];
   greetingName: string;
@@ -96,6 +108,8 @@ export function TodayDashboard({
   assignments: readonly FacultyAssignment[];
   /** Up to three approved announcements targeting the learner's batch. */
   announcements: readonly AnnouncementSummary[];
+  /** Up to five most recent HOD/admin → student messages. */
+  inboxMessages: readonly InboxMessageSummary[];
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
 
@@ -198,8 +212,40 @@ export function TodayDashboard({
         <FacultyHomeworkCard assignments={assignments} />
       </section>
 
+      {inboxMessages.length > 0 ? <InboxCard messages={inboxMessages} /> : null}
       {announcements.length > 0 ? <AnnouncementsCard announcements={announcements} /> : null}
     </main>
+  );
+}
+
+function InboxCard({ messages }: { messages: readonly InboxMessageSummary[] }) {
+  const unreadCount = messages.filter((m) => m.readAt === null).length;
+  return (
+    <section
+      aria-label="Direct messages"
+      className="border-border bg-card flex flex-col gap-3 rounded-md border p-4"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-heading text-sm font-semibold tracking-wide uppercase">Inbox</h2>
+        {unreadCount > 0 ? (
+          <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+            {unreadCount} unread
+          </span>
+        ) : null}
+      </div>
+      <ul className="flex flex-col gap-2">
+        {messages.map((m) => (
+          <InboxMessage
+            key={m.id}
+            id={m.id}
+            senderName={m.senderName}
+            body={m.body}
+            sentAt={m.sentAt}
+            initiallyRead={m.readAt !== null}
+          />
+        ))}
+      </ul>
+    </section>
   );
 }
 

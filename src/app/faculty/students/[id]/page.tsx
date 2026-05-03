@@ -5,6 +5,8 @@ import { extractCards, type Card } from "@/lib/content/cards";
 import { readAllChapters } from "@/lib/content/source";
 import { createClient } from "@/lib/supabase/server";
 
+import { MessageComposer } from "./message-composer";
+
 export const metadata = {
   title: "Student detail · Faculty",
 };
@@ -68,11 +70,14 @@ export default async function FacultyStudentDetailPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_faculty, is_admin, institution_id")
+    .select("is_faculty, is_admin, institution_id, role")
     .eq("id", user.id)
     .single();
   if (!profile?.is_faculty && !profile?.is_admin) redirect("/today");
   if (!profile.institution_id) redirect("/faculty/students");
+
+  const callerRole = profile.role ?? "student";
+  const canMessageStudent = Boolean(profile.is_admin) || callerRole === "hod";
 
   // Three RPCs in parallel.
   const [summaryRes, aggRes, recentRes] = await Promise.all([
@@ -148,6 +153,10 @@ export default async function FacultyStudentDetailPage({
           />
         </dl>
       </section>
+
+      {canMessageStudent ? (
+        <MessageComposer recipientId={studentId} recipientName={greetingName} />
+      ) : null}
 
       <section aria-label="Chapter breakdown" className="flex flex-col gap-3">
         <h2 className="font-heading text-xl font-medium">Chapter breakdown</h2>
