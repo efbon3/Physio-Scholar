@@ -207,6 +207,12 @@ export function TodayDashboard({
           >
             Change topic
           </Link>
+          <Link
+            href="/me/bookmarks"
+            className="text-muted-foreground hover:bg-muted text-foreground rounded-md border px-2 py-0.5 text-xs"
+          >
+            ★ Bookmarks
+          </Link>
         </div>
       </header>
 

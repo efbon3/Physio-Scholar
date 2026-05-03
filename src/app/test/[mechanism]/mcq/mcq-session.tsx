@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { FlagCard } from "@/app/review/components/flag-card";
+import { BookmarkButton } from "@/components/bookmark-button";
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import type { McqQuestion } from "@/lib/content/exam";
@@ -17,6 +18,8 @@ type Props = {
   chapterId: string;
   mechanismSystem: string;
   profileId: string;
+  /** Card ids the calling student has already bookmarked. */
+  bookmarkedCardIds?: readonly string[];
 };
 
 type SessionStatus = "answering" | "feedback" | "complete";
@@ -68,7 +71,15 @@ const DONT_KNOW = -1 as const;
  * §2.3 — review row still records (analytics), card_state stays
  * untouched. Locked once the first answer is committed.
  */
-export function McqSession({ questions, cards, chapterId, mechanismSystem, profileId }: Props) {
+export function McqSession({
+  questions,
+  cards,
+  chapterId,
+  mechanismSystem,
+  profileId,
+  bookmarkedCardIds = [],
+}: Props) {
+  const bookmarkedSet = useMemo(() => new Set(bookmarkedCardIds), [bookmarkedCardIds]);
   const [index, setIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [status, setStatus] = useState<SessionStatus>("answering");
@@ -276,7 +287,13 @@ export function McqSession({ questions, cards, chapterId, mechanismSystem, profi
         )}
       </header>
 
-      <p className="text-base leading-relaxed">{question.stem}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-base leading-relaxed">{question.stem}</p>
+        <BookmarkButton
+          cardId={question.cardId}
+          initiallyBookmarked={bookmarkedSet.has(question.cardId)}
+        />
+      </div>
 
       <ul className="flex flex-col gap-2">
         {question.options.map((option, i) => {

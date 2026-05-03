@@ -327,6 +327,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      card_bookmarks: {
+        Row: {
+          card_id: string;
+          created_at: string;
+          id: string;
+          profile_id: string;
+        };
+        Insert: {
+          card_id: string;
+          created_at?: string;
+          id?: string;
+          profile_id: string;
+        };
+        Update: {
+          card_id?: string;
+          created_at?: string;
+          id?: string;
+          profile_id?: string;
+        };
+        Relationships: [];
+      };
       batches: {
         Row: {
           created_at: string;

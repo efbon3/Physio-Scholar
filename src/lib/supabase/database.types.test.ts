@@ -27,6 +27,7 @@ describe("Database type", () => {
       | "attendance_codes"
       | "attendance_records"
       | "batches"
+      | "card_bookmarks"
       | "card_states"
       | "class_sessions"
       | "content_chapters"

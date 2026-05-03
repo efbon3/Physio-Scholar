@@ -33,6 +33,20 @@ async function getProfileId(nextPath: string): Promise<string> {
   }
 }
 
+async function getBookmarkedCardIds(profileId: string): Promise<string[]> {
+  if (profileId === "preview" || !process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("card_bookmarks")
+      .select("card_id")
+      .eq("profile_id", profileId);
+    return (data ?? []).map((r) => r.card_id);
+  } catch {
+    return [];
+  }
+}
+
 export default async function DescriptiveSessionPage({
   params,
   searchParams,
@@ -43,6 +57,7 @@ export default async function DescriptiveSessionPage({
   if (!chapter) notFound();
 
   const profileId = await getProfileId(`/test/${id}/descriptive`);
+  const bookmarkedCardIds = await getBookmarkedCardIds(profileId);
 
   const allCards = extractCards(chapter);
   const formatCards = filterByFormat(filterPublished(allCards), "descriptive");
@@ -86,6 +101,7 @@ export default async function DescriptiveSessionPage({
           chapterId={id}
           mechanismSystem={chapter.frontmatter.organ_system}
           profileId={profileId}
+          bookmarkedCardIds={bookmarkedCardIds}
         />
       )}
     </main>

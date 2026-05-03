@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { FlagCard } from "@/app/review/components/flag-card";
+import { BookmarkButton } from "@/components/bookmark-button";
 import { buttonVariants } from "@/components/ui/button";
 import type { Card } from "@/lib/content/cards";
 import { bandToRating, type GradingBand } from "@/lib/grading/rating-mapping";
@@ -15,6 +16,7 @@ type Props = {
   chapterId: string;
   mechanismSystem: string;
   profileId: string;
+  bookmarkedCardIds?: readonly string[];
 };
 
 type SessionStatus = "answering" | "revealed" | "method" | "complete";
@@ -79,7 +81,14 @@ function readEngagementDefault(): EngagementMethod | null {
  * see build spec §2.6 ("the student must read the model answer
  * before rating").
  */
-export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileId }: Props) {
+export function DescriptiveSession({
+  cards,
+  chapterId,
+  mechanismSystem,
+  profileId,
+  bookmarkedCardIds = [],
+}: Props) {
+  const bookmarkedSet = useMemo(() => new Set(bookmarkedCardIds), [bookmarkedCardIds]);
   const [index, setIndex] = useState(0);
   const [studentAnswer, setStudentAnswer] = useState("");
   const [dontKnow, setDontKnow] = useState(false);
@@ -336,7 +345,10 @@ export function DescriptiveSession({ cards, chapterId, mechanismSystem, profileI
         )}
       </header>
 
-      <p className="text-base leading-relaxed">{card.stem}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-base leading-relaxed">{card.stem}</p>
+        <BookmarkButton cardId={card.id} initiallyBookmarked={bookmarkedSet.has(card.id)} />
+      </div>
 
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-sm">
