@@ -36,6 +36,15 @@ const MAX_MARKS_SCHEMA = z
       z.number().positive("Max marks must be > 0").max(10000, "Max marks too large"),
     ]),
   );
+const LINK_URL_SCHEMA = z
+  .union([
+    z.literal(""),
+    z
+      .string()
+      .max(2000, "Link URL is too long")
+      .regex(/^https?:\/\//i, "Link URL must start with http:// or https://"),
+  ])
+  .transform((v) => (v === "" ? null : v));
 
 const createSchema = z.object({
   title: TITLE_SCHEMA,
@@ -43,6 +52,7 @@ const createSchema = z.object({
   due_at: DUE_AT_SCHEMA,
   target_batch_ids: TARGET_BATCH_IDS_SCHEMA,
   max_marks: MAX_MARKS_SCHEMA,
+  link_url: LINK_URL_SCHEMA,
 });
 
 const updateSchema = createSchema.extend({
@@ -91,6 +101,7 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
     due_at: formData.get("due_at")?.toString() ?? "",
     target_batch_ids: pickTargetBatchIds(formData),
     max_marks: formData.get("max_marks")?.toString() ?? "",
+    link_url: formData.get("link_url")?.toString() ?? "",
   });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid form input." };
@@ -112,6 +123,7 @@ export async function createAssignmentAction(formData: FormData): Promise<Assign
       due_at: parsed.data.due_at,
       target_batch_ids: parsed.data.target_batch_ids,
       max_marks: parsed.data.max_marks,
+      link_url: parsed.data.link_url,
       status: initialStatus,
     })
     .select("id")
@@ -207,6 +219,7 @@ export async function updateAssignmentAction(formData: FormData): Promise<Assign
     due_at: formData.get("due_at")?.toString() ?? "",
     target_batch_ids: pickTargetBatchIds(formData),
     max_marks: formData.get("max_marks")?.toString() ?? "",
+    link_url: formData.get("link_url")?.toString() ?? "",
   });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid form input." };
@@ -220,6 +233,7 @@ export async function updateAssignmentAction(formData: FormData): Promise<Assign
       due_at: parsed.data.due_at,
       target_batch_ids: parsed.data.target_batch_ids,
       max_marks: parsed.data.max_marks,
+      link_url: parsed.data.link_url,
     })
     .eq("id", parsed.data.id);
   if (error) {

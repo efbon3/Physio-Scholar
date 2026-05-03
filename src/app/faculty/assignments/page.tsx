@@ -78,7 +78,7 @@ export default async function FacultyAssignmentsPage() {
     supabase
       .from("faculty_assignments")
       .select(
-        "id, title, description, due_at, created_at, faculty_id, status, decision_comment, submitted_at, target_batch_ids, max_marks",
+        "id, title, description, due_at, created_at, faculty_id, status, decision_comment, submitted_at, target_batch_ids, max_marks, link_url",
       )
       .eq("institution_id", profile.institution_id)
       .order("due_at", { ascending: true, nullsFirst: false })
@@ -159,6 +159,16 @@ export default async function FacultyAssignmentsPage() {
                   </div>
                   {a.description ? (
                     <p className="text-sm whitespace-pre-wrap">{a.description}</p>
+                  ) : null}
+                  {a.link_url ? (
+                    <a
+                      href={a.link_url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-primary text-xs underline-offset-2 hover:underline"
+                    >
+                      {a.link_url}
+                    </a>
                   ) : null}
                   {a.decision_comment &&
                   (a.status === "rejected" || a.status === "changes_requested") ? (

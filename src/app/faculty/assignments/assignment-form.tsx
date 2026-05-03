@@ -116,6 +116,22 @@ export function AssignmentForm({ batches }: { batches: AssignmentBatchOption[] }
       </div>
 
       <div className="flex flex-col gap-1.5">
+        <Label htmlFor="assignment-link">Link URL (optional)</Label>
+        <Input
+          id="assignment-link"
+          name="link_url"
+          type="url"
+          inputMode="url"
+          maxLength={2000}
+          placeholder="https://forms.gle/… or https://drive.google.com/…"
+        />
+        <p className="text-muted-foreground text-xs">
+          Optional external link (Google Form, Drive doc, video). Students see an &ldquo;Open
+          assignment&rdquo; button on their dashboard.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="assignment-targets">Target batches (leave empty to broadcast)</Label>
         <select
           id="assignment-targets"

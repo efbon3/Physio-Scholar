@@ -44,6 +44,8 @@ export type FacultyAssignment = {
   title: string;
   /** ISO timestamp or null when there's no deadline. */
   dueAt: string | null;
+  /** Optional external link (Google Form, Drive, etc.). null when faculty didn't attach one. */
+  linkUrl: string | null;
 };
 
 export type AnnouncementSummary = {
@@ -515,6 +517,16 @@ function FacultyHomeworkCard({ assignments }: { assignments: readonly FacultyAss
           <li key={a.id} className="flex flex-col gap-0.5">
             <span className="text-sm font-medium">{a.title}</span>
             <span className="text-muted-foreground text-xs">{formatAssignmentDue(a.dueAt)}</span>
+            {a.linkUrl ? (
+              <a
+                href={a.linkUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-primary mt-0.5 self-start text-xs underline-offset-2 hover:underline"
+              >
+                Open assignment →
+              </a>
+            ) : null}
           </li>
         ))}
       </ul>

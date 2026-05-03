@@ -142,7 +142,7 @@ export default async function TodayPage() {
       const [assignmentsRes, announcementsRes, messagesRes] = await Promise.all([
         supabaseForReads
           .from("faculty_assignments")
-          .select("id, title, due_at")
+          .select("id, title, due_at, link_url")
           .or(`due_at.gte.${now.toISOString()},due_at.is.null`)
           .order("due_at", { ascending: true, nullsFirst: false })
           .limit(3),
@@ -169,6 +169,7 @@ export default async function TodayPage() {
         id: r.id,
         title: r.title,
         dueAt: r.due_at,
+        linkUrl: r.link_url,
       }));
       announcements = (announcementsRes.data ?? []).map((r) => ({
         id: r.id,

@@ -503,6 +503,7 @@ export type Database = {
           faculty_id: string;
           id: string;
           institution_id: string;
+          link_url: string | null;
           max_marks: number | null;
           status: string;
           submitted_at: string | null;
@@ -520,6 +521,7 @@ export type Database = {
           faculty_id: string;
           id?: string;
           institution_id: string;
+          link_url?: string | null;
           max_marks?: number | null;
           status?: string;
           submitted_at?: string | null;
@@ -537,6 +539,7 @@ export type Database = {
           faculty_id?: string;
           id?: string;
           institution_id?: string;
+          link_url?: string | null;
           max_marks?: number | null;
           status?: string;
           submitted_at?: string | null;
