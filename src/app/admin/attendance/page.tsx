@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
 
 import { AttendanceCodeRow } from "./attendance-code-row";
@@ -161,6 +163,15 @@ export default async function AdminAttendancePage() {
           </ul>
         )}
       </section>
+
+      <footer data-print="hide" className="border-border mt-8 border-t pt-4">
+        <Link
+          href="/admin"
+          className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline"
+        >
+          ← Back to admin
+        </Link>
+      </footer>
     </main>
   );
 }

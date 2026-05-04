@@ -153,6 +153,14 @@ function Shell({ children }: { children: React.ReactNode }) {
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Content flags</h1>
       </header>
       {children}
+      <footer data-print="hide" className="border-border mt-8 border-t pt-4">
+        <Link
+          href="/admin"
+          className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline"
+        >
+          ← Back to admin
+        </Link>
+      </footer>
     </main>
   );
 }

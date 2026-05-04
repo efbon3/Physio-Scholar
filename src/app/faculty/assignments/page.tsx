@@ -222,9 +222,9 @@ export default async function FacultyAssignmentsPage() {
       </section>
 
       <footer className="border-border border-t pt-4">
-        <Link href="/today">
+        <Link href="/faculty">
           <Button variant="ghost" size="sm">
-            Back to dashboard
+            ← Back to faculty hub
           </Button>
         </Link>
       </footer>

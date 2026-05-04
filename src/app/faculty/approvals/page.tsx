@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
 import { DecisionBar } from "./decision-bar";
@@ -325,6 +327,14 @@ export default async function FacultyApprovalsPage() {
           ) : null}
         </>
       )}
+
+      <footer data-print="hide" className="border-border border-t pt-4">
+        <Link href="/faculty">
+          <Button variant="ghost" size="sm">
+            ← Back to faculty hub
+          </Button>
+        </Link>
+      </footer>
     </main>
   );
 }
